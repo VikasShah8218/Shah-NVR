@@ -26,11 +26,12 @@ from app.recordings.services import deletion_tick, scan_tick, upload_tick
 from database.config import TORTOISE_ORM
 from settings.settings import settings
 from utilities.common import run_periodic
+from utilities.logbuffer import log_buffer
 
-logging.basicConfig(
-    level=settings.LOG_LEVEL,
-    format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
-)
+LOG_FORMAT = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
+logging.basicConfig(level=settings.LOG_LEVEL, format=LOG_FORMAT)
+log_buffer.setFormatter(logging.Formatter(LOG_FORMAT))
+logging.getLogger().addHandler(log_buffer)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger("node")
 

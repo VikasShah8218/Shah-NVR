@@ -2,7 +2,7 @@
 
   MediaMTX writes chunk  ->  scanner finds finished chunk  ->  indexer (byte offsets of keyframe parts)
   ->  LocalSegment row (SQLite, upload queue)  ->  uploader batches metadata to central
-  ->  retention / disk-pressure deletes files and confirms to central.
+  ->  retention / disk-pressure / storage-quota cleanup deletes files and confirms to central.
 """
 
 import asyncio
@@ -11,6 +11,8 @@ import os
 import time
 from datetime import timedelta
 from pathlib import Path
+
+from tortoise.functions import Sum
 
 from app.node.models import KeyValue
 from app.node.services import disk_info
@@ -23,11 +25,14 @@ from utilities.common import utcnow
 logger = logging.getLogger("node.recordings")
 
 KV_PENDING_DELETED = "pending_deleted"
+QUOTA_HIGH = 0.95  # start deleting above 95% of the storage quota
+QUOTA_LOW = 0.90  # ...until usage is below 90%
 UPLOAD_BATCH = 200
 RECENT_DAY_DIRS = 2  # after the first full scan, only the newest N day folders are scanned
 
 _known: set[str] = set()
 _full_scan_done = False
+_used_cache: tuple[float, int] = (0.0, 0)
 
 
 # ---------------------------------------------------------------- scanner
@@ -227,6 +232,51 @@ async def disk_pressure_cleanup() -> list[str]:
     return deleted
 
 
+async def recordings_used_bytes(max_age_seconds: float = 30.0) -> int:
+    """Total size of indexed chunks on this node (cached for `max_age_seconds`)."""
+    global _used_cache
+    if time.monotonic() - _used_cache[0] > max_age_seconds:
+        rows = await LocalSegment.all().annotate(total=Sum("size_bytes")).values("total")
+        _used_cache = (time.monotonic(), int((rows[0]["total"] if rows else 0) or 0))
+    return _used_cache[1]
+
+
+async def quota_cleanup() -> list[str]:
+    """If recordings exceed QUOTA_HIGH of the storage quota set by central, delete the oldest
+    chunks (never newer than DISK_MIN_KEEP_HOURS) until usage drops below QUOTA_LOW."""
+    quota = runtime.storage_quota_bytes
+    if not quota:
+        return []
+    used = await recordings_used_bytes(max_age_seconds=0)
+    if used <= quota * QUOTA_HIGH:
+        return []
+    keep_after = utcnow() - timedelta(hours=settings.DISK_MIN_KEEP_HOURS)
+    deleted: list[str] = []
+    while used > quota * QUOTA_LOW:
+        # Pick just enough of the oldest chunks to get below QUOTA_LOW.
+        oldest = await LocalSegment.filter(start_time__lt=keep_after).order_by("start_time").limit(200)
+        if not oldest:
+            logger.error("Recordings above storage quota but nothing old enough to delete")
+            break
+        batch, freed = [], 0
+        for s in oldest:
+            if used - freed <= quota * QUOTA_LOW:
+                break
+            batch.append(s)
+            freed += s.size_bytes
+        sizes = {str(s.id): s.size_bytes for s in batch}
+        removed = await _delete_local([(str(s.id), s.rel_path) for s in batch])
+        used -= sum(sizes[i] for i in removed)
+        deleted += removed
+        if not removed:
+            break
+    if deleted:
+        logger.warning("Storage quota: deleted %s oldest chunk(s); now %.2f GB of %.2f GB",
+                       len(deleted), used / 1024**3, quota / 1024**3)
+    await recordings_used_bytes(max_age_seconds=0)
+    return deleted
+
+
 async def deletion_tick() -> None:
     deleted: list[str] = []
     if runtime.node_id is not None:
@@ -239,6 +289,7 @@ async def deletion_tick() -> None:
             deleted += await _delete_local([(d["id"], d["file_path"]) for d in todo])
             logger.info("Retention: deleted %s chunk(s)", len(deleted))
     deleted += await disk_pressure_cleanup()
+    deleted += await quota_cleanup()
     await _confirm(deleted)
 
 

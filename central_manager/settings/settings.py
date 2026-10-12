@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     LOG_LEVEL: str = "INFO"
+    # Browser origins allowed to call this API (comma-separated, "*" = any). Needed by nvr_client.
+    CORS_ORIGINS: str = "*"
 
     # Database (PostgreSQL)
     DB_HOST: str = "localhost"
@@ -45,6 +47,10 @@ class Settings(BaseSettings):
     DEFAULT_RETENTION_DAYS: int = 7
     PLAYBACK_GAP_TOLERANCE_SECONDS: float = 2.0
     PLAYBACK_MAX_HOURS: int = 24
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
     @property
     def db_url(self) -> str:

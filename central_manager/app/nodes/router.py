@@ -19,6 +19,7 @@ from app.nodes.schemas import (
     StreamAssignment,
     StreamStatusBatchIn,
 )
+from app.recordings.models import RecordingSegment
 from settings.settings import settings
 from utilities.common import utcnow
 
@@ -60,9 +61,30 @@ async def get_node(node_id: int):
 async def update_node(node_id: int, body: NodeUpdate):
     node = await _get_node(node_id)
     data = body.model_dump(exclude_unset=True)
+    if "storage_quota_gb" in data:
+        gb = data.pop("storage_quota_gb")
+        node.storage_quota_bytes = int(gb * 1024**3) if gb is not None else None
     if data:
-        await node.update_from_dict(data).save()
+        node.update_from_dict(data)
+    await node.save()
     return await _node_out(node)
+
+
+@router.delete("/{node_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Remove a retired node")
+async def delete_node(node_id: int, force: bool = False):
+    """Refused while cameras are assigned. Refused if the node still has recordings in the
+    catalog unless force=true (which also removes that recordings index). A node that is still
+    running will register itself again."""
+    node = await _get_node(node_id)
+    if await CameraAssignment.filter(node_id=node.id).exists():
+        raise HTTPException(status.HTTP_409_CONFLICT, "Node still has cameras assigned. Drain it first.")
+    if not force and await RecordingSegment.filter(node_id=node.id).exists():
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Node has recordings in the catalog. Use force=true to delete the node and its recordings index.",
+        )
+    await node.delete()
+    logger.info("Node %s (%s) deleted by admin (force=%s)", node.id, node.name, force)
 
 
 async def _set_state(node_id: int, new_state: NodeState) -> NodeOut:
@@ -127,7 +149,13 @@ async def heartbeat(node_id: int, body: HeartbeatIn):
     node.metrics = body.model_dump()
     await node.save(update_fields=["state", "last_heartbeat_at", "metrics", "updated_at"])
 
-    return HeartbeatOut(node_id=node.id, state=node.state, lease_expires_at=lease_expires_at, assignments=assigned)
+    return HeartbeatOut(
+        node_id=node.id,
+        state=node.state,
+        lease_expires_at=lease_expires_at,
+        assignments=assigned,
+        storage_quota_bytes=node.storage_quota_bytes,
+    )
 
 
 @internal_router.get("/{node_id}/assignments", response_model=AssignmentsOut)

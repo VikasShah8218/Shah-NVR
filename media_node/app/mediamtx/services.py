@@ -11,6 +11,18 @@ from settings.settings import settings
 logger = logging.getLogger("node.mediamtx")
 
 
+MAX_LOG_BYTES = 20 * 1024 * 1024
+
+
+def _rotate(log_path) -> None:
+    """Keep one previous MediaMTX log; rotate when the current one exceeds MAX_LOG_BYTES."""
+    try:
+        if log_path.exists() and log_path.stat().st_size > MAX_LOG_BYTES:
+            log_path.replace(log_path.with_suffix(".log.1"))
+    except OSError as exc:
+        logger.warning("Could not rotate %s: %s", log_path, exc)
+
+
 def kill_orphan_mediamtx() -> None:
     """If the agent was killed hard, its MediaMTX child may still hold our ports. Stop it."""
     for conn in psutil.net_connections(kind="tcp"):
@@ -56,6 +68,7 @@ class MediaMTXSupervisor:
         log_dir.mkdir(parents=True, exist_ok=True)
         backoff = 1.0
         while not self._stopping:
+            _rotate(log_dir / "mediamtx.log")
             config_path = write_config()
             with open(log_dir / "mediamtx.log", "ab") as log:
                 self._proc = await asyncio.create_subprocess_exec(

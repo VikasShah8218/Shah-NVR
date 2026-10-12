@@ -26,6 +26,8 @@ class MediaNode(Model):
     hls_port = fields.IntField(default=8888)
     webrtc_port = fields.IntField(default=8889)
     capacity_cameras = fields.IntField(default=100)
+    # Max bytes this node may use for recordings (None = limited only by the disk). Enforced on the node.
+    storage_quota_bytes = fields.BigIntField(null=True)
     version = fields.CharField(max_length=64, null=True)
     mediamtx_version = fields.CharField(max_length=64, null=True)
     state = fields.CharEnumField(NodeState, max_length=16, default=NodeState.READY)

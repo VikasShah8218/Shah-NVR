@@ -1,4 +1,6 @@
-from fastapi import APIRouter
+from typing import Literal
+
+from fastapi import APIRouter, Query
 
 from app.mediamtx.utils import mtx
 from app.node.schemas import NodeStatusOut
@@ -6,6 +8,7 @@ from app.node.services import disk_info
 from app.node.utils import runtime
 from app.recordings.models import LocalSegment
 from settings.settings import settings
+from utilities.logbuffer import log_buffer
 
 router = APIRouter(prefix="/api/v1", tags=["Node"])
 
@@ -38,3 +41,26 @@ async def node_assignments():
 @router.get("/mediamtx/paths", summary="Live MediaMTX path state (debug)")
 async def mediamtx_paths():
     return list((await mtx.list_runtime_paths()).values())
+
+
+def _tail_file(path, lines: int) -> list[str]:
+    if not path.exists():
+        return []
+    with open(path, "rb") as f:
+        f.seek(0, 2)
+        size = f.tell()
+        f.seek(max(0, size - 256 * 1024))
+        data = f.read().decode("utf-8", "replace")
+    return data.splitlines()[-lines:]
+
+
+@router.get("/logs", summary="Recent log lines of the agent or MediaMTX")
+async def node_logs(
+    source: Literal["agent", "mediamtx"] = "agent",
+    lines: int = Query(default=200, ge=1, le=2000),
+):
+    if source == "agent":
+        out = log_buffer.tail(lines)
+    else:
+        out = _tail_file(settings.DATA_DIR / "logs" / "mediamtx.log", lines)
+    return {"source": source, "lines": out}

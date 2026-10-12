@@ -34,10 +34,24 @@ class DiskInfo(BaseModel):
     used_percent: float
 
 
+class GpuInfo(BaseModel):
+    name: str
+    utilization_percent: float | None = None
+    memory_used_bytes: int | None = None
+    memory_total_bytes: int | None = None
+
+
 class HeartbeatIn(BaseModel):
     cpu_percent: float | None = None
+    cpu_count: int | None = None
     memory_percent: float | None = None
+    memory_total_bytes: int | None = None
+    memory_used_bytes: int | None = None
+    gpus: list[GpuInfo] = []
     disk: DiskInfo | None = None
+    recordings_bytes: int | None = None
+    net_rx_mbps: float | None = None
+    net_tx_mbps: float | None = None
     mediamtx_running: bool = True
     paths_configured: int = 0
     paths_ready: int = 0
@@ -50,6 +64,7 @@ class HeartbeatOut(BaseModel):
     state: NodeState
     lease_expires_at: datetime
     assignments: int
+    storage_quota_bytes: int | None = None
 
 
 class StreamAssignment(BaseModel):
@@ -97,6 +112,7 @@ class NodeOut(BaseModel):
     hls_port: int
     webrtc_port: int
     capacity_cameras: int
+    storage_quota_bytes: int | None
     version: str | None
     mediamtx_version: str | None
     state: NodeState
@@ -107,3 +123,5 @@ class NodeOut(BaseModel):
 
 class NodeUpdate(BaseModel):
     capacity_cameras: int | None = Field(default=None, ge=1)
+    # Recordings storage limit in GB. Send null to remove the limit (use the whole disk).
+    storage_quota_gb: float | None = Field(default=None, gt=0)
