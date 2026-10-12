@@ -1,0 +1,163 @@
+import { Camera as CameraIcon, History, MonitorPlay, MoreHorizontal, Pencil, Plus, Search, Trash2 } from "lucide-react"
+import { useState } from "react"
+import { Link, useNavigate } from "react-router"
+import { useCameras, useDeleteCamera, useUpdateCamera } from "@/api/queries"
+import type { Camera } from "@/api/types"
+import { ConfirmDialog, EmptyState, ErrorState, Loading, PageHeader } from "@/components/common"
+import { StatusBadge } from "@/components/StatusBadge"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { timeAgo } from "@/lib/format"
+import { CameraFormSheet } from "./CameraFormSheet"
+
+export function CamerasPage() {
+  const cameras = useCameras()
+  const [search, setSearch] = useState("")
+  const [editing, setEditing] = useState<Camera | "new" | null>(null)
+
+  const list = (cameras.data ?? []).filter(
+    (c) => c.name.toLowerCase().includes(search.toLowerCase()) || String(c.id) === search.trim(),
+  )
+
+  return (
+    <div>
+      <PageHeader
+        title="Cameras"
+        description="Register cameras, their streams and how long recordings are kept."
+        actions={
+          <>
+            <div className="relative w-60">
+              <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
+              <Input className="pl-8" placeholder="Search cameras" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <Button onClick={() => setEditing("new")}>
+              <Plus className="size-4" /> Add camera
+            </Button>
+          </>
+        }
+      />
+      {cameras.isLoading && <Loading />}
+      {cameras.error && <ErrorState error={cameras.error} />}
+      {cameras.data && cameras.data.length === 0 && (
+        <EmptyState icon={CameraIcon} title="No cameras yet">
+          Click <b>Add camera</b> and enter the camera's RTSP URL.
+        </EmptyState>
+      )}
+      {list.length > 0 && (
+        <Card className="overflow-hidden py-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-12 pl-4">#</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Streams</TableHead>
+                <TableHead>Media node</TableHead>
+                <TableHead>Retention</TableHead>
+                <TableHead>Last recording</TableHead>
+                <TableHead>Enabled</TableHead>
+                <TableHead className="w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {list.map((c) => (
+                <CameraRow key={c.id} camera={c} onEdit={() => setEditing(c)} />
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+      {editing && (
+        <CameraFormSheet camera={editing === "new" ? undefined : editing} open onOpenChange={(o) => !o && setEditing(null)} />
+      )}
+    </div>
+  )
+}
+
+function CameraRow({ camera: c, onEdit }: { camera: Camera; onEdit: () => void }) {
+  const navigate = useNavigate()
+  const update = useUpdateCamera()
+  const del = useDeleteCamera()
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const lastSegment = c.streams
+    .map((s) => s.last_segment_at)
+    .filter(Boolean)
+    .sort()
+    .pop()
+
+  return (
+    <TableRow className="cursor-pointer" onClick={() => navigate(`/cameras/${c.id}`)}>
+      <TableCell className="pl-4 text-muted-foreground tabular-nums">{c.id}</TableCell>
+      <TableCell>
+        <div className="font-medium">{c.name}</div>
+        {c.description && <div className="max-w-xs truncate text-xs text-muted-foreground">{c.description}</div>}
+      </TableCell>
+      <TableCell>
+        <div className="flex flex-wrap gap-1.5">
+          {c.streams.map((s) => (
+            <span key={s.profile} className="flex items-center gap-1 text-xs">
+              <span className="text-muted-foreground">{s.profile}</span>
+              <StatusBadge status={s.status} title={s.status_detail ?? undefined} />
+            </span>
+          ))}
+        </div>
+      </TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        {c.assignment?.node_id ? (
+          <Link to={`/nodes/${c.assignment.node_id}`} className="hover:text-primary">
+            {c.assignment.node_name}
+          </Link>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </TableCell>
+      <TableCell className="tabular-nums">{c.retention_days} days</TableCell>
+      <TableCell className="text-xs text-muted-foreground">{lastSegment ? timeAgo(lastSegment) : "—"}</TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        <Switch checked={c.enabled} disabled={update.isPending} onCheckedChange={(v) => update.mutate({ id: c.id, body: { enabled: v } })} />
+      </TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="size-8">
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onEdit}>
+              <Pencil className="size-4" /> Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/cameras/${c.id}`)}>
+              <MonitorPlay className="size-4" /> Live preview
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/playback?camera=${c.id}`)}>
+              <History className="size-4" /> Recordings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-danger focus:text-danger" onClick={() => setConfirmDelete(true)}>
+              <Trash2 className="size-4" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <ConfirmDialog
+          open={confirmDelete}
+          onOpenChange={setConfirmDelete}
+          title={`Delete ${c.name}?`}
+          description="Only cameras without recordings can be deleted. If it has recordings, disable it instead; they are removed by retention."
+          confirmLabel="Delete camera"
+          destructive
+          onConfirm={() => del.mutate(c.id)}
+        />
+      </TableCell>
+    </TableRow>
+  )
+}

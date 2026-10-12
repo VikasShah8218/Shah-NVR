@@ -1,0 +1,116 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Geist Variable', sans-serif;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-info: var(--info);
+    --color-danger: var(--danger);
+    --color-video: var(--video-bg);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Dusk slate theme: soft dark, easy on the eyes for long monitoring sessions. */
+:root {
+    --background: #2e3440;
+    --foreground: #eceff4;
+    --card: #3b4252;
+    --card-foreground: #eceff4;
+    --popover: #3b4252;
+    --popover-foreground: #eceff4;
+    --primary: #88c0d0;
+    --primary-foreground: #242933;
+    --secondary: #434c5e;
+    --secondary-foreground: #eceff4;
+    --muted: #353c4a;
+    --muted-foreground: #a9b1c2;
+    --accent: #434c5e;
+    --accent-foreground: #eceff4;
+    --destructive: #bf616a;
+    --border: #4c566a;
+    --input: #4c566a;
+    --ring: #88c0d0;
+    --chart-1: #88c0d0;
+    --chart-2: #a3be8c;
+    --chart-3: #ebcb8b;
+    --chart-4: #b48ead;
+    --chart-5: #d08770;
+    --radius: 0.625rem;
+    --sidebar: #272c36;
+    --sidebar-foreground: #d8dee9;
+    --sidebar-primary: #88c0d0;
+    --sidebar-primary-foreground: #242933;
+    --sidebar-accent: #3b4252;
+    --sidebar-accent-foreground: #eceff4;
+    --sidebar-border: #3b4252;
+    --sidebar-ring: #88c0d0;
+
+    /* Status colours used across the app */
+    --success: #a3be8c;
+    --warning: #ebcb8b;
+    --info: #88c0d0;
+    --danger: #bf616a;
+    --video-bg: #1f232b;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    color-scheme: dark;
+    }
+}
+
+/* Thin, theme-coloured scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}

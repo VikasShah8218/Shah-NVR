@@ -1,0 +1,578 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Shah-NVR Media Node (node-1)",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/status": {
+      "get": {
+        "tags": [
+          "Node"
+        ],
+        "summary": "Node Status",
+        "operationId": "node_status_api_v1_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeStatusOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assignments": {
+      "get": {
+        "tags": [
+          "Node"
+        ],
+        "summary": "Cameras this node is currently running (cached from central)",
+        "operationId": "node_assignments_api_v1_assignments_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mediamtx/paths": {
+      "get": {
+        "tags": [
+          "Node"
+        ],
+        "summary": "Live MediaMTX path state (debug)",
+        "operationId": "mediamtx_paths_api_v1_mediamtx_paths_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/logs": {
+      "get": {
+        "tags": [
+          "Node"
+        ],
+        "summary": "Recent log lines of the agent or MediaMTX",
+        "operationId": "node_logs_api_v1_logs_get",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "agent",
+                "mediamtx"
+              ],
+              "type": "string",
+              "default": "agent",
+              "title": "Source"
+            }
+          },
+          {
+            "name": "lines",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2000,
+              "minimum": 1,
+              "default": 200,
+              "title": "Lines"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/{segment_id}/init.mp4": {
+      "get": {
+        "tags": [
+          "Recorded media"
+        ],
+        "summary": "Media Init",
+        "operationId": "media_init_api_v1_media__segment_id__init_mp4_get",
+        "parameters": [
+          {
+            "name": "segment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Segment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/{segment_id}/part/{index}.m4s": {
+      "get": {
+        "tags": [
+          "Recorded media"
+        ],
+        "summary": "Media Part",
+        "operationId": "media_part_api_v1_media__segment_id__part__index__m4s_get",
+        "parameters": [
+          {
+            "name": "segment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Segment Id"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/{segment_id}/file.mp4": {
+      "get": {
+        "tags": [
+          "Recorded media"
+        ],
+        "summary": "Media File",
+        "operationId": "media_file_api_v1_media__segment_id__file_mp4_get",
+        "parameters": [
+          {
+            "name": "segment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Segment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/segments": {
+      "get": {
+        "tags": [
+          "Recorded media"
+        ],
+        "summary": "Chunks stored on this node (debug)",
+        "operationId": "list_local_segments_api_v1_segments_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LocalSegmentOut"
+                  },
+                  "title": "Response List Local Segments Api V1 Segments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Root",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LocalSegmentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "generation": {
+            "type": "integer",
+            "title": "Generation"
+          },
+          "rel_path": {
+            "type": "string",
+            "title": "Rel Path"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codec"
+          },
+          "part_count": {
+            "type": "integer",
+            "title": "Part Count"
+          },
+          "uploaded": {
+            "type": "boolean",
+            "title": "Uploaded"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "camera_id",
+          "profile",
+          "generation",
+          "rel_path",
+          "start_time",
+          "end_time",
+          "duration_ms",
+          "size_bytes",
+          "codec",
+          "part_count",
+          "uploaded"
+        ],
+        "title": "LocalSegmentOut"
+      },
+      "NodeStatusOut": {
+        "properties": {
+          "node_name": {
+            "type": "string",
+            "title": "Node Name"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "api_url": {
+            "type": "string",
+            "title": "Api Url"
+          },
+          "central_url": {
+            "type": "string",
+            "title": "Central Url"
+          },
+          "central_online": {
+            "type": "boolean",
+            "title": "Central Online"
+          },
+          "last_central_contact": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Central Contact"
+          },
+          "mediamtx_running": {
+            "type": "boolean",
+            "title": "Mediamtx Running"
+          },
+          "mediamtx_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediamtx Version"
+          },
+          "recordings_dir": {
+            "type": "string",
+            "title": "Recordings Dir"
+          },
+          "disk": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Disk"
+          },
+          "assigned_cameras": {
+            "type": "integer",
+            "title": "Assigned Cameras"
+          },
+          "ready_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ready Paths"
+          },
+          "pending_uploads": {
+            "type": "integer",
+            "title": "Pending Uploads"
+          },
+          "local_segments": {
+            "type": "integer",
+            "title": "Local Segments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_name",
+          "node_id",
+          "api_url",
+          "central_url",
+          "central_online",
+          "last_central_contact",
+          "mediamtx_running",
+          "mediamtx_version",
+          "recordings_dir",
+          "disk",
+          "assigned_cameras",
+          "ready_paths",
+          "pending_uploads",
+          "local_segments"
+        ],
+        "title": "NodeStatusOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

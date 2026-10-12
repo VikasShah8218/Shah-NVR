@@ -1,11 +1,12 @@
 # Shah-NVR
 
-A distributed network video recorder (NVR) backend with two services:
+A distributed network video recorder (NVR): two backend services and a web UI.
 
 | Service | Folder | Role |
 |---|---|---|
 | **Central Manager** | `central_manager/` | The "main server". Camera registry, node registry, scheduler and failover, recording catalog, live-URL lookup and HLS playback playlists. **Never handles video.** |
 | **Media Node** | `media_node/` | The "recording/streaming server". Runs MediaMTX, pulls the cameras it's assigned, records 60-second fMP4 chunks, indexes them, reports them to the central manager and serves recorded video. **Never connects to PostgreSQL.** |
+| **Web UI** | `nvr_client/` | React + TypeScript client for testing every feature (see [nvr_client/README.md](nvr_client/README.md)). |
 
 ```
 Camera ──RTSP──► Media Node (MediaMTX) ──► chunks on disk ──► chunk index ──► Central (PostgreSQL)
@@ -62,6 +63,9 @@ cd media_node && py main.py
 
 # 3) (optional) fake cameras if you have no real ones
 py tools/camera_simulator.py --count 2      # rtsp://127.0.0.1:8654/sim-1, sim-2
+
+# 4) (optional) web UI                       -> http://localhost:5180
+cd nvr_client && npm install && npm run dev
 ```
 
 The media node starts MediaMTX itself, registers with the central manager and starts sending heartbeats.
@@ -105,11 +109,11 @@ Times are UTC: use the `Z` suffix, or an offset such as `+05:30` written as `%2B
 | Live | `GET /api/v1/cameras/{id}/live` |
 | Recordings | `GET /api/v1/cameras/{id}/recordings?minutes=` or `?start=&end=` |
 | Playback (HLS VOD) | `GET /api/v1/playback/{id}/index.m3u8?minutes=` or `?start=&end=` |
-| Nodes | `GET /api/v1/nodes`, `PATCH /api/v1/nodes/{id}`, `POST /api/v1/nodes/{id}/drain\|cordon\|activate` |
+| Nodes | `GET /api/v1/nodes`, `PATCH /api/v1/nodes/{id}` (capacity, `storage_quota_gb`), `POST /api/v1/nodes/{id}/drain\|cordon\|activate`, `DELETE /api/v1/nodes/{id}` |
 | Assignments | `GET /api/v1/assignments`, `PUT /api/v1/assignments/{camera_id}`, `GET /api/v1/assignments/{camera_id}/history`, `POST /api/v1/assignments/run-scheduler` |
 | Cluster | `GET /api/v1/cluster/health` |
 | Internal (node → central) | `/internal/v1/...`: register, heartbeat, assignments, stream status, segments, deletions |
-| Media node | `GET /api/v1/status`, `/api/v1/assignments`, `/api/v1/mediamtx/paths`, `/api/v1/segments`, `/api/v1/media/{segment}/init.mp4\|part/{n}.m4s\|file.mp4` |
+| Media node | `GET /api/v1/status`, `/api/v1/assignments`, `/api/v1/mediamtx/paths`, `/api/v1/segments`, `/api/v1/logs?source=agent\|mediamtx`, `/api/v1/media/{segment}/init.mp4\|part/{n}.m4s\|file.mp4` |
 
 ## 7. How it works
 
@@ -131,13 +135,18 @@ Times are UTC: use the `Z` suffix, or an offset such as `+05:30` written as `%2B
 
 **Retention:** every 10 minutes the central manager marks chunks older than the camera's `retention_days`. Nodes delete those files and confirm. Separately, each node deletes its oldest chunks itself if its disk goes above `DISK_MAX_USED_PERCENT`.
 
+**Storage quota:** an admin can limit how much a node may use for recordings (`PATCH /api/v1/nodes/{id}` with `storage_quota_gb`, or the Media Nodes page). The node receives the quota in every heartbeat and caches it locally. Above 95% of the quota it deletes just enough of its oldest chunks to get back under 90%, and confirms the deletions to the central manager.
+
+**Node metrics:** each heartbeat reports CPU (percent and cores), RAM, NVIDIA GPU (via `nvidia-smi`, when present), network in/out, disk and the bytes used by recordings.
+
 ## 8. Two nodes on one PC (failover testing)
 
 Copy `media_node/.env` values into environment variables, or use a second copy of the folder, and change `NODE_NAME`, `PORT`, every MediaMTX port, `DATA_DIR` and `RECORDINGS_DIR`. For example: `NODE_NAME=node-2 PORT=7200 MEDIAMTX_API_PORT=9897 MEDIAMTX_METRICS_PORT=9898 RTSP_PORT=8564 RTP_PORT=8010 RTCP_PORT=8011 HLS_PORT=8898 WEBRTC_PORT=8899 WEBRTC_UDP_PORT=8199 DATA_DIR=./data2 RECORDINGS_DIR=./data2/recordings`.
 
 ## 9. Known limits (current phase)
 
-- No authentication or TLS (planned).
+- No authentication or TLS (planned). `CORS_ORIGINS` defaults to `*` for the web UI; restrict it in production.
+- GPU metrics are NVIDIA-only for now.
 - Run **one** central manager instance; the scheduler has no leader election yet.
 - Camera passwords are stored in plain text in PostgreSQL (encryption is planned with auth).
 - Playback ranges are limited to `PLAYBACK_MAX_HOURS` (default 24 h) per request.

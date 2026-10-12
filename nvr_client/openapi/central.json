@@ -1,0 +1,3238 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Shah-NVR Central Manager",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/cameras": {
+      "post": {
+        "tags": [
+          "Cameras"
+        ],
+        "summary": "Create Camera",
+        "operationId": "create_camera_api_v1_cameras_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CameraCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CameraOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Cameras"
+        ],
+        "summary": "List Cameras",
+        "operationId": "list_cameras_api_v1_cameras_get",
+        "parameters": [
+          {
+            "name": "enabled",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Enabled"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CameraOut"
+                  },
+                  "title": "Response List Cameras Api V1 Cameras Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}": {
+      "get": {
+        "tags": [
+          "Cameras"
+        ],
+        "summary": "Get Camera",
+        "operationId": "get_camera_api_v1_cameras__camera_id__get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CameraOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Cameras"
+        ],
+        "summary": "Update Camera",
+        "operationId": "update_camera_api_v1_cameras__camera_id__patch",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CameraUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CameraOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Cameras"
+        ],
+        "summary": "Delete Camera",
+        "operationId": "delete_camera_api_v1_cameras__camera_id__delete",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams": {
+      "post": {
+        "tags": [
+          "Cameras"
+        ],
+        "summary": "Add Stream",
+        "operationId": "add_stream_api_v1_cameras__camera_id__streams_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StreamIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}": {
+      "patch": {
+        "tags": [
+          "Cameras"
+        ],
+        "summary": "Update Stream",
+        "operationId": "update_stream_api_v1_cameras__camera_id__streams__profile__patch",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StreamUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Cameras"
+        ],
+        "summary": "Delete Stream",
+        "operationId": "delete_stream_api_v1_cameras__camera_id__streams__profile__delete",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/live": {
+      "get": {
+        "tags": [
+          "Cameras"
+        ],
+        "summary": "Get Live",
+        "description": "Where to watch this camera live. Video comes from the media node, never from here.",
+        "operationId": "get_live_api_v1_cameras__camera_id__live_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/recordings": {
+      "get": {
+        "tags": [
+          "Recordings"
+        ],
+        "summary": "Recording timeline (segments + gaps)",
+        "operationId": "timeline_api_v1_cameras__camera_id__recordings_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "main",
+              "title": "Profile"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "examples": [
+                "2026-10-11T10:00:00Z"
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "examples": [
+                "2026-10-11T11:00:00Z"
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "minutes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Shortcut: the last N minutes",
+              "title": "Minutes"
+            },
+            "description": "Shortcut: the last N minutes"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/playback/{camera_id}/index.m3u8": {
+      "get": {
+        "tags": [
+          "Playback"
+        ],
+        "summary": "HLS VOD playlist for a time range (open this URL in VLC)",
+        "operationId": "vod_playlist_api_v1_playback__camera_id__index_m3u8_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "main",
+              "title": "Profile"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "examples": [
+                "2026-10-11T10:00:00Z"
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "examples": [
+                "2026-10-11T11:00:00Z"
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "minutes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Shortcut: the last N minutes",
+              "title": "Minutes"
+            },
+            "description": "Shortcut: the last N minutes"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/nodes": {
+      "get": {
+        "tags": [
+          "Media Nodes"
+        ],
+        "summary": "List Nodes",
+        "operationId": "list_nodes_api_v1_nodes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NodeOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Nodes Api V1 Nodes Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/nodes/{node_id}": {
+      "get": {
+        "tags": [
+          "Media Nodes"
+        ],
+        "summary": "Get Node",
+        "operationId": "get_node_api_v1_nodes__node_id__get",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Media Nodes"
+        ],
+        "summary": "Update Node",
+        "operationId": "update_node_api_v1_nodes__node_id__patch",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Media Nodes"
+        ],
+        "summary": "Remove a retired node",
+        "description": "Refused while cameras are assigned. Refused if the node still has recordings in the\ncatalog unless force=true (which also removes that recordings index). A node that is still\nrunning will register itself again.",
+        "operationId": "delete_node_api_v1_nodes__node_id__delete",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Force"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/nodes/{node_id}/drain": {
+      "post": {
+        "tags": [
+          "Media Nodes"
+        ],
+        "summary": "Move all cameras away from this node",
+        "operationId": "drain_node_api_v1_nodes__node_id__drain_post",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/nodes/{node_id}/cordon": {
+      "post": {
+        "tags": [
+          "Media Nodes"
+        ],
+        "summary": "Keep current cameras, accept no new ones",
+        "operationId": "cordon_node_api_v1_nodes__node_id__cordon_post",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/nodes/{node_id}/activate": {
+      "post": {
+        "tags": [
+          "Media Nodes"
+        ],
+        "summary": "Return node to normal scheduling",
+        "operationId": "activate_node_api_v1_nodes__node_id__activate_post",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assignments": {
+      "get": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "List Assignments",
+        "operationId": "list_assignments_api_v1_assignments_get",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Node Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssignmentOut"
+                  },
+                  "title": "Response List Assignments Api V1 Assignments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assignments/{camera_id}": {
+      "put": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "Manually move a camera to a node",
+        "operationId": "manual_assign_api_v1_assignments__camera_id__put",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualAssignIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assignments/{camera_id}/history": {
+      "get": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "Assignment History",
+        "operationId": "assignment_history_api_v1_assignments__camera_id__history_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssignmentHistoryOut"
+                  },
+                  "title": "Response Assignment History Api V1 Assignments  Camera Id  History Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assignments/run-scheduler": {
+      "post": {
+        "tags": [
+          "Assignments"
+        ],
+        "summary": "Run one scheduler cycle now",
+        "operationId": "run_scheduler_now_api_v1_assignments_run_scheduler_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/api/v1/cluster/health": {
+      "get": {
+        "tags": [
+          "Cluster"
+        ],
+        "summary": "Cluster Health",
+        "operationId": "cluster_health_api_v1_cluster_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClusterHealthOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/nodes/register": {
+      "post": {
+        "tags": [
+          "Internal: Media Nodes"
+        ],
+        "summary": "Register Node",
+        "operationId": "register_node_internal_v1_nodes_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeRegisterIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeRegisterOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/nodes/{node_id}/heartbeat": {
+      "post": {
+        "tags": [
+          "Internal: Media Nodes"
+        ],
+        "summary": "Heartbeat",
+        "operationId": "heartbeat_internal_v1_nodes__node_id__heartbeat_post",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeartbeatIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeartbeatOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/nodes/{node_id}/assignments": {
+      "get": {
+        "tags": [
+          "Internal: Media Nodes"
+        ],
+        "summary": "Node Assignments",
+        "description": "Desired state for a node: every camera stream it must pull (and record).",
+        "operationId": "node_assignments_internal_v1_nodes__node_id__assignments_get",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/nodes/{node_id}/stream-status": {
+      "post": {
+        "tags": [
+          "Internal: Media Nodes"
+        ],
+        "summary": "Report Stream Status",
+        "description": "Per-stream runtime state. Ignored for cameras this node no longer owns.",
+        "operationId": "report_stream_status_internal_v1_nodes__node_id__stream_status_post",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StreamStatusBatchIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/recordings/segments": {
+      "post": {
+        "tags": [
+          "Internal: Recordings"
+        ],
+        "summary": "Ingest Segments",
+        "description": "Idempotent: re-sending the same segment ids is safe.",
+        "operationId": "ingest_segments_internal_v1_recordings_segments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentBatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentBatchOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/nodes/{node_id}/deletions": {
+      "get": {
+        "tags": [
+          "Internal: Recordings"
+        ],
+        "summary": "Pending Deletions",
+        "operationId": "pending_deletions_internal_v1_nodes__node_id__deletions_get",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 5000,
+              "default": 500,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeletionItem"
+                  },
+                  "title": "Response Pending Deletions Internal V1 Nodes  Node Id  Deletions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/nodes/{node_id}/deleted": {
+      "post": {
+        "tags": [
+          "Internal: Recordings"
+        ],
+        "summary": "Confirm Deleted",
+        "description": "Node confirms files are gone (retention or disk-pressure cleanup).",
+        "operationId": "confirm_deleted_internal_v1_nodes__node_id__deleted_post",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeletedIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Root",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AssignmentHistoryOut": {
+        "properties": {
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "generation": {
+            "type": "integer",
+            "title": "Generation"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "node_id",
+          "generation",
+          "reason",
+          "started_at",
+          "ended_at"
+        ],
+        "title": "AssignmentHistoryOut"
+      },
+      "AssignmentInfo": {
+        "properties": {
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "node_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Name"
+          },
+          "generation": {
+            "type": "integer",
+            "title": "Generation"
+          },
+          "lease_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lease Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "node_name",
+          "generation",
+          "lease_expires_at"
+        ],
+        "title": "AssignmentInfo"
+      },
+      "AssignmentOut": {
+        "properties": {
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "camera_name": {
+            "type": "string",
+            "title": "Camera Name"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "node_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Name"
+          },
+          "generation": {
+            "type": "integer",
+            "title": "Generation"
+          },
+          "lease_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lease Expires At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "camera_name",
+          "node_id",
+          "node_name",
+          "generation",
+          "lease_expires_at",
+          "reason",
+          "updated_at"
+        ],
+        "title": "AssignmentOut"
+      },
+      "AssignmentsOut": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NodeState"
+          },
+          "cameras": {
+            "items": {
+              "$ref": "#/components/schemas/CameraAssignmentOut"
+            },
+            "type": "array",
+            "title": "Cameras"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "state",
+          "cameras"
+        ],
+        "title": "AssignmentsOut"
+      },
+      "CameraAssignmentOut": {
+        "properties": {
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "camera_name": {
+            "type": "string",
+            "title": "Camera Name"
+          },
+          "generation": {
+            "type": "integer",
+            "title": "Generation"
+          },
+          "streams": {
+            "items": {
+              "$ref": "#/components/schemas/StreamAssignment"
+            },
+            "type": "array",
+            "title": "Streams"
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "camera_name",
+          "generation",
+          "streams"
+        ],
+        "title": "CameraAssignmentOut"
+      },
+      "CameraCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "retention_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retention Days"
+          },
+          "streams": {
+            "items": {
+              "$ref": "#/components/schemas/StreamIn"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Streams"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "streams"
+        ],
+        "title": "CameraCreate"
+      },
+      "CameraOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "has_password": {
+            "type": "boolean",
+            "title": "Has Password"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "retention_days": {
+            "type": "integer",
+            "title": "Retention Days"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "streams": {
+            "items": {
+              "$ref": "#/components/schemas/StreamOut"
+            },
+            "type": "array",
+            "title": "Streams"
+          },
+          "assignment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssignmentInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "username",
+          "has_password",
+          "enabled",
+          "retention_days",
+          "created_at",
+          "updated_at",
+          "streams",
+          "assignment"
+        ],
+        "title": "CameraOut"
+      },
+      "CameraUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "retention_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retention Days"
+          }
+        },
+        "type": "object",
+        "title": "CameraUpdate"
+      },
+      "ClusterHealthOut": {
+        "properties": {
+          "cameras_total": {
+            "type": "integer",
+            "title": "Cameras Total"
+          },
+          "cameras_enabled": {
+            "type": "integer",
+            "title": "Cameras Enabled"
+          },
+          "streams_by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Streams By Status"
+          },
+          "nodes_by_state": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Nodes By State"
+          },
+          "segments_last_hour": {
+            "type": "integer",
+            "title": "Segments Last Hour"
+          },
+          "segments_total": {
+            "type": "integer",
+            "title": "Segments Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cameras_total",
+          "cameras_enabled",
+          "streams_by_status",
+          "nodes_by_state",
+          "segments_last_hour",
+          "segments_total"
+        ],
+        "title": "ClusterHealthOut"
+      },
+      "DeletedIn": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "DeletedIn"
+      },
+      "DeletionItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "file_path": {
+            "type": "string",
+            "title": "File Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "file_path"
+        ],
+        "title": "DeletionItem"
+      },
+      "DiskInfo": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "total_bytes": {
+            "type": "integer",
+            "title": "Total Bytes"
+          },
+          "free_bytes": {
+            "type": "integer",
+            "title": "Free Bytes"
+          },
+          "used_percent": {
+            "type": "number",
+            "title": "Used Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "total_bytes",
+          "free_bytes",
+          "used_percent"
+        ],
+        "title": "DiskInfo"
+      },
+      "GapOut": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time"
+          },
+          "seconds": {
+            "type": "number",
+            "title": "Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time",
+          "end_time",
+          "seconds"
+        ],
+        "title": "GapOut"
+      },
+      "GpuInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "utilization_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization Percent"
+          },
+          "memory_used_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Used Bytes"
+          },
+          "memory_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Total Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "GpuInfo"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HeartbeatIn": {
+        "properties": {
+          "cpu_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Percent"
+          },
+          "cpu_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Count"
+          },
+          "memory_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Percent"
+          },
+          "memory_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Total Bytes"
+          },
+          "memory_used_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Used Bytes"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/GpuInfo"
+            },
+            "type": "array",
+            "title": "Gpus",
+            "default": []
+          },
+          "disk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiskInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recordings_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recordings Bytes"
+          },
+          "net_rx_mbps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Rx Mbps"
+          },
+          "net_tx_mbps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Tx Mbps"
+          },
+          "mediamtx_running": {
+            "type": "boolean",
+            "title": "Mediamtx Running",
+            "default": true
+          },
+          "paths_configured": {
+            "type": "integer",
+            "title": "Paths Configured",
+            "default": 0
+          },
+          "paths_ready": {
+            "type": "integer",
+            "title": "Paths Ready",
+            "default": 0
+          },
+          "pending_uploads": {
+            "type": "integer",
+            "title": "Pending Uploads",
+            "default": 0
+          },
+          "extra": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra"
+          }
+        },
+        "type": "object",
+        "title": "HeartbeatIn"
+      },
+      "HeartbeatOut": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NodeState"
+          },
+          "lease_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Lease Expires At"
+          },
+          "assignments": {
+            "type": "integer",
+            "title": "Assignments"
+          },
+          "storage_quota_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Quota Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "state",
+          "lease_expires_at",
+          "assignments"
+        ],
+        "title": "HeartbeatOut"
+      },
+      "LiveOut": {
+        "properties": {
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "node_name": {
+            "type": "string",
+            "title": "Node Name"
+          },
+          "generation": {
+            "type": "integer",
+            "title": "Generation"
+          },
+          "streams": {
+            "items": {
+              "$ref": "#/components/schemas/LiveStreamUrls"
+            },
+            "type": "array",
+            "title": "Streams"
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "node_id",
+          "node_name",
+          "generation",
+          "streams"
+        ],
+        "title": "LiveOut"
+      },
+      "LiveStreamUrls": {
+        "properties": {
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "codec_note": {
+            "type": "string",
+            "title": "Codec Note",
+            "default": "Codec is passed through from the camera (no transcoding)."
+          },
+          "rtsp": {
+            "type": "string",
+            "title": "Rtsp"
+          },
+          "hls": {
+            "type": "string",
+            "title": "Hls"
+          },
+          "webrtc": {
+            "type": "string",
+            "title": "Webrtc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile",
+          "rtsp",
+          "hls",
+          "webrtc"
+        ],
+        "title": "LiveStreamUrls"
+      },
+      "ManualAssignIn": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id"
+        ],
+        "title": "ManualAssignIn"
+      },
+      "NodeOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "api_url": {
+            "type": "string",
+            "title": "Api Url"
+          },
+          "media_host": {
+            "type": "string",
+            "title": "Media Host"
+          },
+          "rtsp_port": {
+            "type": "integer",
+            "title": "Rtsp Port"
+          },
+          "hls_port": {
+            "type": "integer",
+            "title": "Hls Port"
+          },
+          "webrtc_port": {
+            "type": "integer",
+            "title": "Webrtc Port"
+          },
+          "capacity_cameras": {
+            "type": "integer",
+            "title": "Capacity Cameras"
+          },
+          "storage_quota_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Quota Bytes"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "mediamtx_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediamtx Version"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NodeState"
+          },
+          "last_heartbeat_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Heartbeat At"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metrics"
+          },
+          "assigned_cameras": {
+            "type": "integer",
+            "title": "Assigned Cameras",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "api_url",
+          "media_host",
+          "rtsp_port",
+          "hls_port",
+          "webrtc_port",
+          "capacity_cameras",
+          "storage_quota_bytes",
+          "version",
+          "mediamtx_version",
+          "state",
+          "last_heartbeat_at",
+          "metrics"
+        ],
+        "title": "NodeOut"
+      },
+      "NodeRegisterIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.-]+$",
+            "title": "Name"
+          },
+          "api_url": {
+            "type": "string",
+            "title": "Api Url"
+          },
+          "media_host": {
+            "type": "string",
+            "title": "Media Host"
+          },
+          "rtsp_port": {
+            "type": "integer",
+            "title": "Rtsp Port",
+            "default": 8554
+          },
+          "hls_port": {
+            "type": "integer",
+            "title": "Hls Port",
+            "default": 8888
+          },
+          "webrtc_port": {
+            "type": "integer",
+            "title": "Webrtc Port",
+            "default": 8889
+          },
+          "capacity_cameras": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Capacity Cameras",
+            "default": 100
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "mediamtx_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediamtx Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "api_url",
+          "media_host"
+        ],
+        "title": "NodeRegisterIn"
+      },
+      "NodeRegisterOut": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NodeState"
+          },
+          "heartbeat_interval_seconds": {
+            "type": "integer",
+            "title": "Heartbeat Interval Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "state",
+          "heartbeat_interval_seconds"
+        ],
+        "title": "NodeRegisterOut"
+      },
+      "NodeState": {
+        "type": "string",
+        "enum": [
+          "READY",
+          "ACTIVE",
+          "DRAINING",
+          "CORDONED",
+          "UNREACHABLE",
+          "OFFLINE"
+        ],
+        "title": "NodeState"
+      },
+      "NodeUpdate": {
+        "properties": {
+          "capacity_cameras": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity Cameras"
+          },
+          "storage_quota_gb": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Quota Gb"
+          }
+        },
+        "type": "object",
+        "title": "NodeUpdate"
+      },
+      "SegmentBatchIn": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentIn"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "items"
+        ],
+        "title": "SegmentBatchIn"
+      },
+      "SegmentBatchOut": {
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "title": "Accepted"
+          },
+          "duplicates": {
+            "type": "integer",
+            "title": "Duplicates"
+          },
+          "ignored": {
+            "type": "integer",
+            "title": "Ignored"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accepted",
+          "duplicates",
+          "ignored"
+        ],
+        "title": "SegmentBatchOut"
+      },
+      "SegmentIn": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "generation": {
+            "type": "integer",
+            "title": "Generation",
+            "default": 0
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Duration Ms"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size Bytes"
+          },
+          "codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codec"
+          },
+          "file_path": {
+            "type": "string",
+            "title": "File Path"
+          },
+          "parts": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Parts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "camera_id",
+          "profile",
+          "start_time",
+          "end_time",
+          "duration_ms",
+          "size_bytes",
+          "file_path",
+          "parts"
+        ],
+        "title": "SegmentIn"
+      },
+      "SegmentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "generation": {
+            "type": "integer",
+            "title": "Generation"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codec"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SegmentStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "profile",
+          "node_id",
+          "generation",
+          "start_time",
+          "end_time",
+          "duration_ms",
+          "size_bytes",
+          "codec",
+          "status"
+        ],
+        "title": "SegmentOut"
+      },
+      "SegmentStatus": {
+        "type": "string",
+        "enum": [
+          "AVAILABLE",
+          "DELETING"
+        ],
+        "title": "SegmentStatus"
+      },
+      "StreamAssignment": {
+        "properties": {
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "path_name": {
+            "type": "string",
+            "title": "Path Name"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "record": {
+            "type": "boolean",
+            "title": "Record"
+          },
+          "rtsp_transport": {
+            "type": "string",
+            "title": "Rtsp Transport"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile",
+          "path_name",
+          "source_url",
+          "record",
+          "rtsp_transport"
+        ],
+        "title": "StreamAssignment"
+      },
+      "StreamIn": {
+        "properties": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]{1,32}$",
+            "title": "Profile",
+            "default": "main",
+            "examples": [
+              "main"
+            ]
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url",
+            "examples": [
+              "rtsp://192.168.1.64:554/Streaming/Channels/101"
+            ]
+          },
+          "record": {
+            "type": "boolean",
+            "title": "Record",
+            "default": true
+          },
+          "rtsp_transport": {
+            "type": "string",
+            "pattern": "^(tcp|udp|automatic)$",
+            "title": "Rtsp Transport",
+            "default": "tcp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_url"
+        ],
+        "title": "StreamIn"
+      },
+      "StreamOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "record": {
+            "type": "boolean",
+            "title": "Record"
+          },
+          "rtsp_transport": {
+            "type": "string",
+            "title": "Rtsp Transport"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StreamStatus"
+          },
+          "status_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Detail"
+          },
+          "bytes_received": {
+            "type": "integer",
+            "title": "Bytes Received"
+          },
+          "last_status_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status At"
+          },
+          "last_segment_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Segment At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "profile",
+          "source_url",
+          "record",
+          "rtsp_transport",
+          "status",
+          "status_detail",
+          "bytes_received",
+          "last_status_at",
+          "last_segment_at"
+        ],
+        "title": "StreamOut"
+      },
+      "StreamStatus": {
+        "type": "string",
+        "enum": [
+          "UNKNOWN",
+          "UNASSIGNED",
+          "ASSIGNED",
+          "CONNECTING",
+          "IDLE",
+          "STREAMING",
+          "RECORDING",
+          "NOT_RECORDING",
+          "DISABLED"
+        ],
+        "title": "StreamStatus"
+      },
+      "StreamStatusBatchIn": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StreamStatusIn"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "StreamStatusBatchIn"
+      },
+      "StreamStatusIn": {
+        "properties": {
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StreamStatus"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "bytes_received": {
+            "type": "integer",
+            "title": "Bytes Received",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "profile",
+          "status"
+        ],
+        "title": "StreamStatusIn"
+      },
+      "StreamUpdate": {
+        "properties": {
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "record": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record"
+          },
+          "rtsp_transport": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(tcp|udp|automatic)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rtsp Transport"
+          }
+        },
+        "type": "object",
+        "title": "StreamUpdate"
+      },
+      "TimelineOut": {
+        "properties": {
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End"
+          },
+          "recorded_seconds": {
+            "type": "number",
+            "title": "Recorded Seconds"
+          },
+          "coverage_percent": {
+            "type": "number",
+            "title": "Coverage Percent"
+          },
+          "total_size_bytes": {
+            "type": "integer",
+            "title": "Total Size Bytes"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentOut"
+            },
+            "type": "array",
+            "title": "Segments"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/GapOut"
+            },
+            "type": "array",
+            "title": "Gaps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "profile",
+          "start",
+          "end",
+          "recorded_seconds",
+          "coverage_percent",
+          "total_size_bytes",
+          "segments",
+          "gaps"
+        ],
+        "title": "TimelineOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
