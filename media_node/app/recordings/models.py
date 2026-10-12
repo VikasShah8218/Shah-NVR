@@ -5,8 +5,8 @@ from tortoise.models import Model
 class LocalSegment(Model):
     """A finished recording chunk on this node's disk, with its byte-level index.
 
-    `parts` = [{"o": byte offset, "s": byte size, "d": duration ms}, ...]; every part
-    starts on a keyframe, so each one can be served as an independent HLS media segment.
+    `parts` = [{"o": byte offset, "s": byte size, "d": duration ms, "k": starts on keyframe}, ...];
+    each part is served as one HLS media segment.
     """
 
     id = fields.UUIDField(primary_key=True)

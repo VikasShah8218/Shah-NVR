@@ -117,7 +117,7 @@ Times are UTC: use the `Z` suffix, or an offset such as `+05:30` written as `%2B
 1. The scheduler (central, every 5 s) places each enabled camera on the least-loaded healthy node and records the move with an increasing `generation`.
 2. The node's reconcile loop (every 5 s) fetches its assignments and adds or removes MediaMTX paths through the MediaMTX API. One camera connection is shared by recording and all live viewers.
 3. MediaMTX writes `data/recordings/cam-<id>/<profile>/<date>/<time>.mp4` as fMP4 (1-second fragments, 60-second chunks).
-4. The scanner finds finished chunks and indexes them by reading box headers only (no decoding). It records where each keyframe-aligned ~4-second part sits in the file.
+4. The scanner finds finished chunks and indexes them by reading box headers only (no decoding). It records where each ~4-second part sits in the file, starting parts on keyframes whenever the camera's GOP allows. Set the camera's keyframe interval to its FPS (1 s GOP) for best seeking.
 5. The uploader sends chunk metadata to the central manager in batches. It's idempotent (deterministic IDs) and queued in local SQLite, so nothing is lost while the central manager is down.
 
 **Playback**

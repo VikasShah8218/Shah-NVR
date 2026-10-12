@@ -2,7 +2,7 @@
 
 MediaMTX records each chunk as:  ftyp + moov (init)  then  [moof + mdat] * N  (one per ~1 s).
 We read only box headers / small moof boxes (never the video payload) and group fragments
-into keyframe-aligned parts of ~HLS_PART_TARGET_SECONDS. Each part becomes one HLS media
+into parts of ~HLS_PART_TARGET_SECONDS, starting on keyframes where possible. Each part becomes one HLS media
 segment, served as a byte slice of the original file - no remux, no copy.
 
 MediaMTX restarts timestamps at 0 in every chunk. When a part is served, the 8-byte `tfdt`
@@ -241,13 +241,18 @@ def index_fmp4(path: Path, part_target_seconds: float) -> Mp4Index:
     if init_size is None or not fragments:
         raise Mp4IndexError("no complete fragments")
 
+    # Prefer to start each part on a fragment that begins with a keyframe. If the camera GOP
+    # does not line up with MediaMTX fragments (e.g. GOP 32 frames @ 30 fps vs 1 s fragments),
+    # such fragments are rare, so cut anyway at 1.5x the target: playback stays continuous and a
+    # seek into that part only waits for the next keyframe (<= one GOP).
     timescale = ref_track.timescale
     target_ticks = int(part_target_seconds * timescale)
+    max_ticks = int(part_target_seconds * 1.5 * timescale)
     groups: list[list[Fragment]] = []
     current: list[Fragment] = []
     current_ticks = 0
     for frag in fragments:
-        if current and frag.keyframe and current_ticks >= target_ticks:
+        if current and current_ticks >= target_ticks and (frag.keyframe or current_ticks >= max_ticks):
             groups.append(current)
             current, current_ticks = [], 0
         current.append(frag)
@@ -258,7 +263,12 @@ def index_fmp4(path: Path, part_target_seconds: float) -> Mp4Index:
     parts = []
     for g in groups:
         ticks = sum(fr.ticks for fr in g)
-        parts.append({"o": g[0].offset, "s": g[-1].end - g[0].offset, "d": round(ticks * 1000 / timescale)})
+        parts.append({
+            "o": g[0].offset,
+            "s": g[-1].end - g[0].offset,
+            "d": round(ticks * 1000 / timescale),
+            "k": g[0].keyframe,  # part starts with a keyframe (clean random access)
+        })
 
     codecs = [t.codec for t in sorted(tracks.values(), key=lambda t: t.handler != "vide") if t.codec]
     return Mp4Index(

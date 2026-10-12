@@ -19,8 +19,9 @@ def build_vod_playlist(
 ) -> str | None:
     """HLS VOD playlist pointing directly at the media nodes that hold each chunk.
 
-    Each chunk = one EXT-X-MAP (init) + N parts. Every part starts on a keyframe, so the
-    player can seek to any part. Returns None when nothing playable is in range.
+    Each chunk = one EXT-X-MAP (init) + N parts. Parts start on keyframes whenever the camera
+    GOP lines up with the recorder's fragments; the player can seek to any part.
+    Returns None when nothing playable is in range.
     """
     body: list[str] = []
     max_part = 1.0
@@ -68,6 +69,7 @@ def build_vod_playlist(
         f"#EXT-X-TARGETDURATION:{math.ceil(max_part)}",
         "#EXT-X-MEDIA-SEQUENCE:0",
         "#EXT-X-PLAYLIST-TYPE:VOD",
-        "#EXT-X-INDEPENDENT-SEGMENTS",
+        # No EXT-X-INDEPENDENT-SEGMENTS: when a camera GOP does not line up with the recorder's
+        # fragments, some parts start mid-GOP (see media_node fMP4 indexer).
     ]
     return "\n".join(header + body + ["#EXT-X-ENDLIST", ""])

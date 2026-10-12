@@ -1,7 +1,7 @@
 """Serves recorded video. The central manager's HLS playlist points straight at these URLs:
 
   /api/v1/media/{segment_id}/init.mp4      -> ftyp+moov of the chunk (EXT-X-MAP)
-  /api/v1/media/{segment_id}/part/{n}.m4s  -> n-th keyframe-aligned part (byte slice of the file,
+  /api/v1/media/{segment_id}/part/{n}.m4s  -> n-th part (byte slice of the file,
                                               timestamps rebased to the absolute timeline)
   /api/v1/media/{segment_id}/file.mp4      -> whole chunk (download / export)
 """
