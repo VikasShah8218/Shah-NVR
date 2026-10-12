@@ -63,7 +63,9 @@ export function Timeline({
 
   const step = tickStep(span)
   const ticks: number[] = []
-  for (let t = Math.ceil(viewStart / step) * step; t <= viewEnd; t += step) ticks.push(t)
+  // Align ticks to local clock time (e.g. 00:00, 02:00 in UTC+05:30), not to UTC multiples.
+  const tz = new Date(viewStart).getTimezoneOffset() * MIN
+  for (let t = Math.ceil((viewStart - tz) / step) * step + tz; t <= viewEnd; t += step) ticks.push(t)
 
   const onPointerDown = (e: React.PointerEvent) => {
     ;(e.target as Element).setPointerCapture(e.pointerId)
@@ -122,7 +124,13 @@ export function Timeline({
         {ticks.map((t) => (
           <g key={t}>
             <line x1={`${pct(t)}%`} x2={`${pct(t)}%`} y1="14" y2={height - 8} stroke="var(--border)" strokeWidth="1" />
-            <text x={`${pct(t)}%`} y="10" fontSize="10" fill="var(--muted-foreground)" textAnchor="middle">
+            <text
+              x={`${pct(t)}%`}
+              y="10"
+              fontSize="10"
+              fill="var(--muted-foreground)"
+              textAnchor={pct(t) < 2 ? "start" : pct(t) > 98 ? "end" : "middle"}
+            >
               {format(t, "HH:mm")}
             </text>
           </g>
