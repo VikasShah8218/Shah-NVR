@@ -1,0 +1,1673 @@
+VMS Archetecture. 
+
+Distributed Video Management System (DVMS)
+Technical Architecture & System Design Specification
+Document version
+1.0
+
+
+Architecture
+Distributed, multi-server
+
+
+Initial design capacity
+1,000 cameras
+
+
+Video specification
+1080p · 30 FPS · H.264/H.265
+
+
+Backend / Client
+Python / Python
+
+
+Design objective
+10,000+ camera extensibility
+
+
+1. Executive summary
+We will design a distributed, horizontally scalable Video Management System responsible for ingesting, continuously recording, storing, managing, and streaming video from IP surveillance cameras.
+The system will consist of multiple independent media servers coordinated by a centralized management layer.
+Each media server will be responsible for a dynamically assigned subset of cameras. A central management service will maintain the camera registry, assign cameras to servers, monitor server health, coordinate failover, and provide secure stream-discovery APIs to clients.
+The critical architectural principle:
+The central management servers will control the system, but they will not sit in the video transmission path.
+
+For example:
+- Camera 101 is managed by Media Node X.
+- Media Node X continuously ingests and records the camera's compressed H.265 stream.
+- A Python desktop client requests Camera 101 from the Central Management API.
+- The management API identifies Media Node X as the active owner.
+- The client establishes a streaming connection directly to Media Node X, or through a designated media relay when direct access is unavailable.
+- The client receives compressed video and decodes it locally.
+- The server never needs to decode video for ordinary recording or live relay.
+This separation enables the system to scale without overloading the central management servers.
+1.1 Functional objectives
+Requirement	Target behavior
+Camera scale	1,000 initial cameras; expandable architecture
+Video resolution	1920 × 1080
+Frame rate	30 FPS
+Video codecs	H.264 and H.265
+Ingestion	RTSP/RTP and optional vendor-specific adapters
+Recording	Continuous compressed-video recording
+Live streaming	Direct client-to-media-node or via dedicated relay
+Video decoding	On the client for live viewing
+Playback	Server locates and supplies compressed recordings
+Database	Centralized logical metadata service
+Camera distribution	Automatic capacity-aware scheduling
+Node failure	Automatic camera reassignment
+Storage	Distributed recording storage
+Management	Python FastAPI services
+Media processing	Native FFmpeg/GStreamer/MediaMTX components
+Client application	Python desktop application
+These are design requirements, not claims that the system has already been benchmarked.
+
+2. High-level system architecture
+Python Client Applications
+Live View · Playback · Camera Selection
+
+Control requests
+
+CONTROL PLANE
+API Gateway
+Auth · Routing
+
+Scheduler
+Camera ownership
+
+Node Manager
+Health · Failover
+
+Catalog Service
+Recording index
+
+
+
+PostgreSQL HA · Event Bus
+Persistent configuration, state and events
+
+Assignments · Heartbeats · Events
+
+MEDIA PLANE
+Node X
+Ingest
+Record
+Relay
+
+
+Node Y
+Ingest
+Record
+Relay
+
+
+Node Z
+Ingest
+Record
+Relay
+
+
+
+
+Distributed Recording Storage
+Video segments · Storage lifecycle
+
+RTSP/RTP compressed streams
+
+1,000 IP Cameras
+Camera groups · Network sites · VLANs
+
+The control-plane arrows represent management communication. Live video travels separately from the selected media node or relay to the client, rather than passing through the central API.
+2.1 Logical layers
+The system will be organized into five logical layers.
+Layer	Responsibilities
+Camera Layer	IP cameras, RTSP endpoints, ONVIF configuration, main/substreams
+Media Layer	Compressed stream ingestion, packet forwarding, recording
+Storage Layer	Video segments, replication, retention, disk management
+Control Layer	Configuration, scheduling, authentication, monitoring, failover
+Client Layer	Discover streams, receive compressed data, decode and display
+Each layer can evolve independently without requiring a complete system redesign.
+
+3. Central control plane
+The Control Plane acts as the management authority for the entire distributed VMS.
+It will be implemented primarily with Python and FastAPI.
+It should be logically centralized but deployed with multiple service instances for high availability.
+3.1 Core services
+Service	Responsibility
+API Gateway	Entry point for desktop clients and administrators
+Authentication Service	User authentication and authorization
+Camera Registry	Camera configuration and metadata
+Media Node Registry	Track available media servers
+Camera Scheduler	Assign cameras to suitable media nodes
+Assignment Controller	Reconcile desired and actual camera assignments
+Health Monitor	Track cameras, streams, servers, and storage
+Failover Coordinator	Initiate reassignment after node failures
+Streaming Discovery	Return the correct live streaming endpoint
+Recording Catalog	Maintain recording segment metadata
+Playback Locator	Find video recordings across storage nodes
+Retention Manager	Enforce recording retention policies
+Audit Service	Track configuration and access activities
+These are logical services. Do not deploy 13 independent microservices on day one.
+For the initial implementation, I recommend a modular FastAPI application containing these functional modules, with scheduler and monitoring workers deployed separately.
+3.2 Central management must not process video
+The control plane should handle small control messages, not continuous video data.
+Allowed operations include:
+- Registering and modifying cameras.
+- Assigning and reassigning cameras.
+- Checking media node status.
+- Creating short-lived streaming authorization credentials.
+- Looking up recording locations.
+- Receiving recording metadata and health events.
+- Managing user permissions.
+- Requesting recording or stream operations.
+Not allowed in the normal control-plane request path:
+- Receiving all camera video streams.
+- Decoding frames.
+- Transcoding streams.
+- Writing continuous media into PostgreSQL.
+- Forwarding video from every media node to viewers.
+This prevents the central API from becoming a bandwidth and processing bottleneck.
+
+4. Distributed media nodes
+A Media Node is the main operational component of the system.
+Each media node is a separate deployment that operates independently after receiving assignments from the central controller.
+4.1 Internal architecture of a media node
+MEDIA NODE X
+│
+├── Python Media Agent
+│   ├── Node Registration
+│   ├── Assignment Controller
+│   ├── Camera Lifecycle Manager
+│   ├── Recording Supervisor
+│   ├── Stream Health Monitor
+│   ├── Disk Health Monitor
+│   ├── Local State Store
+│   └── Heartbeat Reporter
+│
+├── Media Engine
+│   ├── RTSP Ingestion
+│   ├── RTP Packet Handling
+│   ├── Stream Replication
+│   ├── Recording / Remuxing
+│   └── Live Streaming Output
+│
+├── Recording Storage
+│   ├── Active Segments
+│   ├── Completed Segments
+│   └── Recovery Journal
+│
+└── Management Interface
+    ├── Health
+    ├── Metrics
+    └── Local Administration
+
+
+4.2 Python Media Agent
+The Python agent will handle orchestration and lifecycle management.
+For example:
+Controller assigns Camera 101
+            ↓
+Media Agent validates assignment
+            ↓
+Agent configures media engine
+            ↓
+Media engine connects to camera
+            ↓
+Recording begins
+            ↓
+Agent reports operational state
+
+
+Python is particularly appropriate for configuration, scheduling, event processing, API communication, monitoring, and storage orchestration.
+4.3 Media Engine
+The actual continuous media pipeline should use a proven native media component.
+Recommended starting option: MediaMTX integrated with the Python Media Agent.
+MediaMTX supports RTSP ingestion, stream proxying, recording, playback, authentication, and a management API, making it relevant to this architecture. 
+
+MediaMTX
++1
+
+
+
+For recording formats or camera-specific behavior that MediaMTX does not satisfy, use FFmpeg or GStreamer workers under the same Python agent.
+Important: Do not launch one Python frame-decoding loop per camera. With 1,000 cameras, that would unnecessarily consume CPU and memory.
+4.4 Media node operating states
+Each node has one of the following states:
+State	Meaning
+REGISTERING	Starting and registering with controller
+READY	Healthy and available for assignments
+ACTIVE	Running assigned streams
+DEGRADED	Operating with reduced capacity
+DRAINING	Stopping new assignments before maintenance
+UNREACHABLE	Controller cannot contact the node
+FENCED	Not authorized to own or resume camera ingestion
+OFFLINE	Confirmed stopped or administratively disabled
+A node must not accept new assignments while it is draining or fenced.
+
+5. Camera ingestion architecture
+5.1 Complete ingest pipeline
+IP CAMERA
+   │
+   │ H.264/H.265 compressed stream
+   │ RTSP/RTP
+   ▼
+MEDIA NODE X
+   │
+   ├── Establish RTSP session
+   │
+   ├── Receive RTP packets
+   │
+   ├── Reorder/reassemble as required
+   │
+   ├── Track timestamps and codec metadata
+   │
+   ▼
+COMPRESSED MEDIA PIPELINE
+   │
+   ├───────────┐
+   ▼           ▼
+RECORDER     LIVE RELAY
+   │           │
+   ▼           ▼
+STORAGE      CLIENT
+               │
+               ▼
+             DECODE
+               │
+               ▼
+             DISPLAY
+
+
+The incoming compressed stream is shared between the recording pipeline and live relay pipeline.
+The server does not convert the video into decoded RGB images.
+5.2 Single upstream camera connection
+For ordinary recording and live viewing, the intended arrangement is:
+Camera 101
+    │
+    │ 1 upstream video session
+    ▼
+Media Node X
+    │
+    ├── Recording Pipeline
+    │
+    ├── Client A
+    │
+    ├── Client B
+    │
+    ├── Client C
+    │
+    └── Client D
+
+
+All four clients consume the media node's existing stream rather than creating four additional camera connections.
+This is particularly important for CCTV cameras with limited RTSP connection capacity.
+Note that additional camera connections may still be necessary for separate substream profiles, recovery, special analytics workflows, or active redundant recording.
+5.3 Mainstream and substream handling
+Many surveillance cameras expose two or more video profiles.
+Profile	Intended usage
+Mainstream	Full-quality recording and full-screen live view
+Substream	Multi-camera grid and low-bandwidth preview
+Additional profile	Mobile, analytics, or specialized purposes
+A typical design might use:
+Camera 101
+   │
+   ├── Mainstream: 1080p / 30 FPS / 4 Mbps
+   │      ├── Recording
+   │      └── Full-screen live view
+   │
+   └── Substream: 640x360 / 10 FPS / 500 Kbps
+          └── Multi-camera preview
+
+
+The substream should be acquired directly from the camera if available. The server should not routinely generate it by decoding and transcoding the mainstream.
+5.4 Recording without decoding
+The recording engine demultiplexes the compressed stream and writes it into the selected output container.
+FFmpeg calls this stream copy. The documented -c copy operation copies compressed streams without decoding and encoding them again. 
+
+FFmpeg
+
+
+
+Conceptual FFmpeg example:
+ffmpeg -rtsp_transport tcp \
+  -i "rtsp://camera-address/stream" \
+  -map 0:v:0 -c:v copy -an \
+  -f segment -segment_time 60 \
+  -reset_timestamps 1 \
+  -segment_format mpegts \
+  "recording_%06d.ts"
+
+
+This illustrates the principle, not a final recording configuration. Segment durations may vary because stream-copy segmentation normally requires suitable keyframes. Production recording should also handle reconnects, timestamps, partial segments, storage errors, and segment finalization.
+
+6. Camera-to-node distribution and scheduling
+The scheduler determines which media server should ingest and record each camera.
+This must be dynamic, persistent, and capacity-aware, rather than assigning cameras randomly.
+6.1 Example distribution
+Consider a deployment with 1,000 cameras and 10 active media servers.
+Media node	Camera assignment	Aggregate ingest at 4 Mbps
+Media Node 01	Cameras 001–100	400 Mbps
+Media Node 02	Cameras 101–200	400 Mbps
+Media Node 03	Cameras 201–300	400 Mbps
+Media Node 04	Cameras 301–400	400 Mbps
+Media Node 05	Cameras 401–500	400 Mbps
+Media Node 06	Cameras 501–600	400 Mbps
+Media Node 07	Cameras 601–700	400 Mbps
+Media Node 08	Cameras 701–800	400 Mbps
+Media Node 09	Cameras 801–900	400 Mbps
+Media Node 10	Cameras 901–1000	400 Mbps
+These assignments demonstrate the distribution model only. Actual production capacity must be validated by benchmarking.
+6.2 Capacity-aware scheduling
+Each media node periodically reports resource and operational data.
+{
+  "node_id": "media-node-03",
+  "status": "ACTIVE",
+  "assigned_cameras": 86,
+  "healthy_streams": 84,
+  "cpu_usage_percent": 24,
+  "memory_usage_percent": 36,
+  "ingress_mbps": 348,
+  "egress_mbps": 120,
+  "disk_write_mbps": 44,
+  "disk_free_bytes": 15000000000000,
+  "camera_capacity_limit": 120
+}
+
+
+This is an illustrative payload, not a measurement.
+The scheduler should consider:
+Factor	Scheduling decision
+Active camera count	Prevent exceeding tested camera capacity
+Incoming bitrate	Prevent network interface saturation
+Recording write rate	Ensure storage can sustain recording
+Available disk	Ensure sufficient retention headroom
+CPU and memory	Avoid overloaded nodes
+Camera network access	Only assign cameras reachable by the node
+Network location	Prefer nodes close to camera networks
+Streaming egress	Account for viewer traffic
+Failure domain	Distribute redundant workloads across distinct hosts
+Node state	Avoid degraded, draining, or offline nodes
+A scheduling policy should apply hard eligibility constraints first, then score eligible nodes based on available capacity and locality.
+6.3 How camera assignment works
+Camera Registration
+       │
+       ▼
+Camera Registry
+       │
+       ▼
+Assignment Scheduler
+       │
+       ├── Find reachable nodes
+       ├── Check capacity
+       ├── Check disk and network
+       ├── Check failure domain
+       └── Select preferred node
+       │
+       ▼
+Persist Assignment
+       │
+       ▼
+Media Node Agent
+       │
+       ▼
+Start Camera Ingestion
+       │
+       ▼
+Confirm Stream Health
+       │
+       ▼
+Camera State = RECORDING
+
+
+The authoritative desired assignment must be stored in the persistent database. An event bus can notify nodes about changes, but the agent must also reconcile its local state with the authoritative state after reconnecting.
+6.4 Camera ownership and fencing
+A critical failure scenario occurs when a media node temporarily loses connectivity to the controller but continues communicating with its cameras.
+If the controller immediately reassigns those cameras, two media nodes might begin recording the same cameras.
+Therefore, implement lease-based ownership with fencing tokens.
+Example:
+Camera 101
+  primary_owner: Node X
+  ownership_generation: 27
+  lease_expiry: ...
+
+
+If ownership moves to Node Y:
+Camera 101
+  primary_owner: Node Y
+  ownership_generation: 28
+
+
+The system must reject stale generation 27 control operations and catalog writes.
+For strict single-active ownership, rejecting stale database writes alone is insufficient: a partitioned old node might still consume the camera stream. Enforce fencing through the media agent and, where necessary, network-level access control or revocation. The design also needs an explicit policy for lease expiry during temporary control-plane outages.
+
+7. Live video streaming architecture
+This is the most important section for client connectivity.
+7.1 Primary live-streaming design
+The management server returns a streaming location. The media node supplies the actual video.
+PYTHON DESKTOP CLIENT
+        │
+        │ 1. GET /api/v1/cameras/101/live
+        ▼
+CENTRAL API
+        │
+        │ 2. Lookup active camera assignment
+        ▼
+CAMERA REGISTRY
+        │
+        │ Camera 101 → Media Node X
+        ▼
+CENTRAL API
+        │
+        │ 3. Return stream endpoint + token
+        ▼
+PYTHON CLIENT
+        │
+        │ 4. Establish RTSP session
+        ▼
+MEDIA NODE X
+        │
+        │ 5. Transmit compressed RTP media
+        ▼
+PYTHON CLIENT
+        │
+        │ 6. Decode H.264/H.265
+        ▼
+CANVAS / DISPLAY
+
+
+The video does not pass through the Central API.
+7.2 Live stream discovery API
+Proposed endpoint:
+GET /api/v1/cameras/{camera_id}/live
+Authorization: Bearer <user-access-token>
+
+
+Example response:
+{
+  "camera_id": "camera-101",
+  "status": "ONLINE",
+  "node_id": "media-node-x",
+  "assignment_generation": 27,
+  "stream": {
+    "protocol": "rtsps",
+    "url": "rtsps://media-x.example:322/streams/camera-101",
+    "codec": "h265",
+    "profile": "mainstream",
+    "expires_at": "2026-10-08T16:00:00Z"
+  },
+  "connection": {
+    "transport": "tcp",
+    "authorization": "short-lived-stream-credential"
+  }
+}
+
+
+The response is a proposed contract. The actual authentication mechanism must be compatible with the media engine and selected RTSP client.
+Use short-lived credentials restricted to the requested camera and read operation. Do not return permanent camera credentials.
+7.3 How the client accesses compressed packets
+Consider the Python client using PyAV.
+import avstream_url = (    "rtsp://media-node-x:8554/"    "streams/camera-101")container = av.open(    stream_url,    options={"rtsp_transport": "tcp"})video_stream = container.streams.video[0]for packet in container.demux(video_stream):    for frame in packet.decode():        rgb = frame.to_ndarray(format="rgb24")        # Render frame in the frontend        display_frame(rgb)
+
+
+
+display_frame() represents the frontend rendering integration.
+Internally, the PyAV/FFmpeg stack handles the RTSP session, RTP payload processing, demultiplexing, and decoding. PyAV exposes separate demuxing and decoding operations. 
+
+PyAV 9.0.3.dev0 documentation
++1
+
+
+
+In production, this decoder runs in a worker thread or process, not in the Qt UI thread. Playback pacing, bounded frame queues, and reconnect behavior are also required.
+7.4 Recommended transport protocol
+Protocol	Recommended usage
+RTSP/RTP over TCP	Default Python desktop live streaming
+RTSPS / protected RTSP	Secure RTSP deployment where supported
+RTP over UDP	Controlled low-latency networks
+WebRTC	Browser viewing and interactive low-latency applications
+HLS	Browser playback where additional latency is acceptable
+SRT	Resilient contribution across unreliable networks
+WebSocket	Control events, notifications and reconnect messages
+For your Python-to-Python desktop VMS, I recommend RTSP/RTP over TCP as the initial transport.
+You do not need to design a proprietary video packet protocol.
+7.5 What happens when multiple clients view one camera?
+Camera 101 (4 Mbps)
+        │
+        │ One upstream stream
+        ▼
+Media Node X
+        │
+        ├── Recorder (4 Mbps payload)
+        │
+        ├── Viewer 1 (4 Mbps)
+        ├── Viewer 2 (4 Mbps)
+        ├── Viewer 3 (4 Mbps)
+        └── Viewer 4 (4 Mbps)
+
+
+The media node sends separate copies of the already-compressed data to each viewer, without decoding it.
+For four simultaneous mainstream viewers, the approximate outgoing live bandwidth is 16 Mbps.
+For 100 simultaneous mainstream viewers watching the same 4 Mbps stream, it becomes approximately 400 Mbps.
+This is why viewer concurrency is a separate sizing dimension from camera ingestion.
+You must account for both:
+- Camera-to-server ingress bandwidth.
+- Server-to-client streaming egress bandwidth.
+For large numbers of viewers, introduce dedicated streaming relay nodes.
+
+8. Media routing and gateway architecture
+A direct connection to the recording node is the preferred path when network access and security policies permit it.
+However, this is not always possible in a real distributed network.
+For example, a recording node may be inside a camera VLAN, at a remote district site, or behind a private network.
+8.1 Two supported connection modes
+Mode A — Direct streaming
+Preferred
+
+Media Node X
+
+Python Client
+
+
+Shortest media path. No central relay bandwidth.
+
+Mode B — Gateway streaming
+Media Node
+
+Relay
+
+Client
+
+
+Use for isolated networks, remote sites, security boundaries, or high viewer concurrency.
+
+8.2 Streaming Gateway responsibilities
+The Media Gateway will:
+- Accept authorized viewer connections.
+- Resolve or receive the current upstream media node.
+- Establish and maintain upstream stream subscriptions.
+- Redistribute compressed streams to connected clients.
+- Reuse one upstream subscription for multiple local viewers where possible.
+- Enforce bandwidth and viewer limits.
+- Maintain session and traffic metrics.
+- Recover upstream connections after media node changes.
+It should not decode or transcode ordinary streams.
+8.3 Gateway routing rules
+Condition	Routing behavior
+Client can directly access media node	Use direct endpoint
+Client is on a restricted network	Use approved relay
+Many clients request one camera	Use relay fanout when economical
+Media node egress approaches capacity	Route new sessions through relay capacity
+Media node changes	Resolve new owner and reconnect
+Selected gateway fails	Obtain a replacement gateway and reconnect
+Do not route live video through the FastAPI API Gateway. The Media Gateway is a separate media-plane component.
+8.4 Network locality
+If cameras are distributed across different district networks or remote sites, the scheduler should prefer a recording node close to the camera.
+For example:
+DISTRICT A
+  100 Cameras
+       │
+       ▼
+  Local Media Node
+       │
+       ├── Local Recording
+       │
+       └── Media Relay / WAN
+                 │
+                 ▼
+          Central Viewing Client
+
+
+This avoids continuously sending 100 camera streams across the WAN simply to record them at the central site.
+Only streams actively viewed at the central site need to traverse the WAN when recordings remain local, unless central replication is also required.
+
+9. Recording architecture
+Recording must operate independently of connected viewers.
+A camera should continue recording even when zero clients are watching.
+9.1 Recording lifecycle
+Camera assigned to Media Node
+             │
+             ▼
+RTSP stream established
+             │
+             ▼
+Compressed packets received
+             │
+             ▼
+Recorder writes active segment
+             │
+             ▼
+Segment closed and finalized
+             │
+             ▼
+Integrity and metadata validation
+             │
+             ▼
+Segment indexed in Recording Catalog
+             │
+             ▼
+Segment retained / replicated / expired
+
+
+9.2 Segment-based recording
+Do not store one enormous continuously growing file per camera.
+Use bounded recording segments.
+Recommended initial segment target: 60 seconds, subject to camera keyframe configuration, crash-recovery requirements, and media engine capabilities.
+Example:
+/storage/
+  cameras/
+    camera-101/
+      2026/
+        10/
+          08/
+            10-00-00.mp4
+            10-01-00.mp4
+            10-02-00.mp4
+
+
+A recording engine might use fragmented MP4 or MPEG-TS depending on recovery needs. The chosen format must be tested with power loss, incomplete writes, and timestamp discontinuities.
+9.3 Segment metadata
+Every finalized segment should be registered with the Recording Catalog.
+Example:
+{
+  "segment_id": "seg-98761",
+  "camera_id": "camera-101",
+  "node_id": "media-node-x",
+  "assignment_generation": 27,
+  "start_time": "2026-10-08T10:00:00Z",
+  "end_time": "2026-10-08T10:01:00Z",
+  "storage_uri": "node://media-node-x/recordings/seg-98761",
+  "codec": "h265",
+  "size_bytes": 30000000,
+  "status": "FINALIZED"
+}
+
+
+The node:// location is a proposed logical URI, not a predefined storage protocol. A storage resolver would translate it into an authorized local, object-storage, or media-service location.
+9.4 Segment state machine
+State	Description
+WRITING	Recorder is writing the active segment
+FINALIZING	File is being safely closed and validated
+AVAILABLE	Segment is complete and discoverable
+REPLICATING	Copying to an additional storage location
+DEGRADED	Available with reduced redundancy or integrity concern
+DELETING	Retention cleanup is in progress
+DELETED	Segment and its recording availability have been retired
+CORRUPT	Validation failed
+Segment finalization must be idempotent. Repeated notifications should not create duplicate catalog records.
+9.5 Recovery from unexpected node shutdown
+If a server suddenly loses power:
+1. Completed segments should remain discoverable.
+2. An active segment may be incomplete.
+3. On restart, a recovery worker inspects the local recording journal.
+4. Recoverable segments are finalized or repaired when possible.
+5. The Recording Catalog is reconciled with actual files.
+6. Missing or irrecoverable intervals are recorded as gaps.
+Do not assume that merely writing MP4 files guarantees crash safety.
+The storage filesystem and recording format should be tested under unclean shutdown conditions.
+
+10. Distributed storage architecture
+Storage is likely to become the dominant infrastructure cost.
+10.1 Storage calculations
+Assume 1,000 cameras, each streaming at an average 4 Mbps, recording continuously.
+Metric	Estimated requirement
+Total compressed ingest	4 Gbps
+Aggregate payload write rate	500 MB/s
+Recording per day	43.2 TB
+Recording per 7 days	302.4 TB
+Recording per 15 days	648 TB
+Recording per 30 days	1,296 TB
+Recording per 90 days	3,888 TB
+These are decimal payload figures and do not include filesystem overhead, replication, parity, filesystem reserves, or operational headroom.
+At 100 cameras per recording node, each node would produce approximately 4.32 TB of recording data per day, or 129.6 TB over 30 days at the assumed bitrate.
+10.2 Available storage models
+Model	Description	Trade-off
+Local node storage	Each recording node writes to attached disks	Efficient but older video can be inaccessible after node failure
+Shared NAS/SAN	Nodes record to shared storage	Easier centralized access; requires robust storage networking
+Object storage	Finalized segments uploaded to S3-compatible storage	Scalable retention and replication; requires upload/caching design
+Hybrid	Record locally, replicate or tier to central storage	Strong option for distributed surveillance sites
+10.3 Recommended hybrid approach
+Media Node
+   │
+   ▼
+LOCAL RECORDING DISKS
+   │
+   ├── Immediate live recording
+   ├── Local recent playback
+   └── Durable upload queue
+              │
+              ▼
+     REPLICATION WORKER
+              │
+              ▼
+      CENTRAL STORAGE
+              │
+              ├── Long-term retention
+              ├── Recovery copy
+              └── Playback retrieval
+
+
+The central storage destination could be a highly available NAS or S3-compatible object storage platform.
+Replication is optional depending on the actual budget, site connectivity, availability requirements, and retention policy.
+For remote sites with limited bandwidth, continuous central replication of every camera may be impractical.
+10.4 Recording continuity versus recording durability
+These are different requirements.
+Recording continuity means a healthy camera continues recording as consistently as possible.
+Recording durability means video already recorded survives hardware failures.
+Failing over Camera 101 to another node may restore recording continuity, but it will not protect historical segments stored exclusively on the failed node.
+Durability requires appropriate disk redundancy and/or independent storage copies.
+10.5 Storage capacity protection
+The recording system must continuously monitor:
+- Free usable disk space.
+- Sustained disk write performance.
+- Storage error rates.
+- Replication backlog.
+- Segment finalization failures.
+- Expected retention exhaustion.
+- Degraded storage pools.
+Retention deletion should run through a controlled lifecycle that prevents deleting files currently in use or losing track of recorded segments.
+For surveillance evidence, additional retention holds may prohibit deletion even after the ordinary retention period expires.
+
+11. Recording playback architecture
+Live viewing and historical playback are related but different operations.
+Live viewing needs to locate the current camera owner.
+Historical playback needs to find which storage location contains video for the requested time interval, even if the camera has moved between media servers.
+11.1 Playback request flow
+PYTHON CLIENT
+     │
+     │ Request:
+     │ Camera 101
+     │ 10:00 AM to 10:30 AM
+     ▼
+CENTRAL API
+     │
+     ▼
+RECORDING CATALOG
+     │
+     ├── 10:00–10:10 → Node X
+     ├── 10:10–10:20 → Node Y
+     └── 10:20–10:30 → Object Storage
+     │
+     ▼
+PLAYBACK LOCATOR
+     │
+     │ Builds ordered segment manifest
+     ▼
+CLIENT
+     │
+     │ Requests compressed media
+     ▼
+STORAGE / PLAYBACK SERVICE
+     │
+     │ Sends compressed video
+     ▼
+CLIENT DECODER
+     │
+     ▼
+CANVAS / DISPLAY
+
+
+The catalog makes playback independent of whichever node currently owns the camera.
+11.2 Playback API
+Proposed endpoint:
+GET /api/v1/cameras/{camera_id}/recordings
+    ?start=2026-10-08T10:00:00Z
+    &end=2026-10-08T10:30:00Z
+
+
+Example response:
+{
+  "camera_id": "camera-101",
+  "requested_start": "2026-10-08T10:00:00Z",
+  "requested_end": "2026-10-08T10:30:00Z",
+  "segments": [
+    {
+      "segment_id": "seg-001",
+      "start": "2026-10-08T10:00:00Z",
+      "end": "2026-10-08T10:01:00Z",
+      "storage_node": "media-node-x",
+      "status": "AVAILABLE"
+    },
+    {
+      "segment_id": "seg-002",
+      "start": "2026-10-08T10:01:00Z",
+      "end": "2026-10-08T10:02:00Z",
+      "storage_node": "media-node-y",
+      "status": "AVAILABLE"
+    }
+  ],
+  "gaps": []
+}
+
+
+11.3 Playback service responsibilities
+The Playback Service will:
+- Query the recording catalog.
+- Find segments overlapping the requested time range.
+- Retrieve media from local or remote storage.
+- Validate playback authorization.
+- Support seeking, pause, resume, and playback speed changes.
+- Present recording gaps accurately.
+- Return media in a supported streaming or segmented-file format.
+- Avoid re-encoding when existing compressed streams are compatible.
+The playback service may remux compressed packets into a more suitable output container without decoding them.
+11.4 Seeking and time synchronization
+The system must use consistent timestamps throughout the camera, recorder, database, and client.
+Recommended practice:
+- Store absolute timestamps in UTC.
+- Synchronize all media nodes using NTP, or PTP where precise synchronization is required.
+- Retain original media presentation and decoding timestamps.
+- Maintain a mapping between recording wall-clock time and media timestamps.
+- Preserve discontinuities caused by camera restarts or reconnections.
+- Seek from a suitable preceding keyframe and decode forward to the requested presentation time.
+Do not assume that a camera's embedded time is always correct.
+
+12. Database architecture
+PostgreSQL will be the authoritative system of record for management state and recording metadata.
+The database must not store decoded frames or continuous media payloads.
+12.1 Proposed database entities
+cameras
+Camera configuration
+
+
+camera_streams
+Main/substream profiles
+
+
+media_nodes
+Node registration
+
+
+camera_assignments
+Ownership and generation
+
+
+recording_segments
+Video index
+
+
+storage_locations
+Disk/object references
+
+
+stream_sessions
+Active viewers
+
+
+recording_gaps
+Missing intervals
+
+
+node_health
+Operational state
+
+
+users / roles
+Access control
+
+
+audit_events
+Administrative history
+
+
+retention_policies
+Storage lifecycle
+
+
+
+
+12.2 Important relationships
+media_nodes
+    │
+    └── camera_assignments
+              │
+              └── cameras
+                    │
+                    ├── camera_streams
+                    │
+                    ├── recording_segments
+                    │       │
+                    │       └── storage_locations
+                    │
+                    ├── recording_gaps
+                    │
+                    └── stream_sessions
+
+
+Historical segment records must not be deleted simply because a camera is reassigned to another node.
+12.3 Example core table design
+CREATE TABLE media_nodes (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    management_address TEXT NOT NULL,
+    streaming_address TEXT,
+    status TEXT NOT NULL,
+    capacity_limit INTEGER NOT NULL,
+    last_heartbeat TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE cameras (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    site_id UUID,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    recording_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE camera_assignments (
+    camera_id UUID PRIMARY KEY
+        REFERENCES cameras(id),
+    node_id UUID NOT NULL
+        REFERENCES media_nodes(id),
+    generation BIGINT NOT NULL,
+    lease_expires_at TIMESTAMPTZ NOT NULL,
+    desired_state TEXT NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+
+These definitions illustrate the core schema. The full implementation also needs stream profiles, encrypted credential references, network reachability, indices, constraints, storage metadata, and operational history.
+12.4 Recording segment indexing
+The most important recording query will be:
+Find all recording segments for Camera X between Timestamp A and Timestamp B.
+
+Recommended query pattern:
+SELECT *
+FROM recording_segments
+WHERE camera_id = :camera_id
+  AND start_time < :requested_end
+  AND end_time > :requested_start
+  AND status = 'AVAILABLE'
+ORDER BY start_time;
+
+
+This finds overlapping segments, not only those whose start times fall inside the interval.
+Recording metadata tables should be partitioned by time as data volume increases, with indexes appropriate for camera-and-time interval queries.
+At 1,000 cameras with ideal 60-second segments:
+Period	Approximate new segment rows
+One hour	60,000
+One day	1,440,000
+30 days	43,200,000
+Actual counts depend on stream interruptions, segment boundaries, and camera-specific recording policies.
+This database load is manageable with appropriate batching, partitioning, indexing, and maintenance, but it requires deliberate design.
+12.5 Database high availability
+Use PostgreSQL with:
+- One writable primary and at least one standby.
+- Automated failover with a proven cluster manager.
+- Regular backups and tested point-in-time recovery.
+- WAL archiving.
+- Connection pooling.
+- Monitoring of replication lag and storage capacity.
+Redis, if used, should serve caching and event-distribution purposes rather than replacing the durable assignment registry.
+
+13. Server failure and automatic recovery
+Failover must be controlled by the central cluster-management system.
+13.1 Failure detection
+Each Media Agent reports heartbeats to the management service.
+Illustrative configuration:
+Heartbeat interval:       5 seconds
+Suspect node after:      15 seconds
+Failover decision:       After lease/fencing checks
+
+
+These are configurable starting values, not guarantees of detection latency.
+A missed heartbeat does not necessarily mean the server has failed. It could indicate a network partition, controller outage, or temporary congestion.
+13.2 Failover sequence
+Camera 101 → Node X
+                  │
+                  ▼
+             Node X fails
+                  │
+                  ▼
+           Heartbeat timeout
+                  │
+                  ▼
+       Validate node/lease state
+                  │
+                  ▼
+          Fence old ownership
+                  │
+                  ▼
+        Select healthy Node Y
+                  │
+                  ▼
+      Persist new assignment
+                  │
+                  ▼
+       Node Y connects camera
+                  │
+                  ▼
+         Recording resumes
+                  │
+                  ▼
+       Catalog and registry update
+                  │
+                  ▼
+         Clients reconnect
+
+
+13.3 Failure scenarios and expected behavior
+Failure	Expected action
+Individual camera disconnects	Reconnect with bounded exponential backoff
+RTSP session stalls	Detect stalled media, then restart session
+Media engine crashes	Python Agent restarts engine and reconciles streams
+Media Agent crashes	Service supervisor restarts it
+Entire media node fails	Fence and reassign cameras
+Local recording disk fills	Alert, apply storage policy, or relocate workloads
+Node loses controller connection	Follow defined lease-expiry policy
+Central API fails	Another API instance serves requests
+Database primary fails	Promote healthy standby through HA manager
+Streaming gateway fails	Clients reconnect through an alternate gateway
+Site network fails	Local recording continues if node-camera connectivity survives
+13.4 Live client failover
+The client should not keep an outdated media node address permanently.
+Two mechanisms should be implemented:
+Connection failure recovery
+Client → Node X
+      Connection lost
+            │
+            ▼
+Client → Central API
+            │
+            ▼
+Updated assignment: Node Y
+            │
+            ▼
+Client → Node Y
+
+
+Proactive topology notifications
+The central API can publish events using WebSocket or Server-Sent Events:
+{
+  "event": "CAMERA_OWNER_CHANGED",
+  "camera_id": "camera-101",
+  "previous_node": "media-node-x",
+  "new_node": "media-node-y",
+  "generation": 28
+}
+
+
+Clients receiving this event can refresh stream discovery instead of waiting for a prolonged timeout.
+The event should not be treated as an authorization token or a permanent source of truth.
+13.5 Control-plane failure
+A temporary failure of the Central API should not immediately terminate healthy recording streams.
+The design should support local recording continuity within a defined failure policy.
+For example, agents can continue recording under a locally retained valid assignment while control-plane connectivity is temporarily unavailable.
+However, this must be coordinated with the ownership lease and fencing strategy. For stronger single-owner guarantees, independent node continuation may need to be bounded, and a highly available coordination store is essential.
+
+14. Network architecture
+A distributed VMS has three main traffic classes.
+
+Camera Ingestion Network
+Camera → Media Node
+RTSP/RTP · Continuous compressed media
+
+
+
+
+Management Network
+Control Plane ↔ Media Agents
+HTTPS · Events · Metrics · Assignments
+
+
+
+
+Viewer Network
+Media Nodes / Relays → Clients
+RTSP/RTP · Playback · Optional WebRTC
+
+
+
+14.1 Network separation
+For larger deployments, use different VLANs or network security zones for:
+- Cameras and field devices.
+- Media-node ingestion interfaces.
+- Internal management traffic.
+- Storage/replication traffic.
+- Client streaming access.
+Physical interface separation is optional depending on the site design, but firewall policies and traffic visibility should remain explicit.
+14.2 Network capacity
+For 100 cameras at 4 Mbps on one media node:
+Ingress:
+
+100 × 4 Mbps = 400 Mbps
+
+Recording payload:
+
+400 / 8 = 50 MB/s
+
+Live egress:
+
+Depends on simultaneous viewers and profile bitrate
+
+
+A 1 Gbps interface may be sufficient for limited workloads, but could become a bottleneck with concurrent viewers, replication, protocol overhead, and bursts.
+Use 10 GbE or higher where sustained traffic and failover capacity justify it.
+The infrastructure should be sized against peak operating conditions, not only the average camera bitrate.
+14.3 Distributed sites
+For district, campus, or remote-site deployments, maintain a reachability matrix:
+Site A Cameras → Nodes A1, A2
+Site B Cameras → Nodes B1, B2
+Site C Cameras → Nodes C1, C2
+
+
+The scheduler should never assign a camera to a node that cannot reach its camera network or that lacks the necessary storage and security permissions.
+
+15. Authentication and security architecture
+Video surveillance streams and recordings may contain sensitive operational information.
+Access control must apply to both management requests and the actual media connections.
+15.1 User authentication
+The client authenticates with the Central API.
+The API evaluates:
+- User identity and roles.
+- Accessible sites and cameras.
+- Live-view permissions.
+- Recording playback permissions.
+- Recording export permissions.
+- Administrative permissions.
+15.2 Media authorization
+Do not expose permanent camera RTSP credentials to clients.
+Use this model:
+Client
+   │
+   │ User access token
+   ▼
+Central API
+   │
+   │ Validate camera permissions
+   ▼
+Issue short-lived media credential
+   │
+   ▼
+Client
+   │
+   │ Authorized media connection
+   ▼
+Media Node / Gateway
+
+
+Media nodes must validate credentials themselves, either locally using trusted signed tokens or through an authorized validation service.
+MediaMTX supports internal authentication, external HTTP authentication, and JWT-based authentication. 
+
+GitHub
+
+
+
+15.3 Essential security controls
+Security area	Recommended approach
+User authentication	Centralized identity and RBAC
+Media authentication	Short-lived, scoped credentials
+Camera credentials	Encrypted secret storage
+API transport	TLS/HTTPS
+Media transport	Protected RTSP/RTP or secured network tunnel
+Service communication	Mutual TLS where appropriate
+Network segmentation	Restricted camera and storage networks
+Node registration	Unique node identity and authenticated enrollment
+Audit logging	Camera access, playback, exports, configuration
+Secrets rotation	Credential rotation without exposing secrets to clients
+Recording access	Per-camera authorization and secure download
+Storage integrity	Checksums, immutable retention where required
+Avoid placing long-lived bearer tokens in URLs, logs, crash reports, or monitoring traces.
+
+16. Monitoring, health checks, and observability
+At 1,000 cameras, it is not enough to know whether each media server is running.
+The system must know whether each camera is producing usable video and whether recording data is actually being written.
+16.1 Three levels of monitoring
+Level	What to monitor
+Infrastructure	CPU, RAM, NIC, disk, temperature, processes
+Camera streams	RTSP status, packet loss, bitrate, FPS, reconnects, stream stalls
+Recording	Segments finalized, recording gaps, write failures, retention, replication
+16.2 Camera state model
+Each camera should expose a meaningful operational state.
+UNASSIGNED
+    │
+    ▼
+ASSIGNED
+    │
+    ▼
+CONNECTING
+    │
+    ▼
+STREAMING
+    │
+    ▼
+RECORDING
+
+
+Additional states include:
+DISCONNECTED, RECONNECTING, STALLED, DEGRADED, FAILOVER, and DISABLED.
+The system must distinguish between stream connected and recording healthy.
+For example, a camera could be streaming correctly while recording fails because the disk is full.
+16.3 Monitoring tools
+I recommend:
+- Prometheus for metrics.
+- Grafana for dashboards.
+- Loki or OpenSearch for logs.
+- OpenTelemetry for distributed request tracing.
+- Central alert management for critical events.
+MediaMTX exposes Prometheus-compatible metrics for streams, sessions, network traffic, and packet-related conditions. 
+
+MediaMTX
+
+
+
+16.4 Operational dashboard
+Distributed VMS — Cluster Health
+Illustrative
+
+Registered cameras
+1,000
+
+Recording cameras
+992
+
+Healthy media nodes
+10 / 11
+
+Incoming bandwidth
+3.97 Gbps
+
+
+
+Recording availability
+99.2%
+
+
+
+992
+Recording
+
+5
+Reconnecting
+
+3
+Offline
+
+
+Illustrative dashboard values only; not actual deployment measurements.
+
+
+17. Deployment architecture
+17.1 Central control services
+The control-plane software should support multi-instance deployment.
+                    CLIENTS
+                       │
+                       ▼
+                API LOAD BALANCER
+                       │
+             ┌─────────┴─────────┐
+             ▼                   ▼
+         API INSTANCE 1      API INSTANCE 2
+             │                   │
+             └─────────┬─────────┘
+                       │
+             ┌─────────┴──────────┐
+             ▼                    ▼
+        PostgreSQL HA         Event Broker
+             │                    │
+             └─────────┬──────────┘
+                       │
+                 Node Agents
+
+
+The control plane should use persistent shared state so any healthy API instance can locate a camera or return its streaming endpoint.
+Run scheduler leadership and failover coordination under a single-active-leader or equivalent concurrency-safe design. Multiple FastAPI replicas must not independently reassign the same cameras without coordination.
+17.2 Media server deployment
+Each media server runs:
+Media Server Host
+│
+├── Python Media Agent
+│
+├── Native Media Engine
+│
+├── Local Recording Service
+│
+├── Storage/Replication Worker
+│
+├── Health and Metrics Exporter
+│
+└── Service Supervisor
+
+
+You may deploy these services in separate containers.
+For example:
+Docker Host
+│
+├── vms-media-agent
+├── vms-media-engine
+├── vms-storage-worker
+└── node-exporter
+
+
+A dedicated container orchestration platform is not mandatory initially.
+For a small, fixed cluster, Docker Compose with a reliable service supervisor and centralized deployment automation is sufficient to begin development and testing.
+For large deployments, Kubernetes or another orchestrator may become useful, but the VMS scheduler must still manage logical camera ownership. Container orchestration does not automatically solve camera assignment, recording continuity, or storage placement.
+
+18. Proposed Python project structure
+I recommend using a monorepo initially, with independently deployable services.
+distributed-vms/
+│
+├── services/
+│   │
+│   ├── control-plane/
+│   │   ├── app/
+│   │   │   ├── api/
+│   │   │   ├── auth/
+│   │   │   ├── cameras/
+│   │   │   ├── nodes/
+│   │   │   ├── scheduler/
+│   │   │   ├── assignments/
+│   │   │   ├── streaming/
+│   │   │   ├── recordings/
+│   │   │   ├── playback/
+│   │   │   ├── monitoring/
+│   │   │   └── database/
+│   │   │
+│   │   ├── migrations/
+│   │   ├── tests/
+│   │   └── main.py
+│   │
+│   ├── media-agent/
+│   │   ├── app/
+│   │   │   ├── registration/
+│   │   │   ├── assignments/
+│   │   │   ├── cameras/
+│   │   │   ├── media_engine/
+│   │   │   ├── recording/
+│   │   │   ├── storage/
+│   │   │   ├── monitoring/
+│   │   │   ├── recovery/
+│   │   │   └── local_state/
+│   │   │
+│   │   ├── tests/
+│   │   └── main.py
+│   │
+│   ├── recording-catalog/
+│   │   ├── app/
+│   │   │   ├── segments/
+│   │   │   ├── indexing/
+│   │   │   ├── retention/
+│   │   │   ├── reconciliation/
+│   │   │   └── playback_locator/
+│   │   │
+│   │   └── main.py
+│   │
+│   └── media-gateway/
+│       ├── app/
+│       │   ├── routing/
+│       │   ├── authorization/
+│       │   └── session_management/
+│       │
+│       └── main.py
+│
+├── clients/
+│   └── python-desktop/
+│       ├── api/
+│       ├── streaming/
+│       ├── decoding/
+│       ├── playback/
+│       └── ui/
+│
+├── shared/
+│   ├── schemas/
+│   ├── events/
+│   ├── security/
+│   └── contracts/
+│
+├── infrastructure/
+│   ├── docker/
+│   ├── database/
+│   ├── monitoring/
+│   └── deployment/
+│
+└── docs/
+
+
+The Recording Catalog can initially run as a module of the control-plane backend while maintaining its own interfaces. It can later be deployed independently if metadata ingestion or playback-query traffic justifies the separation.
+
+19. System APIs and communication contracts
+The following is a proposed initial API contract.
+19.1 Client-facing APIs
+Method	Endpoint	Purpose
+GET	/api/v1/cameras	List authorized cameras
+GET	/api/v1/cameras/{id}	Camera details
+GET	/api/v1/cameras/{id}/live	Get live stream location
+GET	/api/v1/cameras/{id}/recordings	Retrieve recording timeline
+POST	/api/v1/playback/sessions	Create authorized playback session
+GET	/api/v1/media-nodes	List visible node status (administrators)
+GET	/api/v1/cluster/health	Cluster health summary
+19.2 Media node management APIs
+Method	Endpoint	Purpose
+POST	/internal/v1/nodes/register	Register media node
+POST	/internal/v1/nodes/{id}/heartbeat	Report operational state
+GET	/internal/v1/nodes/{id}/assignments	Fetch desired assignments
+POST	/internal/v1/cameras/{id}/status	Report stream/recording status
+POST	/internal/v1/recordings/segments	Register finalized segment
+POST	/internal/v1/nodes/{id}/drain	Start controlled maintenance
+These internal endpoints require service authentication and must not be exposed as general client APIs.
+19.3 Event messaging
+Use durable events for important state transitions.
+Example event types:
+NODE_REGISTERED
+NODE_HEALTH_CHANGED
+NODE_UNREACHABLE
+
+CAMERA_ASSIGNED
+CAMERA_OWNER_CHANGED
+CAMERA_CONNECTED
+CAMERA_DISCONNECTED
+CAMERA_STREAM_STALLED
+
+RECORDING_STARTED
+RECORDING_SEGMENT_FINALIZED
+RECORDING_GAP_DETECTED
+RECORDING_STORAGE_FAILURE
+
+STORAGE_LOW_SPACE
+STORAGE_REPLICATION_FAILED
+
+
+The event broker carries operational information, not the camera video streams.
+For durable state-changing events, use idempotent consumers and a reliable publishing pattern such as a transactional outbox, followed by periodic reconciliation.
+
+20. Implementation roadmap
+The system should be built incrementally, validating recording correctness and recovery behavior before attempting maximum camera scale.
+
+Phase 1 — Single-node media foundation
+Implement Python Media Agent, native media engine, camera ingestion, stream recording, recording segment catalog, and Python live-view client.
+Acceptance: Continuous recording and live viewing work simultaneously, without server-side decoding.
+
+
+
+
+Phase 2 — Multi-node coordination
+Implement node registration, heartbeats, camera scheduler, ownership leases, assignment reconciliation, and stream discovery.
+Acceptance: Cameras can be assigned across multiple servers and clients automatically resolve the correct streaming node.
+
+
+
+
+Phase 3 — Recording catalog and playback
+Implement time-indexed segment storage, recording lookup, playback session creation, storage abstraction, and retention management.
+Acceptance: Historical video remains locatable even after a camera changes media nodes.
+
+
+
+
+Phase 4 — Failover and recovery
+Implement node fencing, camera reassignment, restart recovery, recording journal reconciliation, and client stream reconnection.
+Acceptance: Failover works without duplicate active ownership; recording gaps are measured and accurately indexed.
+
+
+
+
+Phase 5 — Performance and capacity testing
+Test 100, 250, 500, and 1,000 aggregate camera streams using realistic traffic, codecs, and failure simulations.
+Acceptance: Sustained throughput, storage health, recording completeness, and streaming performance meet defined operational targets.
+
+
+
+
+Phase 6 — Production hardening
+Add control-plane HA, durable event processing, authenticated media sessions, monitoring, automated deployment, backup recovery, and operational runbooks.
+Acceptance: Cluster survives tested service, host, disk, and network failure scenarios within documented recovery targets.
+
+
+
+21. Performance validation and acceptance tests
+Before finalizing media node capacity, measure the following under sustained load.
+Test	What must be verified
+Ingestion capacity	Maximum stable cameras per node
+Recording completeness	Expected recording duration versus actual recorded intervals
+Disk throughput	Sustained write performance with concurrent playback
+Live fanout	Maximum viewers at different stream bitrates
+CPU consumption	Media engine and agent overhead without decoding
+Memory stability	No increasing memory usage over long runs
+Camera reconnection	Recovery from connection drops and stream stalls
+Node crash	Reassignment and measured recording gap
+Network partition	Correct fencing and no unintended duplicate ownership
+Storage exhaustion	Predictable behavior without catalog corruption
+Control-plane outage	Healthy recording continuity according to lease policy
+Playback	Accurate seeking across segments and node changes
+Recovery	Catalog and filesystem consistency after power loss
+For meaningful load testing, simulate actual compressed H.264/H.265 streams with realistic GOP/keyframe intervals, bitrates, RTP behavior, timestamp variation, and reconnect patterns. A simple synthetic data generator that only transmits arbitrary bytes will not properly validate a VMS.
+
+22. Final architectural decisions
+Area	Selected approach
+Overall architecture	Distributed media plane + logically centralized HA control plane
+Primary backend language	Python
+Control API	FastAPI
+Database	PostgreSQL
+Media node orchestration	Python Agent
+Media engine	MediaMTX, with FFmpeg/GStreamer where needed
+Ingestion protocol	RTSP/RTP
+Primary client media protocol	RTSP/RTP over TCP
+Default recording method	Compressed stream copy
+Server-side video decoding	Not required for normal recording or relay
+Camera assignment	Capacity-aware scheduler
+Assignment authority	PostgreSQL-backed desired state, leases and fencing
+Live stream discovery	Central API
+Live video delivery	Media Node → Client
+Restricted-network delivery	Media Node → Media Gateway → Client
+Recording storage	Local or hybrid distributed storage
+Recording metadata	Central recording catalog
+Playback	Time-indexed recording manifest and authorized media retrieval
+Node failover	Automated reassignment with ownership fencing
+Monitoring	Prometheus, Grafana and centralized logging
+Long-term scaling	Horizontal media node, gateway and storage expansion
+23. End-to-end architecture: final view
+                  DISTRIBUTED VMS
+════════════════════════════════════════════════════
+
+             PYTHON DESKTOP CLIENTS
+                       │
+                       │ HTTPS
+                       ▼
+              API LOAD BALANCER
+                       │
+                       ▼
+             CENTRAL CONTROL PLANE
+                       │
+          ┌────────────┼────────────┐
+          │            │            │
+          ▼            ▼            ▼
+      CAMERA        NODE         STREAM
+      REGISTRY      SCHEDULER    DISCOVERY
+          │            │            │
+          └────────────┼────────────┘
+                       │
+              POSTGRESQL HA
+                       │
+                 EVENT BROKER
+                       │
+                       ▼
+══════════════ MEDIA SERVER CLUSTER ════════════════
+
+   MEDIA NODE X     MEDIA NODE Y     MEDIA NODE Z
+       │                │                │
+    Agent            Agent            Agent
+       │                │                │
+    Media            Media            Media
+    Engine           Engine           Engine
+       │                │                │
+    Recorder         Recorder         Recorder
+       │                │                │
+    Storage          Storage          Storage
+       │                │                │
+       └────────────────┼────────────────┘
+                        │
+                Recording Catalog
+                        │
+                Playback Locator
+                        │
+                Optional Archive
+                        │
+                        ▼
+                 Storage Cluster
+
+════════════════════════════════════════════════════
+
+CAMERA INGESTION:
+
+Camera → Assigned Media Node → Recorder → Storage
+
+LIVE STREAMING:
+
+Client → Central API → Discover Media Node
+
+Media Node ── Compressed Video ──► Client
+                                      │
+                                      ▼
+                                   Decode
+                                      │
+                                      ▼
+                                   Display
+
+RESTRICTED NETWORK:
+
+Media Node → Media Gateway → Client
+
+HISTORICAL PLAYBACK:
+
+Client → Central API → Recording Catalog
+                              │
+                              ▼
+                         Storage Locator
+                              │
+                              ▼
+                      Compressed Video
+                              │
+                              ▼
+                     Client-side Decode
+
+FAILOVER:
+
+Node X fails
+      │
+      ▼
+Controller detects failure
+      │
+      ▼
+Ownership fencing
+      │
+      ▼
+Camera reassigned to Node Y
+      │
+      ▼
+Recording resumes
+      │
+      ▼
+Client resolves new live endpoint
+
+════════════════════════════════════════════════════
+
+
+24. Conclusion
+The recommended design is a distributed, control-plane-driven VMS with independent recording and streaming media nodes.
+The architecture has three non-negotiable principles:
+1. Media nodes own video processing and storage operations. They ingest compressed camera streams, record them, and relay compressed video to clients. They do not perform unnecessary frame decoding.
+2. The Central Control Plane manages ownership and metadata, not media traffic. It schedules cameras, coordinates failures, manages authorization, and resolves video locations.
+3. The client connects to the correct media endpoint dynamically. It does not need to know beforehand which node owns a camera. If ownership changes, stream discovery provides the updated route.
+With these boundaries, the system can grow by adding media nodes, storage capacity, and relay capacity independently.
+The primary engineering challenge at 1,000 cameras will not be Python itself. It will be achieving reliable 24/7 recording, predictable disk and network performance, correct failover behavior, durable metadata, and accurate playback across distributed nodes.
+These should be treated as the key architectural acceptance criteria before scaling the deployment.

@@ -1,0 +1,63 @@
+from enum import Enum
+
+from tortoise import fields
+from tortoise.models import Model
+
+
+class StreamStatus(str, Enum):
+    UNKNOWN = "UNKNOWN"
+    UNASSIGNED = "UNASSIGNED"
+    ASSIGNED = "ASSIGNED"
+    CONNECTING = "CONNECTING"
+    IDLE = "IDLE"  # live-only stream, connects on demand when someone watches
+    STREAMING = "STREAMING"
+    RECORDING = "RECORDING"
+    NOT_RECORDING = "NOT_RECORDING"
+    DISABLED = "DISABLED"
+
+
+class Camera(Model):
+    id = fields.IntField(primary_key=True)
+    name = fields.CharField(max_length=128)
+    description = fields.TextField(null=True)
+    username = fields.CharField(max_length=128, null=True)
+    password = fields.CharField(max_length=256, null=True)
+    enabled = fields.BooleanField(default=True)
+    retention_days = fields.IntField(default=7)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    streams: fields.ReverseRelation["CameraStream"]
+
+    class Meta:
+        table = "cameras"
+        ordering = ["id"]
+
+
+class CameraStream(Model):
+    """One video profile of a camera (main / sub / ...), pulled by MediaMTX as one path."""
+
+    id = fields.IntField(primary_key=True)
+    camera: fields.ForeignKeyRelation[Camera] = fields.ForeignKeyField(
+        "models.Camera", related_name="streams", on_delete=fields.CASCADE
+    )
+    profile = fields.CharField(max_length=32)
+    source_url = fields.CharField(max_length=1024)
+    record = fields.BooleanField(default=True)
+    rtsp_transport = fields.CharField(max_length=16, default="tcp")
+
+    # Runtime state reported by the owning media node.
+    status = fields.CharEnumField(StreamStatus, max_length=32, default=StreamStatus.UNASSIGNED)
+    status_detail = fields.CharField(max_length=512, null=True)
+    bytes_received = fields.BigIntField(default=0)
+    last_status_at = fields.DatetimeField(null=True)
+    last_segment_at = fields.DatetimeField(null=True)
+
+    class Meta:
+        table = "camera_streams"
+        unique_together = (("camera", "profile"),)
+        ordering = ["id"]
+
+    def path_name(self) -> str:
+        """MediaMTX path name, shared by live URLs and recording folders."""
+        return f"cam-{self.camera_id}/{self.profile}"  # type: ignore[attr-defined]
