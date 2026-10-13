@@ -14,8 +14,14 @@ media_node/data/
 *.sqlite3-shm
 *.sqlite3-wal
 
+# Desktop client: libmpv DLL (download per nvr_desktop/README.md)
+nvr_desktop/bin/
+
 # OS / editors
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+
+# Local-only notes with credentials (never commit)
+*.local.md

@@ -1,0 +1,11 @@
+# Shah-NVR desktop client. Install: pip install -r requirements.txt
+# libmpv itself is not a pip package: see README.md ("libmpv").
+PySide6==6.12.0
+python-mpv==1.0.8
+httpx==0.28.1
+pydantic==2.14.0
+pydantic-settings==2.15.0
+
+# development / tests
+pytest==9.1.1
+respx==0.23.1
