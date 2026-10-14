@@ -7,6 +7,7 @@
 """
 
 import asyncio
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Response, status
@@ -16,34 +17,42 @@ from app.recordings.models import LocalSegment
 from app.recordings.schemas import LocalSegmentOut
 from app.recordings.services import file_exists, read_slice
 from app.recordings.utils import rebase_timestamps
-from settings.settings import settings
+from app.storage.services import storage
 
 router = APIRouter(prefix="/api/v1", tags=["Recorded media"])
 
 CACHE_HEADERS = {"Cache-Control": "public, max-age=86400, immutable"}
 
 
-async def _segment(segment_id: UUID) -> LocalSegment:
+async def _segment(segment_id: UUID) -> tuple[LocalSegment, Path]:
+    """The chunk and the folder of the volume that holds it."""
     seg = await LocalSegment.get_or_none(id=segment_id)
-    if seg is None or not file_exists(seg.rel_path):
+    if seg is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Recording not found on this node")
-    return seg
+    volume = storage.get(seg.volume_id)
+    if volume is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "The storage holding this recording was removed")
+    if not volume.usable:  # e.g. network share offline: answer at once instead of hanging on the path
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"Storage offline: {volume.path}")
+    if not await asyncio.to_thread(file_exists, volume.path, seg.rel_path):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Recording not found on this node")
+    return seg, volume.path
 
 
 @router.get("/media/{segment_id}/init.mp4")
 async def media_init(segment_id: UUID):
-    seg = await _segment(segment_id)
-    data = await asyncio.to_thread(read_slice, seg.rel_path, 0, seg.init_size)
+    seg, root = await _segment(segment_id)
+    data = await asyncio.to_thread(read_slice, root, seg.rel_path, 0, seg.init_size)
     return Response(data, media_type="video/mp4", headers=CACHE_HEADERS)
 
 
 @router.get("/media/{segment_id}/part/{index}.m4s")
 async def media_part(segment_id: UUID, index: int):
-    seg = await _segment(segment_id)
+    seg, root = await _segment(segment_id)
     if not 0 <= index < len(seg.parts):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Part not found")
     part = seg.parts[index]
-    data = bytearray(await asyncio.to_thread(read_slice, seg.rel_path, part["o"], part["s"]))
+    data = bytearray(await asyncio.to_thread(read_slice, root, seg.rel_path, part["o"], part["s"]))
     if seg.tracks:
         rebase_timestamps(data, seg.tracks, seg.start_time)
     return Response(bytes(data), media_type="video/mp4", headers=CACHE_HEADERS)
@@ -51,9 +60,9 @@ async def media_part(segment_id: UUID, index: int):
 
 @router.get("/media/{segment_id}/file.mp4")
 async def media_file(segment_id: UUID):
-    seg = await _segment(segment_id)
+    seg, root = await _segment(segment_id)
     filename = f"cam{seg.camera_id}_{seg.profile}_{seg.start_time:%Y%m%dT%H%M%SZ}.mp4"
-    return FileResponse(settings.RECORDINGS_DIR / seg.rel_path, media_type="video/mp4", filename=filename)
+    return FileResponse(root / seg.rel_path, media_type="video/mp4", filename=filename)
 
 
 @router.get("/segments", response_model=list[LocalSegmentOut], summary="Chunks stored on this node (debug)")
