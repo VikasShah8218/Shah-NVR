@@ -18,8 +18,11 @@ import type {
   NodeStatus,
   NodeUpdate,
   StreamIn,
+  StorageVolume,
   StreamUpdate,
   Timeline,
+  VolumeCreate,
+  VolumeUpdate,
 } from "./types"
 
 /** Central client + polling interval bound to the current settings. */
@@ -270,6 +273,52 @@ export const useDeleteNode = () =>
     (api, { id, force }: { id: number; force: boolean }) =>
       unwrap(api.DELETE("/api/v1/nodes/{node_id}", { params: { path: { node_id: id }, query: { force } } })),
     { success: "Node removed" },
+  )
+
+// ---------------------------------------------------------------- storage volumes (where a node records)
+
+const VOLUME_KEYS = ["nodes", "cluster-health"]
+
+export const useAddVolume = () =>
+  useCentralMutation(
+    (api, { nodeId, body }: { nodeId: number; body: VolumeCreate }) =>
+      unwrap<StorageVolume>(api.POST("/api/v1/nodes/{node_id}/volumes", { params: { path: { node_id: nodeId } }, body })),
+    { success: (v) => `Storage added: ${v.path}`, invalidate: VOLUME_KEYS },
+  )
+
+export const useUpdateVolume = () =>
+  useCentralMutation(
+    (api, { nodeId, volumeId, body }: { nodeId: number; volumeId: number; body: VolumeUpdate }) =>
+      unwrap<StorageVolume>(
+        api.PATCH("/api/v1/nodes/{node_id}/volumes/{volume_id}", {
+          params: { path: { node_id: nodeId, volume_id: volumeId } },
+          body,
+        }),
+      ),
+    { success: "Storage updated", invalidate: VOLUME_KEYS },
+  )
+
+export const useReorderVolumes = () =>
+  useCentralMutation(
+    (api, { nodeId, volumeIds }: { nodeId: number; volumeIds: number[] }) =>
+      unwrap<StorageVolume[]>(
+        api.POST("/api/v1/nodes/{node_id}/volumes/reorder", {
+          params: { path: { node_id: nodeId } },
+          body: { volume_ids: volumeIds },
+        }),
+      ),
+    { success: "Fill order saved", invalidate: VOLUME_KEYS },
+  )
+
+export const useDeleteVolume = () =>
+  useCentralMutation(
+    (api, { nodeId, volumeId, force }: { nodeId: number; volumeId: number; force: boolean }) =>
+      unwrap(
+        api.DELETE("/api/v1/nodes/{node_id}/volumes/{volume_id}", {
+          params: { path: { node_id: nodeId, volume_id: volumeId }, query: { force } },
+        }),
+      ),
+    { success: "Storage removed", invalidate: VOLUME_KEYS },
   )
 
 export const useMoveCamera = () =>
