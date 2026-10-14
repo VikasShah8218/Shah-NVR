@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import shutil
 from datetime import timedelta
@@ -12,7 +13,6 @@ logger = logging.getLogger("node.agent")
 
 KV_NODE_ID = "node_id"
 KV_ASSIGNMENTS = "assignments"
-KV_STORAGE_QUOTA = "storage_quota_bytes"
 VERSION = "0.1.0"
 
 
@@ -21,11 +21,7 @@ async def load_local_state() -> None:
     runtime.node_id = await KeyValue.get_value(KV_NODE_ID)
     cached = await KeyValue.get_value(KV_ASSIGNMENTS, {}) or {}
     runtime.assignments = {int(k): v for k, v in cached.items()}
-    runtime.storage_quota_bytes = await KeyValue.get_value(KV_STORAGE_QUOTA)
-    logger.info(
-        "Local state: node_id=%s, cached cameras=%s, storage quota=%s",
-        runtime.node_id, len(runtime.assignments), runtime.storage_quota_bytes,
-    )
+    logger.info("Local state: node_id=%s, cached cameras=%s", runtime.node_id, len(runtime.assignments))
 
 
 async def register() -> bool:
@@ -52,6 +48,7 @@ async def register() -> bool:
 
 
 def disk_info() -> dict:
+    """The disk of the node's default folder (RECORDINGS_DIR); per-volume figures are in `volumes`."""
     usage = shutil.disk_usage(settings.RECORDINGS_DIR)
     return {
         "path": str(settings.RECORDINGS_DIR),
@@ -61,17 +58,10 @@ def disk_info() -> dict:
     }
 
 
-async def apply_storage_quota(quota: int | None) -> None:
-    if quota == runtime.storage_quota_bytes:
-        return
-    logger.info("Storage quota changed: %s -> %s bytes", runtime.storage_quota_bytes, quota)
-    runtime.storage_quota_bytes = quota
-    await KeyValue.set_value(KV_STORAGE_QUOTA, quota)
-
-
 async def heartbeat_tick() -> None:
     from app.recordings.models import LocalSegment
     from app.recordings.services import recordings_used_bytes
+    from app.storage.services import local_drives, storage
 
     if runtime.node_id is None and not await register():
         return
@@ -85,11 +75,14 @@ async def heartbeat_tick() -> None:
         "paths_configured": sum(len(c["streams"]) for c in runtime.assignments.values()),
         "paths_ready": len(runtime.ready_since),
         "pending_uploads": await LocalSegment.filter(uploaded=False).count(),
+        "default_recordings_dir": str(settings.RECORDINGS_DIR),
+        "drives": await asyncio.to_thread(local_drives),
+        "volumes": storage.reports(),
     }
     try:
         data = await central.heartbeat(runtime.node_id, payload)
         runtime.last_central_contact = utcnow()
-        await apply_storage_quota(data.get("storage_quota_bytes"))
+        await storage.apply_config(data.get("volumes"), data.get("storage_quota_bytes"))
     except CentralError as exc:
         if exc.status_code == 404:  # central lost us (e.g. DB reset): register again
             logger.warning("Central does not know node_id=%s; re-registering", runtime.node_id)
