@@ -86,3 +86,25 @@ central_manager/
 2. Add the models module to `APP_MODELS` in `database/config.py`.
 3. Include the router in `main.py`. Add a background loop to the `tasks` list if needed (`run_periodic`).
 4. Run `aerich migrate && aerich upgrade`, then refresh the OpenAPI types for the UI (07 §5).
+
+
+## 8. Storage volumes (added 2026-10-15)
+- **`StorageVolume`** (`app/nodes/models.py`, table `storage_volumes`):
+  - Fields: node FK, `path` (normalised by `app/nodes/utils.normalize_volume_path`: `X:\…`, `\\host\share\…` or
+    `/abs`), `position` (fill order), `quota_bytes` (null = whole disk), `accepting`, `is_default`.
+  - Reported by the node: `state` (PENDING / OK / FULL / UNAVAILABLE / ERROR), `state_detail`, space,
+    `recordings_bytes`, `writing`, `last_report_at`.
+  - Unique (node, path).
+- **`RecordingSegment.volume`:** a nullable FK (SET NULL). Migration `2_20261015003950_storage_volumes.py`.
+  **Run `aerich upgrade` on the server** when deploying.
+- **Helpers:** `app/nodes/volumes.py` holds `ensure_default_volume` (seeds the cap from the deprecated
+  `MediaNode.storage_quota_bytes`, and follows a changed `RECORDINGS_DIR`), `apply_reports`, `volume_out` /
+  `volume_config` and `renumber`.
+- **Heartbeat:**
+  - It stores `metrics` without `volumes` (which go to the table) but with `drives` and `default_recordings_dir`.
+  - It returns `volumes` (the config) plus the deprecated `storage_quota_bytes`.
+- **`NodeOut`:** `volumes[]`; `storage_quota_bytes` = the sum of the caps (None if any volume is uncapped).
+- **Deprecated alias:** `NodeUpdate.storage_quota_gb` still works and caps the default volume, so old clients such as
+  the desktop app keep working.
+- Deleting the default volume returns 409. A volume with catalog rows returns 409 unless `force` (which drops its rows).
+- Tests: `central_manager/tests`, run with `DATABASE_URL=sqlite://:memory: py -m pytest`.
