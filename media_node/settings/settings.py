@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     DELETION_INTERVAL_SECONDS: int = 60
 
     # Disk protection: above MAX, delete oldest recordings until below TARGET.
+    STORAGE_CHECK_INTERVAL_SECONDS: float = 10  # health / space of every storage volume
     DISK_MAX_USED_PERCENT: float = 95.0
     DISK_TARGET_USED_PERCENT: float = 92.0
     DISK_MIN_KEEP_HOURS: float = 1.0  # never auto-delete recordings younger than this
