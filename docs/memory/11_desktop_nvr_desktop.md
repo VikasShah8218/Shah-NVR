@@ -125,6 +125,13 @@ Stress-verified in both modes: 40 × 9 tiles torn down while connecting, and 20 
 Still to do: the acceptance run on `shah-ho-1` with both GPUs disabled (needs the user's desktop session), and
 64 tiles in 4 windows.
 
+## Pending: storage volumes UI (2026-10-15)
+Central, node and web support several storage volumes per node (see 04 §10). On purpose, the desktop app has **not
+been updated yet** (user's decision: confirm on server + node + web first).
+- It keeps working: `NodeOut` stays compatible, and its "Edit limits" quota field now caps the node's default volume
+  through the deprecated `storage_quota_gb`.
+- To do: a Storage tab like the web one, the volume state tones in `status.py`, and `node_resources` summing volumes.
+
 ## Dev harness (not in the repo)
 Claude used a scratchpad script `shoot.py OUTDIR "page,page=id,page+objName.method(arg),page+@Store.slot(a;b)" waitms`.
 It builds the real app, visits pages, calls QML functions or store slots, saves screenshots and prints QML warnings.
