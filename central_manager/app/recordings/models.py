@@ -16,13 +16,17 @@ class RecordingSegment(Model):
     camera = fields.ForeignKeyField("models.Camera", related_name="segments", on_delete=fields.CASCADE)
     profile = fields.CharField(max_length=32)
     node = fields.ForeignKeyField("models.MediaNode", related_name="segments", on_delete=fields.CASCADE)
+    # Which of the node's storage volumes holds the file (None = the node's default folder, older rows).
+    volume = fields.ForeignKeyField(
+        "models.StorageVolume", related_name="segments", null=True, on_delete=fields.SET_NULL
+    )
     generation = fields.BigIntField(default=0)
     start_time = fields.DatetimeField()
     end_time = fields.DatetimeField()
     duration_ms = fields.IntField()
     size_bytes = fields.BigIntField()
     codec = fields.CharField(max_length=32, null=True)
-    file_path = fields.CharField(max_length=512)  # relative to the node's recordings directory
+    file_path = fields.CharField(max_length=512)  # relative to the volume's folder
     parts = fields.JSONField()  # HLS part durations in ms; part N is served at .../part/N.m4s
     status = fields.CharEnumField(SegmentStatus, max_length=16, default=SegmentStatus.AVAILABLE)
     created_at = fields.DatetimeField(auto_now_add=True)
