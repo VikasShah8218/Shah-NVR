@@ -23,7 +23,9 @@ from app.node.services import heartbeat_tick, load_local_state, register, stream
 from app.node.utils import central
 from app.recordings.router import router as recordings_router
 from app.recordings.services import deletion_tick, scan_tick, upload_tick
+from app.storage.services import storage, storage_tick
 from database.config import TORTOISE_ORM
+from database.migrate import migrate
 from settings.settings import settings
 from utilities.common import run_periodic
 from utilities.logbuffer import log_buffer
@@ -40,7 +42,10 @@ logger = logging.getLogger("node")
 async def lifespan(app: FastAPI):
     # Local SQLite state; tables are created automatically.
     async with RegisterTortoise(app, config=TORTOISE_ORM, generate_schemas=True):
+        await migrate()  # bring an older local database up to date
         await load_local_state()
+        await storage.load()
+        await storage.refresh()  # pick the recording target before MediaMTX gets its first paths
         await supervisor.start()
         await register()
 
@@ -53,6 +58,7 @@ async def lifespan(app: FastAPI):
                 ("uploader", settings.UPLOAD_INTERVAL_SECONDS, upload_tick),
                 ("stream-status", settings.STATUS_INTERVAL_SECONDS, stream_status_tick),
                 ("deletion", settings.DELETION_INTERVAL_SECONDS, deletion_tick),
+                ("storage", settings.STORAGE_CHECK_INTERVAL_SECONDS, storage_tick),
             )
         ]
         logger.info("Media node '%s' started; API %s", settings.NODE_NAME, settings.api_url)
