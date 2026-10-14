@@ -21,6 +21,11 @@ export type Segment = C["schemas"]["SegmentOut"]
 export type Gap = C["schemas"]["GapOut"]
 export type ClusterHealth = C["schemas"]["ClusterHealthOut"]
 export type GpuInfo = C["schemas"]["GpuInfo"]
+export type StorageVolume = C["schemas"]["VolumeOut"]
+export type VolumeState = StorageVolume["state"]
+export type VolumeCreate = C["schemas"]["VolumeCreate"]
+export type VolumeUpdate = C["schemas"]["VolumeUpdate"]
+export type DriveInfo = C["schemas"]["DriveInfo"]
 
 /** Shape of MediaNode.metrics (the node's last heartbeat; stored as free JSON by central). */
 export interface NodeMetrics {
@@ -38,6 +43,10 @@ export interface NodeMetrics {
   paths_configured?: number
   paths_ready?: number
   pending_uploads?: number
+  /** Local fixed drives of the node (offered in "Add storage"). */
+  drives?: DriveInfo[]
+  /** The node's own recordings folder (its default storage volume). */
+  default_recordings_dir?: string | null
 }
 
 export const nodeMetrics = (node: MediaNode): NodeMetrics => (node.metrics ?? {}) as NodeMetrics
