@@ -1,0 +1,7 @@
+
+rtsp: true
+rtspAddress: :8554
+
+paths:
+  live:
+    source: publisher
