@@ -1,6 +1,8 @@
 # Secrets / local config (commit .env.example instead)
 .env
 
+/tests
+
 # Python
 __pycache__/
 *.py[cod]
