@@ -80,9 +80,35 @@ PLAYBACK_OPTIONS = {
     "hr_seek": "yes",
 }
 
+# Render-mode options (see app/video/render_mode.py).
+# GPU mode: simple bilinear scaling. mpv's defaults are tuned for one full-screen movie; for a wall of
+# tiles they cost ~2x GPU time and ~45% more GPU memory with no visible difference at tile size.
+GPU_RENDER_OPTIONS = {
+    "scale": "bilinear",
+    "dscale": "bilinear",
+    "cscale": "bilinear",
+    "dither": "no",
+    "correct_downscaling": "no",
+    "linear_downscaling": "no",
+    "sigmoid_upscaling": "no",
+}
+
+# CPU mode: libswscale's fast bilinear path converts + scales a 1080p frame to tile size in ~1.6 ms
+# (zimg, mpv's default software scaler, takes ~4 ms; plain bilinear ~5 ms).
+CPU_RENDER_OPTIONS = {
+    "keepaspect": "no",  # the surface renders at the picture's own aspect ratio (no letterbox bars)
+    "sws_allow_zimg": "no",
+    "sws_scaler": "fast-bilinear",
+    "sws_fast": "yes",
+}
+
 HWDEC_CHOICES = ["auto-safe", "nvdec", "d3d11va-copy", "nvdec-copy", "no"]
 
 
-def options_for(mode: str) -> dict:
-    """mode is 'live' or 'playback'."""
-    return LIVE_OPTIONS if mode == "live" else PLAYBACK_OPTIONS
+def options_for(mode: str, render_mode: str = "gpu") -> dict:
+    """mode: 'live' | 'playback'; render_mode: 'gpu' | 'cpu'."""
+    options = dict(LIVE_OPTIONS if mode == "live" else PLAYBACK_OPTIONS)
+    options.update(CPU_RENDER_OPTIONS if render_mode == "cpu" else GPU_RENDER_OPTIONS)
+    if render_mode == "cpu" and mode == "playback":
+        options["vd_lavc_threads"] = "2"  # one big view: a second decode thread keeps seeking snappy
+    return options
