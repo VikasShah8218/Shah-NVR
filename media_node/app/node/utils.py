@@ -23,8 +23,6 @@ class NodeRuntime:
     last_central_contact: datetime | None = None
     mediamtx_running: bool = False
     mediamtx_version: str | None = None
-    # Max bytes for recordings set by central (None = whole disk); cached locally.
-    storage_quota_bytes: int | None = None
     # (camera_id, profile) -> end time of the latest indexed chunk
     last_segment_end: dict[tuple[int, str], datetime] = field(default_factory=dict)
     # path name -> time we first saw it "ready" in MediaMTX
