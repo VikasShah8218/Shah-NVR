@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.cameras.models import Camera, CameraStream
-from app.nodes.models import MediaNode
+from app.nodes.models import MediaNode, StorageVolume
 from app.recordings.models import RecordingSegment, SegmentStatus
 from app.recordings.schemas import (
     DeletedIn,
@@ -88,6 +88,7 @@ async def ingest_segments(body: SegmentBatchIn):
     known_cameras = set(
         await Camera.filter(id__in={s.camera_id for s in body.items}).values_list("id", flat=True)
     )
+    node_volumes = set(await StorageVolume.filter(node_id=body.node_id).values_list("id", flat=True))
 
     new_rows = []
     latest: dict[tuple[int, str], datetime] = {}
@@ -98,7 +99,10 @@ async def ingest_segments(body: SegmentBatchIn):
         if s.camera_id not in known_cameras:
             ignored += 1
             continue
-        new_rows.append(RecordingSegment(**s.model_dump(), node_id=body.node_id))
+        row = s.model_dump()
+        if row["volume_id"] not in node_volumes:  # unknown / removed volume: keep the row, drop the link
+            row["volume_id"] = None
+        new_rows.append(RecordingSegment(**row, node_id=body.node_id))
         key = (s.camera_id, s.profile)
         if key not in latest or s.end_time > latest[key]:
             latest[key] = s.end_time
@@ -117,7 +121,7 @@ async def ingest_segments(body: SegmentBatchIn):
 @internal_router.get("/nodes/{node_id}/deletions", response_model=list[DeletionItem])
 async def pending_deletions(node_id: int, limit: int = Query(default=500, le=5000)):
     rows = await RecordingSegment.filter(node_id=node_id, status=SegmentStatus.DELETING).limit(limit)
-    return [DeletionItem(id=r.id, file_path=r.file_path) for r in rows]
+    return [DeletionItem(id=r.id, file_path=r.file_path, volume_id=r.volume_id) for r in rows]
 
 
 @internal_router.post("/nodes/{node_id}/deleted", status_code=status.HTTP_204_NO_CONTENT)
