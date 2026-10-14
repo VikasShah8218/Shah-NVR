@@ -17,6 +17,7 @@ import { LogViewer } from "./LogViewer"
 import { NodeActions } from "./NodeActions"
 import { nodeResources } from "./nodeUtils"
 import { ResourceCharts, useNodeHistory } from "./ResourceCharts"
+import { StorageTab } from "./StorageTab"
 
 export function NodeDetailPage() {
   const nodeId = Number(useParams().id)
@@ -47,12 +48,16 @@ export function NodeDetailPage() {
       <Tabs defaultValue="cameras">
         <TabsList>
           <TabsTrigger value="cameras">Cameras</TabsTrigger>
+          <TabsTrigger value="storage">Storage</TabsTrigger>
           <TabsTrigger value="paths">MediaMTX paths</TabsTrigger>
           <TabsTrigger value="chunks">Recorded chunks</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
         <TabsContent value="cameras">
           <NodeCameras apiUrl={n.api_url} />
+        </TabsContent>
+        <TabsContent value="storage">
+          <StorageTab node={n} />
         </TabsContent>
         <TabsContent value="paths">
           <NodePaths apiUrl={n.api_url} />
@@ -111,14 +116,14 @@ function ResourceSummary({ node }: { node: MediaNode }) {
         </CardHeader>
         <CardContent className="space-y-3">
           <UsageMeter
-            label="Recordings vs quota"
-            value={r.quota != null ? `${formatBytes(r.recordings)} / ${formatBytes(r.quota)}` : `${formatBytes(r.recordings)} · no quota`}
+            label={r.volumes.length > 1 ? `Recordings vs caps · ${r.volumes.length} storages` : "Recordings vs cap"}
+            value={r.quota != null ? `${formatBytes(r.recordings)} / ${formatBytes(r.quota)}` : `${formatBytes(r.recordings)} · no cap`}
             percent={r.storagePercent}
             warnAt={80}
             dangerAt={95}
           />
           <UsageMeter
-            label="Disk"
+            label="Disk of the node's own folder"
             value={`${formatBytes(r.diskFree)} free of ${formatBytes(r.diskTotal)}`}
             percent={r.diskPercent}
             warnAt={85}
@@ -126,8 +131,8 @@ function ResourceSummary({ node }: { node: MediaNode }) {
           />
           <Field label="Usable for recordings">{formatBytes(r.usable)}</Field>
           <Field label="Room left">{formatBytes(r.remaining)}</Field>
-          <Field label="Recordings folder">
-            <span className="break-all text-xs">{s?.recordings_dir ?? "—"}</span>
+          <Field label="Recording to">
+            <span className="break-all text-xs">{r.writingVolume?.path ?? s?.recordings_dir ?? "—"}</span>
           </Field>
         </CardContent>
       </Card>
