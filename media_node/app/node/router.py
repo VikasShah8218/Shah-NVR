@@ -7,6 +7,7 @@ from app.node.schemas import NodeStatusOut
 from app.node.services import disk_info
 from app.node.utils import runtime
 from app.recordings.models import LocalSegment
+from app.storage.services import storage
 from settings.settings import settings
 from utilities.logbuffer import log_buffer
 
@@ -26,6 +27,7 @@ async def node_status():
         mediamtx_version=runtime.mediamtx_version,
         recordings_dir=str(settings.RECORDINGS_DIR),
         disk=disk_info(),
+        volumes=storage.status(),
         assigned_cameras=len(runtime.assignments),
         ready_paths=sorted(runtime.ready_since),
         pending_uploads=await LocalSegment.filter(uploaded=False).count(),
