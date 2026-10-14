@@ -49,7 +49,8 @@ Status (2026-10-14): **built and verified against the local stack.** All pages h
   and maximized state are remembered.
 
 ## Video engine (`app/video/`): what was learned, keep it
-Each item below cost real debugging time. The details are in the docstring of `mpv_item.py`.
+Each item below cost real debugging time. The details are in the docstrings of `player.py`, `gl_surface.py`
+and `sw_surface.py`. (Until 2026-10-14 all of this lived in one `mpv_item.py`, the `MpvVideoItem` class.)
 1. **OpenGL scene graph and the `basic` render loop.** With the threaded loop, Python ran on Qt's render thread and
    `grabWindow` deadlocked on the GIL.
 2. **Qt owns the FBO.** Overriding `createFramebufferObject` in Python caused a double free.
@@ -81,6 +82,48 @@ Each item below cost real debugging time. The details are in the docstring of `m
 
 Stress-verified: 40 cycles of 9 tiles torn down while connecting, and 20 cycles of 16 tiles, with no crash. The full UI
 sequence (layouts 4 → 9 → 1 → 16, navigate away and back) is clean.
+
+10. **Render calls never wait** (`BLOCK_FOR_TARGET_TIME=0` in both contexts). libmpv's default blocks each render
+    until the frame's display time; a CPU render measured 39 ms instead of 1.6 ms.
+11. **Never call `self.window()` from Python in a QQuickItem subclass.** PySide tied the QQuickWindow wrapper to the
+    tile, and the whole app window was deleted together with a removed tile. CPU mode reads the pixel ratio from the
+    screen under the tile.
+12. **mpv's SW renderer clears letterbox bars to 0,0,0,0**, which Qt's RGBX8888 shows as transparent (white). CPU
+    mode renders at the picture's aspect ratio (`keepaspect=no`) and paints it centred.
+
+## Render modes: GPU / CPU (added 2026-10-14)
+Why: on `shah-ho-1` with both GPUs disabled, Chrome played 16 × 1080p at under 10% CPU and 64 streams at under 70%.
+The desktop app fell to 0.5 fps at 70–90% CPU. Cause, measured:
+- Decoding was cheap: 16 streams on the CPU cost about 8% of 12 threads.
+- Drawing was the problem: with no GPU, Qt uses CPU-emulated OpenGL (llvmpipe, `opengl32sw.dll`), so mpv's
+  multi-pass shaders run on the CPU at full resolution. Reproduced with `QT_OPENGL=software`: 74% CPU, window at
+  1.4 fps, 105 ms per render.
+
+Design (`app/video/`):
+- `MpvPlayer` (QObject: logic, bridge, lifecycle) + one `MpvSurface`. `register_video_types(mode)` registers the GL
+  or SW class under the same QML name.
+- **CPU mode** (`sw_surface.py`):
+  - mpv's software render API (`SwRenderContext`, format `rgb0` = QImage RGBX8888).
+  - One worker thread per tile and double buffers.
+  - libswscale `fast-bilinear`: 1.6 ms per 1080p → tile frame. zimg took 4 ms and swscale bilinear 5 ms.
+  - Qt Quick **Software** scene graph (QQuickPaintedItem), `hwdec=no`.
+- **GPU mode**: unchanged pipeline plus `GPU_RENDER_OPTIONS` (bilinear scaling, no dither/linear scaling), which
+  measured −50% GPU 3D and −45% GPU memory.
+- **Auto** (default, agreed with the user): `render_mode.gl_renderer_name()` probes OpenGL before the first window.
+  It picks CPU when the renderer is a software one (llvmpipe, GDI Generic, Basic Render…) or missing.
+  Settings → Video rendering can force CPU or GPU (restart needed). `RENDER_MODE` in `.env` overrides both.
+
+Measured on the dev laptop (16 tiles of the server's 8 cameras ×2, over Tailscale):
+
+| Mode | CPU | GPU 3D |
+|---|---|---|
+| CPU mode | 8–11% | 0 |
+| GPU mode | ~8% | 28% |
+| Old GPU path on software GL | 74%, at 1.4 fps | — |
+
+Stress-verified in both modes: 40 × 9 tiles torn down while connecting, and 20 × 16 tiles.
+Still to do: the acceptance run on `shah-ho-1` with both GPUs disabled (needs the user's desktop session), and
+64 tiles in 4 windows.
 
 ## Dev harness (not in the repo)
 Claude used a scratchpad script `shoot.py OUTDIR "page,page=id,page+objName.method(arg),page+@Store.slot(a;b)" waitms`.
