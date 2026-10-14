@@ -25,8 +25,12 @@ function buildAlerts(cameras: Camera[], nodes: MediaNode[]): Alert[] {
       alerts.push({ level: "danger", title: `${n.name} is unreachable`, detail: `last heartbeat ${timeAgo(n.last_heartbeat_at)}`, to: `/nodes/${n.id}` })
     if (r.diskPercent != null && r.diskPercent >= 85)
       alerts.push({ level: r.diskPercent >= 95 ? "danger" : "warning", title: `${n.name}: disk ${formatPercent(r.diskPercent)} full`, detail: `${formatBytes(r.diskFree)} free`, to: `/nodes/${n.id}` })
-    if (r.quota != null && r.storagePercent != null && r.storagePercent >= 85)
-      alerts.push({ level: "warning", title: `${n.name}: ${formatPercent(r.storagePercent)} of storage quota used`, detail: `${formatBytes(r.recordings)} of ${formatBytes(r.quota)}; oldest recordings are removed above 95%`, to: `/nodes/${n.id}` })
+    for (const v of r.volumesOffline)
+      alerts.push({ level: "danger", title: `${n.name}: storage ${v.state === "ERROR" ? "error" : "offline"}`, detail: `${v.path}${v.state_detail ? ` · ${v.state_detail}` : ""}`, to: `/nodes/${n.id}` })
+    if (r.allFull)
+      alerts.push({ level: "warning", title: `${n.name}: all storage full`, detail: "The oldest recordings are being overwritten. Add storage or raise a cap.", to: `/nodes/${n.id}` })
+    else if (r.quota != null && r.storagePercent != null && r.storagePercent >= 85)
+      alerts.push({ level: "warning", title: `${n.name}: ${formatPercent(r.storagePercent)} of storage caps used`, detail: `${formatBytes(r.recordings)} of ${formatBytes(r.quota)}`, to: `/nodes/${n.id}` })
   }
   for (const c of cameras) {
     if (!c.enabled) continue
