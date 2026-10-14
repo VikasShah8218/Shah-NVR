@@ -1,11 +1,13 @@
 import asyncio
 import logging
+from pathlib import Path
 
 import psutil
 
 from app.mediamtx.utils import MANAGED_PREFIX, mtx, write_config
 from app.node.services import refresh_assignments
 from app.node.utils import runtime
+from app.storage.services import storage
 from settings.settings import settings
 
 logger = logging.getLogger("node.mediamtx")
@@ -101,8 +103,18 @@ class MediaMTXSupervisor:
 supervisor = MediaMTXSupervisor()
 
 
+def record_path(root) -> str:
+    """MediaMTX recordPath under a storage folder (same layout on every volume)."""
+    return (Path(root) / "%path" / "%Y-%m-%d" / "%H-%M-%S-%f").as_posix()
+
+
 def desired_paths() -> dict[str, dict]:
-    """MediaMTX path config for every stream this node must pull."""
+    """MediaMTX path config for every stream this node must pull.
+
+    Recorded streams write to the current storage target (fill in order, app/storage). When the target
+    changes (a volume filled up or went offline) the changed recordPath is PATCHed by reconcile_tick;
+    MediaMTX reloads the path, which costs a gap of a second or two."""
+    target = record_path(storage.target().path)
     desired = {}
     for cam in runtime.assignments.values():
         for s in cam["streams"]:
@@ -112,6 +124,8 @@ def desired_paths() -> dict[str, dict]:
                 # Recorded streams are always pulled; live-only streams connect when someone watches.
                 "sourceOnDemand": not s["record"],
             }
+            if s["record"]:
+                conf["recordPath"] = target
             if s["source_url"].lower().startswith(("rtsp://", "rtsps://")):
                 conf["rtspTransport"] = s["rtsp_transport"]
             desired[s["path_name"]] = conf
