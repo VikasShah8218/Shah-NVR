@@ -83,6 +83,17 @@ http://<node>:7100/api/v1/media/<seg>/part/0.m4s
 | POST | `/assignments/run-scheduler` | 204 |
 | GET | `/cluster/health` | `{cameras_total, cameras_enabled, streams_by_status{}, nodes_by_state{}, segments_last_hour, segments_total}` |
 
+### Storage volumes (2026-10-15)
+| Method | Path | Body / notes |
+|---|---|---|
+| GET | `/api/v1/nodes/{id}/volumes` | `[VolumeOut]` in fill order: id, path, kind (local/network), position, quota_bytes, accepting, is_default, state, state_detail, total/free/recordings_bytes, writing, last_report_at |
+| POST | `/api/v1/nodes/{id}/volumes` | `{path, quota_gb|null, accepting}`. Added last. 409 on duplicate, 422 on a relative path |
+| PATCH | `/api/v1/nodes/{id}/volumes/{vid}` | `{quota_gb|null, accepting}` |
+| POST | `/api/v1/nodes/{id}/volumes/reorder` | `{volume_ids: [...]}`. Must list every volume once |
+| DELETE | `/api/v1/nodes/{id}/volumes/{vid}?force=` | Default volume: 409. Volume with recordings: 409 unless force (drops their index; files stay) |
+
+`NodeOut` also gains `volumes[]`. `metrics.drives` lists the node's local drives: `[{root, fstype, total_bytes, free_bytes}]`.
+
 ## 2. Central: internal (`/internal/v1`, called by nodes only)
 | Method | Path | Body → Response |
 |---|---|---|
@@ -102,6 +113,12 @@ http://<node>:7100/api/v1/media/<seg>/part/0.m4s
   "recordings_bytes": 234988324, "net_rx_mbps": 1.78, "net_tx_mbps": 0.3,
   "mediamtx_running": true, "paths_configured": 2, "paths_ready": 1, "pending_uploads": 0 }
 ```
+
+Storage volumes in the internal API:
+- The heartbeat body adds `default_recordings_dir`, `drives[]` and `volumes[{id, state, state_detail, total_bytes,
+  free_bytes, recordings_bytes, writing}]`.
+- The response adds `volumes[{id, path, position, quota_bytes, accepting, is_default}]`.
+- Segment upload items add `volume_id`. Deletions return `{id, file_path, volume_id}`.
 
 ## 3. Media node (`:7100/api/v1`, all GET, CORS `*`)
 | Path | Returns |
