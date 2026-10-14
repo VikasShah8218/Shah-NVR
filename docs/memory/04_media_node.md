@@ -117,3 +117,52 @@ Order of checks:
 - Windows: `taskkill /F` on the agent leaves MediaMTX running. The next start kills it (orphan logic).
 - Ctrl+C in a console stops both, since they share the console group.
 - Agent stdout encoding on Windows: run with `PYTHONUNBUFFERED=1` when redirecting to a file (the server launcher does).
+
+
+## 10. Storage volumes (added 2026-10-15): several drives and network shares
+A node records to a list of **volumes**, configured in central (Node → Storage tab), not in `.env`.
+- **Default volume:** `RECORDINGS_DIR`, key `None` locally. Central auto-creates it on the first heartbeat that
+  reports `default_recordings_dir`, seeding its cap from the old node-wide `storage_quota_bytes`.
+- **Other volumes:** keyed by their central id.
+- **Configuration:** comes in every heartbeat response (`volumes`) and is cached in KeyValue `volumes`. The old
+  KeyValue `storage_quota_bytes` is kept as the legacy cap when central sends no volumes.
+- **`app/storage/utils.py`** (pure, tested):
+  - `Volume`, `update_full` (FULL at ≥ 95% of the cap or disk ≥ `DISK_MAX_USED_PERCENT`; free again below 90% and
+    `DISK_TARGET_USED_PERCENT`).
+  - `pick_target`: fill in order. It takes the first accepting, OK, not-full volume. If all are full it keeps the first
+    one; if none is healthy it uses the default.
+  - `classify_error` maps errors to messages, e.g. "Access denied… cmdkey /add:host", "Network share not reachable",
+    "Drive or folder not found".
+- **`app/storage/services.py` `storage`:**
+  - `storage_tick` runs every `STORAGE_CHECK_INTERVAL_SECONDS` in **its own loop**. Each check runs in a worker thread
+    with a 10 s timeout, because a dead SMB share can block for 20–30 s and must never delay heartbeats.
+  - It creates the folder if missing, probes a write every 60 s, sums `size_bytes` per `volume_id`, and recomputes
+    FULL and the target.
+  - `local_drives()` (psutil, fixed drives) is sent in the heartbeat as `drives`.
+- **MediaMTX:** `desired_paths()` sets a per-path `recordPath = <target>/%path/%Y-%m-%d/%H-%M-%S-%f`. A target switch
+  is PATCHed by `reconcile_tick`, giving a 1–2 s gap while the path reloads.
+- **Index:**
+  - `LocalSegment.volume_id` / `SkippedFile.volume_id` are added to old SQLite files by `database/migrate.py`
+    (idempotent `ALTER TABLE`).
+  - `rel_path` stays globally unique, because it contains the camera and a microsecond timestamp.
+  - Segment id: `uuid5(node, rel)` for the default volume (old ids unchanged), `uuid5(node, f"v{id}/{rel}")` otherwise.
+- **Upload / serving:**
+  - Uploads carry `volume_id` (central id).
+  - Serving resolves the volume's folder. An offline volume answers **503 "Storage offline"** at once instead of
+    touching the dead path.
+- **Cleanup** (`deletion_tick`), in order:
+  1. Central retention, deleting **by id via the local row**.
+  2. `disk_safety_cleanup`, per volume, which protects the OS drive.
+  3. `cap_cleanup`: a volume over its cap is trimmed to **99%** (`CAP_TRIM_TO`) only.
+  4. `overwrite_cleanup`: only when every accepting volume is FULL. It deletes the oldest chunks **one by one with a
+     running per-volume estimate**, stopping as soon as one volume is free again.
+  - Chunks on offline volumes are skipped (not confirmed), so they are retried later.
+  - Problems are logged once (`_report_once`), not every tick.
+- **Bugs found while testing, don't reintroduce them:**
+  - Trimming an over-cap volume to 90% made it "free" again. Recording jumped back to it and the later volumes were
+    never used. That's why it trims to 99%.
+  - The overwrite deleted a whole batch of 50 oldest chunks before re-checking and **wiped entire volumes**. It now
+    selects chunk by chunk.
+- Removing a volume in central: the node forgets its local rows (the files are left on disk).
+- Tests: `media_node/tests` (rules, config mapping, SQLite migration, overwrite selection), run with
+  `py -m pytest` (`DATA_DIR` set to a scratch folder).
