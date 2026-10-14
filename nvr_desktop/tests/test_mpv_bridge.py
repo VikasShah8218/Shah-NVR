@@ -1,4 +1,4 @@
-"""The thread hand-off between libmpv callbacks and the GUI thread (app/video/mpv_item.py::_MpvBridge)."""
+"""The thread hand-off between libmpv callbacks and the GUI thread (app/video/player.py::MpvBridge)."""
 
 import threading
 
@@ -15,12 +15,12 @@ prepare_libmpv(settings.MPV_DLL_DIR)
 
 from PySide6.QtCore import QObject  # noqa: E402
 
-from app.video.mpv_item import _MpvBridge  # noqa: E402
+from app.video.player import MpvBridge  # noqa: E402
 
 
 def make_bridge():
     owner = QObject()
-    bridge = _MpvBridge(owner)
+    bridge = MpvBridge(owner)
     wakes = []
     bridge.wake.connect(lambda: wakes.append(1))  # direct connection: counts emits
     return owner, bridge, wakes
