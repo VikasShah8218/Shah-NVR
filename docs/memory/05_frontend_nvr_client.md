@@ -131,3 +131,18 @@ Run `py tools/export_openapi.py` (repo root, nvr venv) before `gen:api`. It impo
 - In dev, React StrictMode double-mounts, so one playlist request appears as `ERR_ABORTED`. This doesn't happen in production builds.
 - A node's direct API must be reachable from the browser (via `api_url` / PUBLIC_HOST). If it isn't, the node detail tabs show an error but the central data still loads.
 - The Postman collection does not yet include quota, logs or delete-node.
+
+
+## 10. Storage tab (added 2026-10-15)
+`src/features/nodes/StorageTab.tsx`, under Node detail → **Storage**:
+- **Volumes table:** order with ↑↓ (reorder API), folder (network icon; "node's own folder"; "recording here now";
+  "new recordings stopped"), state badge + detail, recordings/cap bar, disk free, and a menu (Edit cap, Stop/Resume new
+  recordings, Remove with a force switch when recordings exist).
+- **Banners:** "all storage full" and "storage offline".
+- **Add storage:** either a drive picked from `metrics.drives` (path prefilled `<drive>ShahNVR\recordings`) or a
+  network UNC path. The network form shows a help box with `cmdkey /add:<host> …`; credentials never go to central.
+- **Node resources** (`nodeUtils.ts`) add up the volumes: `recordings`, `remaining` (per volume
+  min(cap − used, free)), `writingVolume`, `volumesOffline`, `allFull`.
+- **Dashboard alerts** now cover offline storage and all-storage-full.
+- **Edit limits** keeps only camera capacity.
+- `StatusBadge` gains the volume states OK, FULL, PENDING and ERROR.
