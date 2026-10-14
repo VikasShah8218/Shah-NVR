@@ -23,6 +23,11 @@ const TONE: Record<string, Tone> = {
   // segments
   AVAILABLE: "success",
   DELETING: "warning",
+  // storage volumes
+  OK: "success",
+  FULL: "warning",
+  PENDING: "muted",
+  ERROR: "danger",
 }
 
 const TONE_CLASS: Record<Tone, string> = {
@@ -43,7 +48,8 @@ const DOT_CLASS: Record<Tone, string> = {
 
 export const toneOf = (status: string): Tone => TONE[status] ?? "muted"
 
-const label = (status: string) => status.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())
+const label = (status: string) =>
+  status === "OK" ? "OK" : status.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())
 
 export function StatusBadge({ status, className, title }: { status: string; className?: string; title?: string }) {
   const tone = toneOf(status)
