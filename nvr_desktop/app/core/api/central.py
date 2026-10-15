@@ -19,6 +19,7 @@ from app.core.api.models import (
     ClusterHealth,
     LiveInfo,
     MediaNode,
+    StorageVolume,
     Timeline,
 )
 from settings.settings import settings
@@ -101,6 +102,24 @@ class CentralApi:
 
     def delete_node(self, node_id: int, force: bool) -> None:
         self._request("DELETE", f"/api/v1/nodes/{node_id}", params={"force": str(force).lower()})
+
+    # ------------------------------------------------------------------ storage volumes
+    def add_volume(self, node_id: int, path: str, quota_gb: float | None) -> StorageVolume:
+        body = {"path": path, "quota_gb": quota_gb, "accepting": True}
+        return StorageVolume.model_validate(self._request("POST", f"/api/v1/nodes/{node_id}/volumes", json=body))
+
+    def update_volume(self, node_id: int, volume_id: int, body: dict) -> StorageVolume:
+        """body: {"quota_gb": float | None} and/or {"accepting": bool}."""
+        return StorageVolume.model_validate(
+            self._request("PATCH", f"/api/v1/nodes/{node_id}/volumes/{volume_id}", json=body)
+        )
+
+    def reorder_volumes(self, node_id: int, volume_ids: list[int]) -> list[StorageVolume]:
+        rows = self._request("POST", f"/api/v1/nodes/{node_id}/volumes/reorder", json={"volume_ids": volume_ids})
+        return [StorageVolume.model_validate(v) for v in rows]
+
+    def delete_volume(self, node_id: int, volume_id: int, force: bool) -> None:
+        self._request("DELETE", f"/api/v1/nodes/{node_id}/volumes/{volume_id}", params={"force": str(force).lower()})
 
     # ------------------------------------------------------------------ assignments
     def assignments(self) -> list[Assignment]:
