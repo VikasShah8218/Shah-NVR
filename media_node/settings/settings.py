@@ -19,8 +19,9 @@ class Settings(BaseSettings):
     NODE_NAME: str = "node-1"
     HOST: str = "0.0.0.0"
     PORT: int = 7100
-    # Host/IP that clients (VLC, browsers) and the central manager use to reach this node.
-    PUBLIC_HOST: str = "127.0.0.1"
+    # Host/IP put into every client link (live, playback, downloads). "auto" = this PC's LAN IP, never a
+    # Tailscale/VPN or virtual adapter address (utilities/netaddr.py). Set an IP/hostname only to override.
+    PUBLIC_HOST: str = "auto"
     CAPACITY_CAMERAS: int = 100
     LOG_LEVEL: str = "INFO"
 
@@ -58,7 +59,8 @@ class Settings(BaseSettings):
     DELETION_INTERVAL_SECONDS: int = 60
 
     # Disk protection: above MAX, delete oldest recordings until below TARGET.
-    STORAGE_CHECK_INTERVAL_SECONDS: float = 10  # health / space of every storage volume
+    STORAGE_CHECK_INTERVAL_SECONDS: float = 10
+    ADDRESS_CHECK_INTERVAL_SECONDS: float = 120  # re-detect the LAN IP (PUBLIC_HOST=auto)  # health / space of every storage volume
     DISK_MAX_USED_PERCENT: float = 95.0
     DISK_TARGET_USED_PERCENT: float = 92.0
     DISK_MIN_KEEP_HOURS: float = 1.0  # never auto-delete recordings younger than this
@@ -70,8 +72,14 @@ class Settings(BaseSettings):
         return (v if v.is_absolute() else BASE_DIR / v).resolve()
 
     @property
+    def public_host(self) -> str:
+        from utilities.netaddr import public_host
+
+        return public_host(self.PUBLIC_HOST)
+
+    @property
     def api_url(self) -> str:
-        return f"http://{self.PUBLIC_HOST}:{self.PORT}"
+        return f"http://{self.public_host}:{self.PORT}"
 
     @property
     def mediamtx_api(self) -> str:
