@@ -28,7 +28,7 @@ async def register() -> bool:
     payload = {
         "name": settings.NODE_NAME,
         "api_url": settings.api_url,
-        "media_host": settings.PUBLIC_HOST,
+        "media_host": settings.public_host,
         "rtsp_port": settings.RTSP_PORT,
         "hls_port": settings.HLS_PORT,
         "webrtc_port": settings.WEBRTC_PORT,
@@ -43,8 +43,21 @@ async def register() -> bool:
         return False
     runtime.node_id = data["node_id"]
     await KeyValue.set_value(KV_NODE_ID, runtime.node_id)
-    logger.info("Registered with central as node_id=%s (state=%s)", runtime.node_id, data["state"])
+    logger.info("Registered with central as node_id=%s (state=%s); clients reach this node at %s",
+                runtime.node_id, data["state"], settings.public_host)
     return True
+
+
+async def check_public_host() -> None:
+    """The advertised LAN address can change (DHCP, another cable/Wi-Fi): re-detect, re-register so central
+    rebuilds every client link, and tell MediaMTX's WebRTC which address to offer."""
+    from app.mediamtx.utils import mtx
+    from utilities.netaddr import refresh_public_host
+
+    if await asyncio.to_thread(refresh_public_host, settings.PUBLIC_HOST):
+        logger.warning("This node's address changed: clients now use %s", settings.public_host)
+        await mtx.patch_global({"webrtcAdditionalHosts": [settings.public_host]})
+        await register()
 
 
 def disk_info() -> dict:
@@ -62,6 +75,7 @@ async def heartbeat_tick() -> None:
     from app.recordings.models import LocalSegment
     from app.recordings.services import recordings_used_bytes
     from app.storage.services import local_drives, storage
+    from utilities.netaddr import list_addresses
 
     if runtime.node_id is None and not await register():
         return
@@ -75,6 +89,7 @@ async def heartbeat_tick() -> None:
         "paths_configured": sum(len(c["streams"]) for c in runtime.assignments.values()),
         "paths_ready": len(runtime.ready_since),
         "pending_uploads": await LocalSegment.filter(uploaded=False).count(),
+        "addresses": await asyncio.to_thread(list_addresses),
         "default_recordings_dir": str(settings.RECORDINGS_DIR),
         "drives": await asyncio.to_thread(local_drives),
         "volumes": storage.reports(),
