@@ -19,11 +19,17 @@ def build_alerts(cameras: list[dict], nodes: list[dict]) -> list[dict]:
             alerts.append({"level": "danger" if r["diskPercent"] >= 95 else "warning",
                            "title": f"{n['name']}: disk {format_percent(r['diskPercent'])} full",
                            "detail": f"{format_bytes(r['diskFree'])} free", **link})
-        if r["quota"] is not None and r["storagePercent"] is not None and r["storagePercent"] >= 85:
+        for v in r["volumesOffline"]:
+            alerts.append({"level": "danger",
+                           "title": f"{n['name']}: storage {'error' if v['state'] == 'ERROR' else 'offline'}",
+                           "detail": v["path"] + (f" · {v['state_detail']}" if v.get("state_detail") else ""), **link})
+        if r["allFull"]:
+            alerts.append({"level": "warning", "title": f"{n['name']}: all storage full",
+                           "detail": "The oldest recordings are being overwritten. Add storage or raise a cap.", **link})
+        elif r["quota"] is not None and r["storagePercent"] is not None and r["storagePercent"] >= 85:
             alerts.append({"level": "warning",
-                           "title": f"{n['name']}: {format_percent(r['storagePercent'])} of storage quota used",
-                           "detail": f"{format_bytes(r['recordings'])} of {format_bytes(r['quota'])}; "
-                                     "oldest recordings are removed above 95%", **link})
+                           "title": f"{n['name']}: {format_percent(r['storagePercent'])} of storage caps used",
+                           "detail": f"{format_bytes(r['recordings'])} of {format_bytes(r['quota'])}", **link})
     for c in cameras:
         if not c.get("enabled"):
             continue
