@@ -19,6 +19,9 @@ media_node/data/
 # Desktop client: libmpv DLL (download per nvr_desktop/README.md)
 nvr_desktop/bin/
 
+/requirements
+requirements
+
 # OS / editors
 .DS_Store
 Thumbs.db
