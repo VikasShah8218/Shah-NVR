@@ -5,8 +5,9 @@ import App
 import "../theme"
 import "../components"
 
-// A video surface with the same overlays as the web LivePlayer: connecting / retrying states and an
-// info label "1920×1080 · RTSP · d3d11va-copy". `player` exposes the MpvVideoItem (seek, screenshot...).
+// A video view with the same overlays as the web LivePlayer: connecting / retrying states and an info
+// label "1920×1080 · RTSP · d3d11va-copy". `player` exposes the MpvPlayer (seek, screenshot...);
+// MpvSurface draws it with the GPU or the CPU, depending on the render mode chosen at startup.
 Rectangle {
     id: view
 
@@ -22,13 +23,16 @@ Rectangle {
     color: Theme.video
     clip: true
 
-    MpvVideoItem {
+    MpvPlayer {
         id: mpv
-        anchors.fill: parent
         mode: view.mode
         hwdec: Prefs.hwdec
         fallbackSource: view.fallbackSource
         source: view.source
+    }
+    MpvSurface {
+        anchors.fill: parent
+        player: mpv
     }
 
     // waiting for a source
@@ -82,7 +86,8 @@ Rectangle {
             id: info
             anchors.centerIn: parent
             text: mpv.videoWidth + "×" + mpv.videoHeight + " · " + view.protocolLabel + " · "
-                + (mpv.hwdecCurrent && mpv.hwdecCurrent !== "no" ? mpv.hwdecCurrent : "CPU")
+                + (Prefs.activeRenderMode === "cpu" ? "CPU render"
+                   : mpv.hwdecCurrent && mpv.hwdecCurrent !== "no" ? mpv.hwdecCurrent : "CPU decode")
             color: Qt.rgba(1, 1, 1, 0.85)
             font.family: Theme.font
             font.pixelSize: 10

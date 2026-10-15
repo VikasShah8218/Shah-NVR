@@ -36,7 +36,9 @@ async def create_camera(body: CameraCreate):
             username=body.username,
             password=body.password,
             enabled=body.enabled,
-            retention_days=body.retention_days or settings.DEFAULT_RETENTION_DAYS,
+            # omitted -> default; explicit null -> keep until storage is full
+            retention_days=body.retention_days if "retention_days" in body.model_fields_set
+            else settings.DEFAULT_RETENTION_DAYS,
         )
         for s in body.streams:
             await CameraStream.create(camera=camera, **s.model_dump())
@@ -73,8 +75,8 @@ async def delete_camera(camera_id: int):
     if await RecordingSegment.filter(camera_id=camera.id).exists():
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            "Camera has recordings. Disable it instead (PATCH enabled=false); "
-            "recordings are removed by retention.",
+            "Camera has recordings. Disable it instead (PATCH enabled=false); its recordings stay until "
+            "their retention or storage space removes them.",
         )
     await camera.delete()
 

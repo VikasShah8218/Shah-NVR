@@ -494,6 +494,15 @@
             "type": "object",
             "title": "Disk"
           },
+          "volumes": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Volumes",
+            "default": []
+          },
           "assigned_cameras": {
             "type": "integer",
             "title": "Assigned Cameras"

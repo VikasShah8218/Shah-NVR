@@ -6,7 +6,8 @@ from fastapi import APIRouter, HTTPException, status
 from app.assignments.models import CameraAssignment
 from app.cameras.models import CameraStream
 from app.cameras.utils import build_source_url
-from app.nodes.models import MediaNode, NodeState
+from app.nodes import volumes as vol
+from app.nodes.models import MediaNode, NodeState, StorageVolume
 from app.nodes.schemas import (
     AssignmentsOut,
     CameraAssignmentOut,
@@ -18,7 +19,12 @@ from app.nodes.schemas import (
     NodeUpdate,
     StreamAssignment,
     StreamStatusBatchIn,
+    VolumeCreate,
+    VolumeOrder,
+    VolumeOut,
+    VolumeUpdate,
 )
+from app.nodes.utils import gb_to_bytes, total_quota
 from app.recordings.models import RecordingSegment
 from settings.settings import settings
 from utilities.common import utcnow
@@ -40,8 +46,11 @@ async def _get_node(node_id: int) -> MediaNode:
 
 async def _node_out(node: MediaNode) -> NodeOut:
     count = await CameraAssignment.filter(node_id=node.id).count()
-    return NodeOut(**{k: getattr(node, k) for k in NodeOut.model_fields if k != "assigned_cameras"},
-                   assigned_cameras=count)
+    volumes = await vol.node_volumes(node.id)
+    fields = {k: getattr(node, k) for k in NodeOut.model_fields if k not in ("assigned_cameras", "volumes")}
+    if volumes:  # the cap lives on the volumes now
+        fields["storage_quota_bytes"] = total_quota([v.quota_bytes for v in volumes])
+    return NodeOut(**fields, volumes=[vol.volume_out(v) for v in volumes], assigned_cameras=count)
 
 
 # ================================================================ public API
@@ -61,9 +70,10 @@ async def get_node(node_id: int):
 async def update_node(node_id: int, body: NodeUpdate):
     node = await _get_node(node_id)
     data = body.model_dump(exclude_unset=True)
-    if "storage_quota_gb" in data:
-        gb = data.pop("storage_quota_gb")
-        node.storage_quota_bytes = int(gb * 1024**3) if gb is not None else None
+    if "storage_quota_gb" in data:  # deprecated: caps the default volume (older clients)
+        quota = gb_to_bytes(data.pop("storage_quota_gb"))
+        node.storage_quota_bytes = quota
+        await StorageVolume.filter(node_id=node.id, is_default=True).update(quota_bytes=quota)
     if data:
         node.update_from_dict(data)
     await node.save()
@@ -85,6 +95,84 @@ async def delete_node(node_id: int, force: bool = False):
         )
     await node.delete()
     logger.info("Node %s (%s) deleted by admin (force=%s)", node.id, node.name, force)
+
+
+# ---------------------------------------------------------------- storage volumes
+
+
+async def _get_volume(node_id: int, volume_id: int) -> StorageVolume:
+    volume = await StorageVolume.get_or_none(id=volume_id, node_id=node_id)
+    if volume is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Storage volume not found")
+    return volume
+
+
+@router.get("/{node_id}/volumes", response_model=list[VolumeOut], summary="Where this node may record")
+async def list_volumes(node_id: int):
+    await _get_node(node_id)
+    return [vol.volume_out(v) for v in await vol.node_volumes(node_id)]
+
+
+@router.post("/{node_id}/volumes", response_model=VolumeOut, status_code=status.HTTP_201_CREATED,
+             summary="Allow the node to record in another folder, drive or network share")
+async def add_volume(node_id: int, body: VolumeCreate):
+    """Added at the end of the fill order. The node checks the folder on its next heartbeat (state
+    PENDING until then; OK, or ERROR/UNAVAILABLE with the reason). For a network share, save its
+    credentials on the node PC first (cmdkey) - they are never stored here."""
+    await _get_node(node_id)
+    if await StorageVolume.exists(node_id=node_id, path=body.path):
+        raise HTTPException(status.HTTP_409_CONFLICT, "This node already has that storage folder")
+    last = await StorageVolume.filter(node_id=node_id).order_by("-position").first()
+    volume = await StorageVolume.create(
+        node_id=node_id, path=body.path, position=(last.position + 1) if last else 0,
+        quota_bytes=gb_to_bytes(body.quota_gb), accepting=body.accepting,
+    )
+    logger.info("Node %s: storage volume %s added (cap %s)", node_id, volume.path, volume.quota_bytes)
+    return vol.volume_out(volume)
+
+
+@router.patch("/{node_id}/volumes/{volume_id}", response_model=VolumeOut, summary="Change a volume's cap or pause it")
+async def update_volume(node_id: int, volume_id: int, body: VolumeUpdate):
+    volume = await _get_volume(node_id, volume_id)
+    data = body.model_dump(exclude_unset=True)
+    if "quota_gb" in data:
+        volume.quota_bytes = gb_to_bytes(data["quota_gb"])
+        if volume.is_default:
+            await MediaNode.filter(id=node_id).update(storage_quota_bytes=volume.quota_bytes)
+    if data.get("accepting") is not None:
+        volume.accepting = data["accepting"]
+    await volume.save()
+    return vol.volume_out(volume)
+
+
+@router.post("/{node_id}/volumes/reorder", response_model=list[VolumeOut], summary="Set the fill order")
+async def reorder_volumes(node_id: int, body: VolumeOrder):
+    current = {v.id for v in await vol.node_volumes(node_id)}
+    if set(body.volume_ids) != current or len(body.volume_ids) != len(current):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Send every volume id of this node exactly once")
+    await vol.renumber(node_id, body.volume_ids)
+    return [vol.volume_out(v) for v in await vol.node_volumes(node_id)]
+
+
+@router.delete("/{node_id}/volumes/{volume_id}", status_code=status.HTTP_204_NO_CONTENT,
+               summary="Stop using a storage folder")
+async def delete_volume(node_id: int, volume_id: int, force: bool = False):
+    """The node's default folder cannot be removed (pause it instead). Refused while recordings on this
+    volume are in the catalog unless force=true, which also removes their index (files stay on disk)."""
+    volume = await _get_volume(node_id, volume_id)
+    if volume.is_default:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "The node's default folder cannot be removed. Stop new recordings on it instead.")
+    if await RecordingSegment.filter(volume_id=volume.id).exists():
+        if not force:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Recordings are stored on this volume. Stop new recordings and let retention empty it, "
+                "or use force=true to remove it together with its recordings index.",
+            )
+        await RecordingSegment.filter(volume_id=volume.id).delete()
+    await volume.delete()
+    logger.info("Node %s: storage volume %s removed (force=%s)", node_id, volume.path, force)
 
 
 async def _set_state(node_id: int, new_state: NodeState) -> NodeOut:
@@ -146,8 +234,12 @@ async def heartbeat(node_id: int, body: HeartbeatIn):
             logger.info("Node %s (%s) is reachable again", node.id, node.name)
         node.state = NodeState.ACTIVE if assigned else NodeState.READY
     node.last_heartbeat_at = now
-    node.metrics = body.model_dump()
+    node.metrics = body.model_dump(exclude={"volumes"})
     await node.save(update_fields=["state", "last_heartbeat_at", "metrics", "updated_at"])
+
+    await vol.ensure_default_volume(node, body.default_recordings_dir)
+    await vol.apply_reports(node.id, body.volumes)
+    volumes = await vol.node_volumes(node.id)
 
     return HeartbeatOut(
         node_id=node.id,
@@ -155,6 +247,7 @@ async def heartbeat(node_id: int, body: HeartbeatIn):
         lease_expires_at=lease_expires_at,
         assignments=assigned,
         storage_quota_bytes=node.storage_quota_bytes,
+        volumes=[vol.volume_config(v) for v in volumes],
     )
 
 

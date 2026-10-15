@@ -54,3 +54,12 @@ def test_stream_diff():
     assert [s["profile"] for s in diff["add"]] == ["third"]
     assert diff["update"] == [{"profile": "sub", "body": {"source_url": "rtsp://10.0.0.5/sub2", "record": False, "rtsp_transport": "udp"}}]
     assert diff["remove"] == ["old"]
+
+
+def test_keep_until_full_sends_null_and_skips_days_check():
+    f = form(retention_days="", keep_until_full=True)
+    assert validate(f) == []
+    assert create_body(f)["retention_days"] is None
+    assert update_body(f)["retention_days"] is None
+    assert create_body(form(retention_days="30"))["retention_days"] == 30
+    assert any("Retention" in e for e in validate(form(retention_days="", keep_until_full=False)))

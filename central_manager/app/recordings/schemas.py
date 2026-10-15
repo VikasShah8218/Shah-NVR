@@ -18,7 +18,8 @@ class SegmentIn(BaseModel):
     duration_ms: int = Field(ge=0)
     size_bytes: int = Field(ge=0)
     codec: str | None = None
-    file_path: str
+    file_path: str  # relative to the volume's folder
+    volume_id: int | None = None  # None = the node's default folder (nodes older than storage volumes)
     parts: list[int] = Field(min_length=1)
 
 
@@ -36,6 +37,7 @@ class SegmentBatchOut(BaseModel):
 class DeletionItem(BaseModel):
     id: UUID
     file_path: str
+    volume_id: int | None = None
 
 
 class DeletedIn(BaseModel):

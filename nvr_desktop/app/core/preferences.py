@@ -13,6 +13,7 @@ from PySide6.QtCore import Property, QObject, QRect, QSettings, Signal, Slot
 from settings.settings import settings
 
 LIVE_PROTOCOLS = ("auto", "rtsp", "hls")
+RENDER_MODES = ("auto", "cpu", "gpu")  # see app/video/render_mode.py
 DEFAULT_TILES = [None] * 16
 
 
@@ -23,10 +24,13 @@ class Preferences(QObject):
     gridUsesSubstreamChanged = Signal()
     hwdecChanged = Signal()
     sidebarCollapsedChanged = Signal()
+    renderModeChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._store = QSettings("ShahNVR", "Desktop")
+        self._active_render_mode = "gpu"  # set by main.py at startup; fixed for this process
+        self._render_mode_at_start = "auto"
 
     # ------------------------------------------------------------------ helpers
     def _get(self, key: str, default, kind=str):
@@ -77,6 +81,18 @@ class Preferences(QObject):
     def _set_hwdec(self, value: str) -> None:
         self._set("hwdec", value, self.hwdecChanged)
 
+    def _get_render_mode(self) -> str:
+        value = self._get("renderMode", "auto")
+        return value if value in RENDER_MODES else "auto"
+
+    def _set_render_mode(self, value: str) -> None:
+        if value in RENDER_MODES:
+            self._set("renderMode", value, self.renderModeChanged)  # applies after a restart
+
+    def set_active_render_mode(self, mode: str) -> None:
+        self._active_render_mode = mode
+        self._render_mode_at_start = self._get_render_mode()
+
     def _get_sidebar(self) -> bool:
         return self._get("sidebarCollapsed", False, bool)
 
@@ -89,6 +105,9 @@ class Preferences(QObject):
     gridUsesSubstream = Property(bool, _get_substream, _set_substream, notify=gridUsesSubstreamChanged)
     hwdec = Property(str, _get_hwdec, _set_hwdec, notify=hwdecChanged)
     sidebarCollapsed = Property(bool, _get_sidebar, _set_sidebar, notify=sidebarCollapsedChanged)
+    renderMode = Property(str, _get_render_mode, _set_render_mode, notify=renderModeChanged)
+    activeRenderMode = Property(str, lambda self: self._active_render_mode, constant=True)
+    renderModeAtStart = Property(str, lambda self: self._render_mode_at_start, constant=True)
 
     # ------------------------------------------------------------------ live grid (used by LiveStore)
     def live_layout(self) -> tuple[int, list[int | None]]:
@@ -120,5 +139,6 @@ class Preferences(QObject):
     def reset(self) -> None:
         self._store.clear()
         for signal in (self.centralUrlChanged, self.pollSecondsChanged, self.liveProtocolChanged,
-                       self.gridUsesSubstreamChanged, self.hwdecChanged, self.sidebarCollapsedChanged):
+                       self.gridUsesSubstreamChanged, self.hwdecChanged, self.sidebarCollapsedChanged,
+                       self.renderModeChanged):
             signal.emit()

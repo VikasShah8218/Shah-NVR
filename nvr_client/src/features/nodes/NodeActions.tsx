@@ -19,8 +19,6 @@ import { Switch } from "@/components/ui/switch"
 import { formatBytes } from "@/lib/format"
 import { nodeResources } from "./nodeUtils"
 
-const GB = 1024 ** 3
-
 /** Row/header menu: edit limits, drain, cordon, activate, delete. */
 export function NodeActions({ node, variant = "icon" }: { node: MediaNode; variant?: "icon" | "button" }) {
   const action = useNodeAction()
@@ -117,28 +115,18 @@ export function NodeLimitsDialog({
   const update = useUpdateNode()
   const res = nodeResources(node)
   const [capacity, setCapacity] = useState(String(node.capacity_cameras))
-  const [unlimited, setUnlimited] = useState(node.storage_quota_bytes == null)
-  const [quotaGb, setQuotaGb] = useState(node.storage_quota_bytes ? String(+(node.storage_quota_bytes / GB).toFixed(2)) : "100")
-
-  const quotaNum = Number(quotaGb)
   const capNum = Number(capacity)
-  const valid = Number.isInteger(capNum) && capNum >= 1 && (unlimited || quotaNum > 0)
+  const valid = Number.isInteger(capNum) && capNum >= 1
 
   const save = () =>
-    update.mutate(
-      { id: node.id, body: { capacity_cameras: capNum, storage_quota_gb: unlimited ? null : quotaNum } },
-      { onSuccess: () => onOpenChange(false) },
-    )
+    update.mutate({ id: node.id, body: { capacity_cameras: capNum } }, { onSuccess: () => onOpenChange(false) })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent onClick={(e) => e.stopPropagation()}>
         <DialogHeader>
           <DialogTitle>Limits for {node.name}</DialogTitle>
-          <DialogDescription>
-            The scheduler never assigns more cameras than the capacity. Above 95% of the storage quota the node
-            deletes its oldest recordings until it is back under 90%.
-          </DialogDescription>
+          <DialogDescription>The scheduler never assigns more cameras than the capacity.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
           <div className="grid gap-1.5">
@@ -146,17 +134,9 @@ export function NodeLimitsDialog({
             <Input id="cap" type="number" min={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} />
             <span className="text-xs text-muted-foreground">Currently assigned: {node.assigned_cameras}</span>
           </div>
-          <div className="grid gap-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="quota">Storage quota (GB)</Label>
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Switch checked={unlimited} onCheckedChange={setUnlimited} /> Use whole disk
-              </label>
-            </div>
-            <Input id="quota" type="number" min={0.01} step="any" disabled={unlimited} value={quotaGb} onChange={(e) => setQuotaGb(e.target.value)} />
-            <span className="text-xs text-muted-foreground">
-              Recordings now {formatBytes(res.recordings)} · disk free {formatBytes(res.diskFree)} of {formatBytes(res.diskTotal)}
-            </span>
+          <div className="rounded-md border p-3 text-xs text-muted-foreground">
+            Storage caps are set per drive or network share: open the node and use the <b>Storage</b> tab. Recordings now{" "}
+            {formatBytes(res.recordings)} on {res.volumes.length || 1} storage{res.volumes.length > 1 ? "s" : ""}.
           </div>
         </div>
         <DialogFooter>

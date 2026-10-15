@@ -24,7 +24,8 @@ Sheet {
         descField.text = cam ? (cam.description ?? "") : ""
         userField.text = cam ? (cam.username ?? "") : ""
         passField.text = ""
-        retentionField.text = String(cam ? cam.retention_days : 7)
+        untilFullSwitch.checked = !!cam && (cam.retention_days === null || cam.retention_days === undefined)
+        retentionField.text = String(cam && cam.retention_days ? cam.retention_days : 7)
         enabledSwitch.checked = cam ? cam.enabled : true
         streams.clear()
         if (cam) {
@@ -45,7 +46,8 @@ Sheet {
         }
         return {
             name: nameField.text, description: descField.text, username: userField.text, password: passField.text,
-            retention_days: retentionField.text, enabled: enabledSwitch.checked, streams: list
+            retention_days: retentionField.text, keep_until_full: untilFullSwitch.checked,
+            enabled: enabledSwitch.checked, streams: list
         }
     }
 
@@ -87,11 +89,47 @@ Sheet {
             }
         }
     }
-    RowLayout {
+    // retention: N days counted back from the latest recording, or until storage is full
+    ColumnLayout {
         Layout.fillWidth: true
-        spacing: 12
-        FormField { label: "Keep recordings (days)"; AppInput { id: retentionField; Layout.fillWidth: true } }
-        AppSwitch { id: enabledSwitch; text: "Enabled"; Layout.alignment: Qt.AlignBottom; Layout.bottomMargin: 8; Layout.fillWidth: true }
+        spacing: 6
+        AppText { text: "Keep recordings"; font.weight: Font.Medium }
+        RowLayout {
+            spacing: 10
+            AppInput { id: retentionField; implicitWidth: 110; enabled: !untilFullSwitch.checked; inputMethodHints: Qt.ImhDigitsOnly }
+            AppText { text: "days"; variant: untilFullSwitch.checked ? "muted" : "body" }
+            Item { implicitWidth: 8 }
+            AppSwitch { id: untilFullSwitch; text: "Until storage is full" }
+        }
+        AppText {
+            text: untilFullSwitch.checked
+                ? "Recordings are never deleted by age; the oldest are replaced only when all storage is full."
+                : "Days count back from the camera's latest recording, so a stopped camera keeps its history. When all storage is full the oldest recordings are always replaced."
+            variant: "small"
+            wrapMode: Text.WordWrap
+            elide: Text.ElideNone
+            Layout.fillWidth: true
+        }
+    }
+    Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: enabledRow.implicitHeight + 20
+        radius: Theme.radiusSm
+        color: "transparent"
+        border.color: Theme.border
+        RowLayout {
+            id: enabledRow
+            anchors.fill: parent
+            anchors.margins: 10
+            anchors.leftMargin: 12
+            ColumnLayout {
+                spacing: 2
+                Layout.fillWidth: true
+                AppText { text: "Camera enabled" }
+                AppText { text: "Off: the camera is not pulled; no live view, no new recording."; variant: "small" }
+            }
+            AppSwitch { id: enabledSwitch }
+        }
     }
 
     Separator {}

@@ -14,6 +14,7 @@ class NodeStatusOut(BaseModel):
     mediamtx_version: str | None
     recordings_dir: str
     disk: dict
+    volumes: list[dict] = []  # storage volumes: path, state, caps, sizes, which one is being written
     assigned_cameras: int
     ready_paths: list[str]
     pending_uploads: int

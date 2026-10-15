@@ -26,6 +26,11 @@ TONE = {
     # segments
     "AVAILABLE": "success",
     "DELETING": "warning",
+    # storage volumes
+    "OK": "success",
+    "FULL": "warning",
+    "PENDING": "muted",
+    "ERROR": "danger",
 }
 
 
@@ -34,6 +39,8 @@ def tone_of(status: str | None) -> str:
 
 
 def label_of(status: str | None) -> str:
+    if status == "OK":
+        return "OK"
     text = (status or "").replace("_", " ").lower()
     return text[:1].upper() + text[1:]
 

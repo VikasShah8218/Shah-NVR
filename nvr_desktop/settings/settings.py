@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     MPV_DLL_DIR: Path = BASE_DIR / "bin"
     HTTP_TIMEOUT_SECONDS: float = 10.0
+    # Force the video render mode ("cpu" | "gpu"), overriding Settings in the app. Empty = use Settings.
+    RENDER_MODE: str = ""
 
     @field_validator("MPV_DLL_DIR")
     @classmethod

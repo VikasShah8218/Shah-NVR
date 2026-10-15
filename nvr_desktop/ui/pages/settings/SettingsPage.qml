@@ -31,7 +31,7 @@ PageScroll {
             AppInput {
                 id: urlField
                 text: Prefs.centralUrl
-                placeholderText: "http://100.64.182.102:8000"
+                placeholderText: "http://192.168.1.3:8000"
                 Layout.fillWidth: true
                 onAccepted: SettingsPage.saveCentralUrl(text)
             }
@@ -104,9 +104,29 @@ PageScroll {
             }
         }
         SettingRow {
-            title: "Hardware decoding"
-            hint: "Decode video on the GPU (NVIDIA / Intel / AMD). Auto picks the best safe decoder and falls back to the CPU."
+            title: "Video rendering"
+            hint: "CPU draws video without any graphics card (like a web browser) and is the lightest choice for big grids "
+                + "on PCs without a GPU. Auto uses the GPU when a real graphics driver is present. "
+                + "Active now: " + Prefs.activeRenderMode.toUpperCase()
+                + (Prefs.renderMode !== Prefs.renderModeAtStart ? " · restart the app to apply the change" : "")
             AppSelect {
+                implicitWidth: 220
+                options: [
+                    { value: "auto", label: "Auto (recommended)" },
+                    { value: "cpu", label: "CPU" },
+                    { value: "gpu", label: "GPU (OpenGL)" }
+                ]
+                value: Prefs.renderMode
+                onPicked: v => Prefs.renderMode = v
+            }
+        }
+        SettingRow {
+            title: "Hardware decoding"
+            hint: Prefs.activeRenderMode === "cpu"
+                ? "CPU rendering decodes on the processor; this applies in GPU rendering only."
+                : "Decode video on the GPU (NVIDIA / Intel / AMD). Auto picks the best safe decoder and falls back to the CPU."
+            AppSelect {
+                enabled: Prefs.activeRenderMode !== "cpu"
                 implicitWidth: 220
                 options: [
                     { value: "auto-safe", label: "Auto (recommended)" },

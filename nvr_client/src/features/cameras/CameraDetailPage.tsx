@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { formatBytes, timeAgo } from "@/lib/format"
+import { formatBytes, retentionLabel, timeAgo } from "@/lib/format"
 import { useSettings } from "@/lib/settings"
 import { DAY, fmtDateTime } from "@/lib/time"
 import { MoveCameraDialog } from "../assignments/MoveCameraDialog"
@@ -118,7 +118,7 @@ function Overview({ camera: c }: { camera: Camera }) {
             </Field>
             <Field label="Username">{c.username ?? "—"}</Field>
             <Field label="Password">{c.has_password ? "Set" : "Not set"}</Field>
-            <Field label="Keep recordings">{c.retention_days} days</Field>
+            <Field label="Keep recordings">{retentionLabel(c.retention_days)}</Field>
             <Field label="Added">{fmtDateTime(new Date(c.created_at))}</Field>
           </CardContent>
         </Card>

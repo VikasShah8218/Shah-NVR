@@ -1,36 +1,33 @@
-"""MpvVideoItem: a QML item that plays a stream with libmpv and draws it on the GPU.
+"""MpvPlayer: one libmpv player and everything about playing a stream, except drawing it.
+
+Drawing is done by a surface (QML type `MpvSurface`) bound to the player:
+* GPU mode: app/video/gl_surface.py (OpenGL, Qt Quick FBO);
+* CPU mode: app/video/sw_surface.py (libswscale into memory, Qt Quick software renderer).
+The QML API is identical in both modes; ui/video/VideoView.qml pairs one player with one surface.
 
 How it works
 ------------
-* Each item owns at most one `mpv.MPV` player, created on the first `play()` (empty grid tiles cost
-  nothing). libmpv runs its own network + decode threads; hardware decoding via `hwdec`, CPU fallback
-  built in.
-* `_Renderer` (QQuickFramebufferObject.Renderer) creates the mpv OpenGL render context on its first
-  render with a player, then calls `ctx.render(...)` into Qt's FBO for every frame. Video frames
-  never pass through Python: Python makes one small call per frame.
+* The `mpv.MPV` is created on the first `play()`, so empty grid tiles cost nothing. libmpv runs its
+  own network + decode threads.
+* A source starts loading only once the surface has created mpv's render context ("render-ready"):
+  mpv's video output (vo=libmpv) needs it before `loadfile`.
+* Live mode reconnects by itself (backoff 2 s, 4 s, 8 s ... max 30 s, reset once frames arrive) and,
+  when `fallbackSource` is set (Auto protocol), switches RTSP -> LL-HLS after the first failure.
 
 Threads
 -------
 libmpv calls back from its own threads (frame ready, property changes, end of file). Those callbacks
-never hand arguments to Qt: they append to a lock-protected queue in `_MpvBridge` and emit one
-argument-less `wake` signal (queued to the GUI thread), where the item drains the queue.
-The bridge is a child of the item, so it is always deleted on the GUI thread; it is closed (under
+never hand arguments to Qt: they append to a lock-protected queue in `MpvBridge` and emit one
+argument-less `wake` signal (queued to the GUI thread), where the player drains the queue.
+The bridge is a child of the player, so it is always deleted on the GUI thread; it is closed (under
 the lock) before that, so a late libmpv callback becomes a no-op instead of touching a dead object.
 
 Lifetime
 --------
-libmpv requires: free the render context (with its GL context current) before destroying the player.
-* Qt owns the renderer and deletes it with the GL context current; `_Renderer.__del__` frees the
-  render context. Qt may also replace a renderer while the item lives (scene graph invalidated):
-  the item then waits for the new renderer's context ("render-lost" -> "render-ready").
-* The player is terminated exactly once, by whichever goes last: the item (if no renderer holds a
-  render context) or the renderer (if the item is already gone).
-
-Requires (set in main.py before the QGuiApplication exists):
-* the OpenGL scene graph: QQuickWindow.setGraphicsApi(QSGRendererInterface.OpenGL);
-* the "basic" render loop (QSG_RENDER_LOOP=basic): rendering runs on the GUI thread, so Python never
-  runs on Qt's render thread and GIL deadlocks (e.g. during grabWindow) are impossible. mpv still
-  decodes on its own threads.
+libmpv requires: free the render context before destroying the player. The render context belongs
+to the surface. The `mpv.MPV` is terminated exactly once, by whichever goes last:
+* the player, when it is destroyed and no render context exists (`bridge.has_render_context`);
+* otherwise the surface, right after freeing its render context (`bridge.player_alive` is False).
 """
 
 from __future__ import annotations
@@ -43,46 +40,30 @@ from functools import partial
 
 import mpv
 from PySide6.QtCore import Property, QObject, Qt, QTimer, Signal, Slot
-from PySide6.QtGui import QOpenGLContext
-from PySide6.QtQml import QmlElement
-from PySide6.QtQuick import QQuickFramebufferObject
 
+from app.video import render_mode
 from app.video.profiles import BASE_OPTIONS, TIMELINE_EPOCH, options_for
-from app.video.render_context import GlRenderContext
 
 logger = logging.getLogger(__name__)
 
-QML_IMPORT_NAME = "Nvr.Video"
-QML_IMPORT_MAJOR_VERSION = 1
-
 MAX_BACKOFF_SECONDS = 30
 OBSERVED_PROPERTIES = ("video-params", "hwdec-current", "time-pos", "duration", "pause", "speed")
-_GL_COLOR_BUFFER_BIT = 0x4000
-
-
-def _gl_get_proc_address(name: bytes) -> int:
-    """OpenGL function lookup for libmpv, resolved in the current (Qt Quick) GL context."""
-    context = QOpenGLContext.currentContext()
-    if context is None:
-        return 0
-    address = context.getProcAddress(name)
-    return int(address) if address else 0
 
 
 def _log_mpv_message(level: str, prefix: str, text: str) -> None:
     logger.debug("mpv[%s] %s: %s", level, prefix, text.strip())
 
 
-class _MpvBridge(QObject):
-    """Hand-off between libmpv threads and the GUI thread, plus the state shared with the renderer."""
+class MpvBridge(QObject):
+    """Hand-off between libmpv threads and the GUI thread, plus the state the surface shares."""
 
     wake = Signal()  # no arguments: nothing is converted or copied across threads
 
     def __init__(self, parent: QObject):
         super().__init__(parent)
-        self.player: mpv.MPV | None = None  # created lazily by the item (GUI thread)
-        self.has_render_context = False     # GUI thread only (basic render loop)
-        self.item_alive = True              # GUI thread only
+        self.player: mpv.MPV | None = None  # created lazily (GUI thread)
+        self.has_render_context = False     # GUI thread only
+        self.player_alive = True            # GUI thread only
         self._lock = threading.Lock()
         self._open = True
         self._frame = False
@@ -122,66 +103,21 @@ class _MpvBridge(QObject):
             self._events.clear()
 
 
-def _terminate(player: mpv.MPV | None, why: str) -> None:
+def terminate_player(player: mpv.MPV | None, why: str) -> None:
     if player is not None:
         player.terminate()
         logger.debug("mpv player released (%s)", why)
 
 
-class _Renderer(QQuickFramebufferObject.Renderer):
-    """Draws mpv into the FBO that Qt creates and owns (the default createFramebufferObject).
-
-    Not creating the FBO in Python is deliberate: PySide would leave a Python-created FBO owned by
-    Python, and Qt deletes it too -> double free. Here Python never owns any GPU object.
-    """
-
-    def __init__(self, bridge: _MpvBridge):
-        super().__init__()
-        self._bridge = bridge
-        self._ctx: GlRenderContext | None = None
-        self._player: mpv.MPV | None = None
-
-    def render(self) -> None:
-        player = self._bridge.player
-        if player is None:  # nothing to play yet: keep the surface transparent
-            gl = QOpenGLContext.currentContext().functions()
-            gl.glClearColor(0, 0, 0, 0)
-            gl.glClear(_GL_COLOR_BUFFER_BIT)
-            return
-        if self._ctx is None:  # first frame with a player: the GL context is current here
-            self._ctx = GlRenderContext(player, _gl_get_proc_address)
-            self._player = player
-            self._bridge.has_render_context = True
-            self._ctx.set_update_callback(self._bridge.post_frame)
-            self._bridge.post_event("render-ready")
-        fbo = self.framebufferObject()
-        self._ctx.render(fbo.handle(), fbo.width(), fbo.height())
-
-    def __del__(self):
-        # Runs when Qt deletes the renderer, with the GL context current.
-        try:
-            if self._ctx is None:
-                return
-            self._ctx.free()  # must happen before the player is destroyed
-            self._ctx = None
-            self._bridge.has_render_context = False
-            if self._bridge.item_alive:
-                self._bridge.post_event("render-lost")  # the item waits for the next renderer
-            else:
-                _terminate(self._player, "after its render context")
-        except Exception:  # never raise from a destructor
-            logger.exception("Failed to release mpv render context")
-
-
-def _on_item_destroyed(bridge: _MpvBridge, *_args) -> None:
+def _on_player_destroyed(bridge: MpvBridge, *_args) -> None:
     bridge.close()
-    bridge.item_alive = False
-    if not bridge.has_render_context:  # otherwise the renderer terminates it after freeing its context
-        _terminate(bridge.player, "item destroyed")
+    bridge.player_alive = False
+    if not bridge.has_render_context:  # otherwise the surface terminates it after freeing its context
+        terminate_player(bridge.player, "player destroyed")
 
 
-def _forward_mpv_event(bridge: _MpvBridge, event) -> None:
-    """libmpv event thread -> bridge queue (only the events the item cares about)."""
+def _forward_mpv_event(bridge: MpvBridge, event) -> None:
+    """libmpv event thread -> bridge queue (only the events the player cares about)."""
     event_id = event.event_id.value
     if event_id == mpv.MpvEventID.END_FILE:
         bridge.post_event("end-file", {"reason": event.data.reason, "error": event.data.error})
@@ -189,8 +125,7 @@ def _forward_mpv_event(bridge: _MpvBridge, event) -> None:
         bridge.post_event("playback-restart")
 
 
-@QmlElement
-class MpvVideoItem(QQuickFramebufferObject):
+class MpvPlayer(QObject):
     sourceChanged = Signal()
     fallbackSourceChanged = Signal()
     modeChanged = Signal()
@@ -205,6 +140,9 @@ class MpvVideoItem(QQuickFramebufferObject):
     speedChanged = Signal()
     activeSourceChanged = Signal()
     eofReached = Signal()
+    # for the surface (GUI thread)
+    mpvCreated = Signal()  # the mpv.MPV now exists: create the render context
+    frameReady = Signal()  # a new frame can be drawn
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -224,50 +162,49 @@ class MpvVideoItem(QQuickFramebufferObject):
         self._speed = 1.0
         self._failures = 0
         self._stopped = True
-        self._complete = False  # QML sets properties in any order; start only after all are set
         self._render_ready = False  # mpv's video output needs the render context before loadfile
 
         self._retry_timer = QTimer(self)
         self._retry_timer.setSingleShot(True)
         self._retry_timer.timeout.connect(self._load_active_source)
 
-        self._bridge = _MpvBridge(self)
-        self._bridge.wake.connect(self._drain, Qt.ConnectionType.QueuedConnection)
-        self.destroyed.connect(partial(_on_item_destroyed, self._bridge))
+        # QML assigns properties one by one while creating the object: start playing once, after all
+        # of them are set (the next event-loop turn), instead of on the first `source` assignment.
+        self._play_timer = QTimer(self)
+        self._play_timer.setSingleShot(True)
+        self._play_timer.setInterval(0)
+        self._play_timer.timeout.connect(self.play)
+
+        self.bridge = MpvBridge(self)
+        self.bridge.wake.connect(self._drain, Qt.ConnectionType.QueuedConnection)
+        self.destroyed.connect(partial(_on_player_destroyed, self.bridge))
 
     @property
-    def player(self) -> mpv.MPV | None:
-        return self._bridge.player
+    def mpv(self) -> mpv.MPV | None:
+        return self.bridge.player
 
-    def _ensure_player(self) -> mpv.MPV:
-        if self._bridge.player is None:
-            player = mpv.MPV(log_handler=_log_mpv_message, loglevel="warn", hwdec=self._hwdec, **BASE_OPTIONS)
-            bridge = self._bridge  # callbacks capture the bridge, never the item
+    def _hwdec_option(self) -> str:
+        return "no" if render_mode.active() == "cpu" else self._hwdec  # CPU mode decodes on the processor
+
+    def _ensure_mpv(self) -> mpv.MPV:
+        if self.bridge.player is None:
+            player = mpv.MPV(log_handler=_log_mpv_message, loglevel="warn", hwdec=self._hwdec_option(), **BASE_OPTIONS)
+            bridge = self.bridge  # callbacks capture the bridge, never the player object
             for name in OBSERVED_PROPERTIES:
                 player.observe_property(name, lambda prop, value, b=bridge: b.post_event("prop:" + prop, value))
             player.register_event_callback(partial(_forward_mpv_event, bridge))
             bridge.player = player
-            self.update()  # let the renderer create the render context
-        return self._bridge.player
-
-    # ------------------------------------------------------------------ Qt Quick hooks
-    def createRenderer(self) -> QQuickFramebufferObject.Renderer:
-        return _Renderer(self._bridge)
-
-    def componentComplete(self) -> None:
-        super().componentComplete()
-        self._complete = True
-        if self._source:
-            self.play()
+            self.mpvCreated.emit()
+        return self.bridge.player
 
     # ------------------------------------------------------------------ events (GUI thread)
     @Slot()
     def _drain(self) -> None:
-        frame, events = self._bridge.take()
+        frame, events = self.bridge.take()
         for kind, payload in events:
             self._handle_mpv_event(kind, payload)
         if frame:
-            self.update()
+            self.frameReady.emit()
 
     def _handle_mpv_event(self, kind: str, payload) -> None:
         if kind == "render-ready":
@@ -275,8 +212,7 @@ class MpvVideoItem(QQuickFramebufferObject):
             if not self._stopped:
                 self._load_active_source()
         elif kind == "render-lost":
-            self._render_ready = False  # the next renderer brings a new context ("render-ready")
-            self.update()
+            self._render_ready = False  # the surface brings a new context ("render-ready")
         elif kind == "prop:video-params":
             w = int((payload or {}).get("w") or 0)
             h = int((payload or {}).get("h") or 0)
@@ -350,9 +286,9 @@ class MpvVideoItem(QQuickFramebufferObject):
             self.activeSourceChanged.emit()
 
     def _apply_mode_options(self) -> None:
-        for key, value in options_for(self._mode).items():
+        for key, value in options_for(self._mode, render_mode.active()).items():
             try:
-                self.player[key.replace("_", "-")] = value
+                self.mpv[key.replace("_", "-")] = value
             except Exception as exc:  # an option unknown to this libmpv build must not break playback
                 logger.warning("mpv option %s=%s rejected: %s", key, value, exc)
 
@@ -363,14 +299,13 @@ class MpvVideoItem(QQuickFramebufferObject):
         self._set_state("connecting" if self._failures == 0 else "reconnecting")
         self._apply_mode_options()
         logger.debug("Loading %s (%s)", self._active_source, self._mode)
-        self.player.loadfile(self._active_source)
+        self.mpv.loadfile(self._active_source)
 
     # ------------------------------------------------------------------ QML API
     @Slot()
     def play(self) -> None:
         """(Re)start the current source from scratch."""
-        if not self._complete:
-            return
+        self._play_timer.stop()
         if not self._source:
             self.stop()
             return
@@ -378,33 +313,33 @@ class MpvVideoItem(QQuickFramebufferObject):
         self._failures = 0
         self._retry_timer.stop()
         self._set_active_source(self._source)
-        self._ensure_player()
+        self._ensure_mpv()
         self._load_active_source()
 
     @Slot()
     def stop(self) -> None:
         self._stopped = True
         self._retry_timer.stop()
-        if self.player is not None:
-            self.player.command("stop")
+        if self.mpv is not None:
+            self.mpv.command("stop")
         self._set_state("idle")
 
     @Slot(float)
     def seekAbsolute(self, seconds: float) -> None:
-        if self.player is not None:
-            self.player.seek(seconds, reference="absolute", precision="exact")
+        if self.mpv is not None:
+            self.mpv.seek(seconds, reference="absolute", precision="exact")
 
     @Slot(float)
     def seekRelative(self, seconds: float) -> None:
-        if self.player is not None:
-            self.player.seek(seconds, reference="relative", precision="exact")
+        if self.mpv is not None:
+            self.mpv.seek(seconds, reference="relative", precision="exact")
 
     @Slot(str, result=bool)
     def screenshot(self, path: str) -> bool:
-        if self.player is None:
+        if self.mpv is None:
             return False
         try:
-            self.player.command("screenshot-to-file", path, "video")
+            self.mpv.command("screenshot-to-file", path, "video")
             return True
         except Exception as exc:
             logger.warning("Screenshot failed: %s", exc)
@@ -428,7 +363,7 @@ class MpvVideoItem(QQuickFramebufferObject):
         if value != self._source:
             self._source = value
             self.sourceChanged.emit()
-            self.play()
+            self._play_timer.start()
 
     def _get_fallback(self) -> str:
         return self._fallback_source
@@ -452,23 +387,23 @@ class MpvVideoItem(QQuickFramebufferObject):
     def _set_hwdec(self, value: str) -> None:
         if value and value != self._hwdec:
             self._hwdec = value
-            if self.player is not None:
-                self.player["hwdec"] = value
+            if self.mpv is not None:
+                self.mpv["hwdec"] = self._hwdec_option()
             self.hwdecChanged.emit()
 
     def _get_paused(self) -> bool:
         return self._paused
 
     def _set_paused(self, value: bool) -> None:
-        if self.player is not None:
-            self.player["pause"] = bool(value)
+        if self.mpv is not None:
+            self.mpv["pause"] = bool(value)
 
     def _get_speed(self) -> float:
         return self._speed
 
     def _set_speed(self, value: float) -> None:
-        if self.player is not None:
-            self.player["speed"] = float(value)
+        if self.mpv is not None:
+            self.mpv["speed"] = float(value)
 
     source = Property(str, _get_source, _set_source, notify=sourceChanged)
     fallbackSource = Property(str, _get_fallback, _set_fallback, notify=fallbackSourceChanged)
@@ -476,7 +411,7 @@ class MpvVideoItem(QQuickFramebufferObject):
     hwdec = Property(str, _get_hwdec, _set_hwdec, notify=hwdecChanged)
     paused = Property(bool, _get_paused, _set_paused, notify=pausedChanged)
     speed = Property(float, _get_speed, _set_speed, notify=speedChanged)
-    # not "state": QQuickItem already has a `state` property (QML states) that would shadow it
+    # not "state": a QQuickItem has a `state` property (QML states); keep the same name everywhere
     playState = Property(str, lambda self: self._state, notify=playStateChanged)
     errorText = Property(str, lambda self: self._error_text, notify=errorTextChanged)
     videoWidth = Property(int, lambda self: self._video_w, notify=videoSizeChanged)

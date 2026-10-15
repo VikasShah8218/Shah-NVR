@@ -23,7 +23,9 @@ class Camera(Model):
     username = fields.CharField(max_length=128, null=True)
     password = fields.CharField(max_length=256, null=True)
     enabled = fields.BooleanField(default=True)
-    retention_days = fields.IntField(default=7)
+    # Max days of recordings, counted back from the camera's latest recording (app/recordings/services.py).
+    # None = keep until storage is full (only space-based cleanup on the node removes recordings).
+    retention_days = fields.IntField(default=7, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 

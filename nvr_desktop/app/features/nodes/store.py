@@ -59,10 +59,10 @@ class NodesStore(BaseStore):
     listModel = Property(QObject, lambda self: self.model, constant=True)
 
     # ------------------------------------------------------------------ actions
-    @Slot(int, int, "QVariant")
-    def updateLimits(self, node_id: int, capacity: int, quota_gb) -> None:
-        """quota_gb: a number of GB, or null/undefined for "use the whole disk"."""
-        body = {"capacity_cameras": int(capacity), "storage_quota_gb": float(quota_gb) if quota_gb else None}
+    @Slot(int, int)
+    def updateLimits(self, node_id: int, capacity: int) -> None:
+        """Camera capacity. (Storage caps are set per volume: NodeDetail.updateVolumeCap.)"""
+        body = {"capacity_cameras": int(capacity)}
         self.act(lambda: self.api.update_node(node_id, body).to_qml(),
                  success=lambda n: f"Limits saved for {n['name']}", after=lambda _n: self.refresh())
 

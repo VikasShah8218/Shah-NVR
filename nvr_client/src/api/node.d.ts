@@ -226,6 +226,13 @@ export interface components {
             disk: {
                 [key: string]: unknown;
             };
+            /**
+             * Volumes
+             * @default []
+             */
+            volumes: {
+                [key: string]: unknown;
+            }[];
             /** Assigned Cameras */
             assigned_cameras: number;
             /** Ready Paths */

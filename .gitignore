@@ -1,6 +1,8 @@
 # Secrets / local config (commit .env.example instead)
 .env
 
+/tests
+
 # Python
 __pycache__/
 *.py[cod]
@@ -16,6 +18,19 @@ media_node/data/
 
 # Desktop client: libmpv DLL (download per nvr_desktop/README.md)
 nvr_desktop/bin/
+
+/requirements
+requirements
+
+# Development plans / internal architecture notes (local only)
+CLAUDE.md
+.claude/
+docs
+IMPLEMENTATION_PLAN.md
+Initial_archetecture.txt
+*PLAN*.md
+*[Aa]rchitecture*
+*[Aa]rchetecture*
 
 # OS / editors
 .DS_Store

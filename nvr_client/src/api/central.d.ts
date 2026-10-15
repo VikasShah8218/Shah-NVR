@@ -171,6 +171,68 @@ export interface paths {
         patch: operations["update_node_api_v1_nodes__node_id__patch"];
         trace?: never;
     };
+    "/api/v1/nodes/{node_id}/volumes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Where this node may record */
+        get: operations["list_volumes_api_v1_nodes__node_id__volumes_get"];
+        put?: never;
+        /**
+         * Allow the node to record in another folder, drive or network share
+         * @description Added at the end of the fill order. The node checks the folder on its next heartbeat (state
+         *     PENDING until then; OK, or ERROR/UNAVAILABLE with the reason). For a network share, save its
+         *     credentials on the node PC first (cmdkey) - they are never stored here.
+         */
+        post: operations["add_volume_api_v1_nodes__node_id__volumes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nodes/{node_id}/volumes/{volume_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Stop using a storage folder
+         * @description The node's default folder cannot be removed (pause it instead). Refused while recordings on this
+         *     volume are in the catalog unless force=true, which also removes their index (files stay on disk).
+         */
+        delete: operations["delete_volume_api_v1_nodes__node_id__volumes__volume_id__delete"];
+        options?: never;
+        head?: never;
+        /** Change a volume's cap or pause it */
+        patch: operations["update_volume_api_v1_nodes__node_id__volumes__volume_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/nodes/{node_id}/volumes/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set the fill order */
+        post: operations["reorder_volumes_api_v1_nodes__node_id__volumes_reorder_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nodes/{node_id}/drain": {
         parameters: {
             query?: never;
@@ -564,7 +626,7 @@ export interface components {
             /** Enabled */
             enabled: boolean;
             /** Retention Days */
-            retention_days: number;
+            retention_days: number | null;
             /**
              * Created At
              * Format: date-time
@@ -627,6 +689,8 @@ export interface components {
             id: string;
             /** File Path */
             file_path: string;
+            /** Volume Id */
+            volume_id?: number | null;
         };
         /** DiskInfo */
         DiskInfo: {
@@ -638,6 +702,22 @@ export interface components {
             free_bytes: number;
             /** Used Percent */
             used_percent: number;
+        };
+        /**
+         * DriveInfo
+         * @description A local fixed drive of the node (offered in "Add storage").
+         */
+        DriveInfo: {
+            /** Root */
+            root: string;
+            /** Label */
+            label?: string | null;
+            /** Fstype */
+            fstype?: string | null;
+            /** Total Bytes */
+            total_bytes: number;
+            /** Free Bytes */
+            free_bytes: number;
         };
         /** GapOut */
         GapOut: {
@@ -714,6 +794,25 @@ export interface components {
              * @default 0
              */
             pending_uploads: number;
+            /**
+             * Addresses
+             * @default []
+             */
+            addresses: {
+                [key: string]: unknown;
+            }[];
+            /** Default Recordings Dir */
+            default_recordings_dir?: string | null;
+            /**
+             * Drives
+             * @default []
+             */
+            drives: components["schemas"]["DriveInfo"][];
+            /**
+             * Volumes
+             * @default []
+             */
+            volumes: components["schemas"]["VolumeReport"][];
             /** Extra */
             extra?: {
                 [key: string]: unknown;
@@ -733,6 +832,11 @@ export interface components {
             assignments: number;
             /** Storage Quota Bytes */
             storage_quota_bytes?: number | null;
+            /**
+             * Volumes
+             * @default []
+             */
+            volumes: components["schemas"]["VolumeConfig"][];
         };
         /** LiveOut */
         LiveOut: {
@@ -788,6 +892,11 @@ export interface components {
             capacity_cameras: number;
             /** Storage Quota Bytes */
             storage_quota_bytes: number | null;
+            /**
+             * Volumes
+             * @default []
+             */
+            volumes: components["schemas"]["VolumeOut"][];
             /** Version */
             version: string | null;
             /** Mediamtx Version */
@@ -908,6 +1017,8 @@ export interface components {
             codec?: string | null;
             /** File Path */
             file_path: string;
+            /** Volume Id */
+            volume_id?: number | null;
             /** Parts */
             parts: number[];
         };
@@ -1079,6 +1190,117 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * VolumeConfig
+         * @description What a node needs to know about one of its volumes (sent in every heartbeat response).
+         */
+        VolumeConfig: {
+            /** Id */
+            id: number;
+            /** Path */
+            path: string;
+            /** Position */
+            position: number;
+            /** Quota Bytes */
+            quota_bytes: number | null;
+            /** Accepting */
+            accepting: boolean;
+            /** Is Default */
+            is_default: boolean;
+        };
+        /** VolumeCreate */
+        VolumeCreate: {
+            /**
+             * Path
+             * @description A folder on the node: D:\ShahNVR\recordings, \\192.168.1.9\nvr (network share) or /data/nvr
+             */
+            path: string;
+            /**
+             * Quota Gb
+             * @description Max GB of recordings here; null = whole disk
+             */
+            quota_gb?: number | null;
+            /**
+             * Accepting
+             * @default true
+             */
+            accepting: boolean;
+        };
+        /** VolumeOrder */
+        VolumeOrder: {
+            /**
+             * Volume Ids
+             * @description All of the node's volume ids, in fill order
+             */
+            volume_ids: number[];
+        };
+        /** VolumeOut */
+        VolumeOut: {
+            /** Id */
+            id: number;
+            /** Path */
+            path: string;
+            /** Kind */
+            kind: string;
+            /** Position */
+            position: number;
+            /** Quota Bytes */
+            quota_bytes: number | null;
+            /** Accepting */
+            accepting: boolean;
+            /** Is Default */
+            is_default: boolean;
+            state: components["schemas"]["VolumeState"];
+            /** State Detail */
+            state_detail: string | null;
+            /** Total Bytes */
+            total_bytes: number | null;
+            /** Free Bytes */
+            free_bytes: number | null;
+            /** Recordings Bytes */
+            recordings_bytes: number | null;
+            /** Writing */
+            writing: boolean;
+            /** Last Report At */
+            last_report_at: string | null;
+        };
+        /**
+         * VolumeReport
+         * @description The node's view of one storage volume.
+         */
+        VolumeReport: {
+            /** Id */
+            id: number;
+            state: components["schemas"]["VolumeState"];
+            /** State Detail */
+            state_detail?: string | null;
+            /** Total Bytes */
+            total_bytes?: number | null;
+            /** Free Bytes */
+            free_bytes?: number | null;
+            /** Recordings Bytes */
+            recordings_bytes?: number | null;
+            /**
+             * Writing
+             * @default false
+             */
+            writing: boolean;
+        };
+        /**
+         * VolumeState
+         * @enum {string}
+         */
+        VolumeState: "PENDING" | "OK" | "FULL" | "UNAVAILABLE" | "ERROR";
+        /** VolumeUpdate */
+        VolumeUpdate: {
+            /**
+             * Quota Gb
+             * @description null = whole disk
+             */
+            quota_gb?: number | null;
+            /** Accepting */
+            accepting?: boolean | null;
         };
     };
     responses: never;
@@ -1560,6 +1782,175 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NodeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_volumes_api_v1_nodes__node_id__volumes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolumeOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_volume_api_v1_nodes__node_id__volumes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VolumeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolumeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_volume_api_v1_nodes__node_id__volumes__volume_id__delete: {
+        parameters: {
+            query?: {
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                node_id: number;
+                volume_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_volume_api_v1_nodes__node_id__volumes__volume_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: number;
+                volume_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VolumeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolumeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_volumes_api_v1_nodes__node_id__volumes_reorder_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VolumeOrder"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolumeOut"][];
                 };
             };
             /** @description Validation Error */

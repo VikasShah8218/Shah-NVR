@@ -108,7 +108,7 @@ PageScroll {
                             onActivated: Router.go("node", a.node_id)
                         }
                     }
-                    AppText { text: model.retention_days + " days"; Layout.preferredWidth: 90 }
+                    AppText { text: Fmt.retention(model.retention_days); Layout.preferredWidth: 90 }
                     AppText {
                         text: model.lastSegment ? Fmt.timeAgo(model.lastSegment) : "—"
                         variant: "small"
@@ -164,7 +164,7 @@ PageScroll {
     ConfirmDialog {
         id: deleteConfirm
         title: "Delete " + (rowMenu.camera.name ?? "") + "?"
-        description: "Only cameras without recordings can be deleted. If it has recordings, disable it instead; they are removed by retention."
+        description: "Only cameras without recordings can be deleted. If it has recordings, disable it instead; they stay until their retention or storage space removes them."
         confirmLabel: "Delete camera"
         destructive: true
         onConfirmed: Cameras.remove(rowMenu.camera.id)

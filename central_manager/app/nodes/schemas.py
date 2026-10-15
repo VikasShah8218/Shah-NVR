@@ -1,10 +1,11 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.cameras.models import StreamStatus
-from app.nodes.models import NodeState
+from app.nodes.models import NodeState, VolumeState
+from app.nodes.utils import normalize_volume_path
 
 # ---------------------------------------------------------------- node -> central (internal)
 
@@ -41,6 +42,28 @@ class GpuInfo(BaseModel):
     memory_total_bytes: int | None = None
 
 
+class DriveInfo(BaseModel):
+    """A local fixed drive of the node (offered in "Add storage")."""
+
+    root: str  # e.g. "D:\\"
+    label: str | None = None
+    fstype: str | None = None
+    total_bytes: int
+    free_bytes: int
+
+
+class VolumeReport(BaseModel):
+    """The node's view of one storage volume."""
+
+    id: int
+    state: VolumeState
+    state_detail: str | None = None
+    total_bytes: int | None = None
+    free_bytes: int | None = None
+    recordings_bytes: int | None = None
+    writing: bool = False
+
+
 class HeartbeatIn(BaseModel):
     cpu_percent: float | None = None
     cpu_count: int | None = None
@@ -56,7 +79,24 @@ class HeartbeatIn(BaseModel):
     paths_configured: int = 0
     paths_ready: int = 0
     pending_uploads: int = 0
+    # the node's IPv4 addresses [{interface, ip, usable}] (it advertises one of them as media_host)
+    addresses: list[dict[str, Any]] = []
+    # storage volumes (nodes older than 2026-10-15 send none of these)
+    default_recordings_dir: str | None = None
+    drives: list[DriveInfo] = []
+    volumes: list[VolumeReport] = []
     extra: dict[str, Any] | None = None
+
+
+class VolumeConfig(BaseModel):
+    """What a node needs to know about one of its volumes (sent in every heartbeat response)."""
+
+    id: int
+    path: str
+    position: int
+    quota_bytes: int | None
+    accepting: bool
+    is_default: bool
 
 
 class HeartbeatOut(BaseModel):
@@ -64,7 +104,8 @@ class HeartbeatOut(BaseModel):
     state: NodeState
     lease_expires_at: datetime
     assignments: int
-    storage_quota_bytes: int | None = None
+    storage_quota_bytes: int | None = None  # deprecated: for nodes older than storage volumes
+    volumes: list[VolumeConfig] = []
 
 
 class StreamAssignment(BaseModel):
@@ -103,6 +144,47 @@ class StreamStatusBatchIn(BaseModel):
 # ---------------------------------------------------------------- public
 
 
+class VolumeOut(BaseModel):
+    id: int
+    path: str
+    kind: str  # local | network
+    position: int
+    quota_bytes: int | None
+    accepting: bool
+    is_default: bool
+    state: VolumeState
+    state_detail: str | None
+    total_bytes: int | None
+    free_bytes: int | None
+    recordings_bytes: int | None
+    writing: bool
+    last_report_at: datetime | None
+
+
+class VolumeCreate(BaseModel):
+    path: str = Field(
+        min_length=3,
+        max_length=400,
+        description=r"A folder on the node: D:\ShahNVR\recordings, \\192.168.1.9\nvr (network share) or /data/nvr",
+    )
+    quota_gb: float | None = Field(default=None, gt=0, description="Max GB of recordings here; null = whole disk")
+    accepting: bool = True
+
+    @field_validator("path")
+    @classmethod
+    def _path(cls, value: str) -> str:
+        return normalize_volume_path(value)
+
+
+class VolumeUpdate(BaseModel):
+    quota_gb: float | None = Field(default=None, gt=0, description="null = whole disk")
+    accepting: bool | None = None
+
+
+class VolumeOrder(BaseModel):
+    volume_ids: list[int] = Field(min_length=1, description="All of the node's volume ids, in fill order")
+
+
 class NodeOut(BaseModel):
     id: int
     name: str
@@ -112,7 +194,8 @@ class NodeOut(BaseModel):
     hls_port: int
     webrtc_port: int
     capacity_cameras: int
-    storage_quota_bytes: int | None
+    storage_quota_bytes: int | None  # total cap of all volumes (None if any volume is uncapped)
+    volumes: list[VolumeOut] = []
     version: str | None
     mediamtx_version: str | None
     state: NodeState
@@ -123,5 +206,5 @@ class NodeOut(BaseModel):
 
 class NodeUpdate(BaseModel):
     capacity_cameras: int | None = Field(default=None, ge=1)
-    # Recordings storage limit in GB. Send null to remove the limit (use the whole disk).
+    # Deprecated (use the volumes API): sets the cap of the node's default volume. null = whole disk.
     storage_quota_gb: float | None = Field(default=None, gt=0)

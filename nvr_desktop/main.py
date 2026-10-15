@@ -4,8 +4,9 @@ Run:  py main.py   (inside `workon nvr`)
 
 Startup order matters:
 1. logging, then libmpv on PATH (before anything imports `mpv`);
-2. Qt Quick graphics settings (OpenGL scene graph + basic render loop, required by MpvVideoItem);
+2. the basic render loop (rendering on the GUI thread, required by both video surfaces);
 3. QGuiApplication, fonts, the "C" numeric locale libmpv requires;
+   then the render mode (GPU/OpenGL or CPU/software, app/video/render_mode.py) - before any window;
 4. the stores (Python state for every page), registered as QML singletons under `import App`;
 5. ui/Main.qml.
 """
@@ -29,7 +30,7 @@ except LibmpvMissingError as exc:
     logger.error("%s", exc)
     sys.exit(1)
 
-os.environ.setdefault("QSG_RENDER_LOOP", "basic")  # see app/video/mpv_item.py
+os.environ.setdefault("QSG_RENDER_LOOP", "basic")  # see app/video/gl_surface.py
 
 from PySide6.QtCore import QThreadPool  # noqa: E402
 from PySide6.QtGui import QFontDatabase, QGuiApplication, QIcon, QWindow  # noqa: E402
@@ -47,9 +48,21 @@ def load_fonts() -> None:
             logger.warning("Could not load font %s", font.name)
 
 
+def choose_render_mode(preference: str) -> str:
+    """GPU (OpenGL) or CPU (software) drawing for this run. Must run before the first window."""
+    from app.video import render_mode
+
+    renderer = render_mode.gl_renderer_name() if preference == "auto" else None
+    mode = render_mode.resolve(preference, renderer)
+    logger.info("Render mode: %s (preference %s, OpenGL renderer: %s)", mode.upper(), preference,
+                renderer if preference == "auto" else "not probed")
+    api = QSGRendererInterface.GraphicsApi
+    QQuickWindow.setGraphicsApi(api.OpenGL if mode == "gpu" else api.Software)
+    return mode
+
+
 def build_app():
     """Create the application, stores and QML engine. Returns (app, engine, singletons)."""
-    QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.OpenGL)
     QQuickStyle.setStyle("Basic")  # fully re-skinned by ui/theme + ui/components
 
     qt_app = QGuiApplication(sys.argv)
@@ -60,7 +73,6 @@ def build_app():
     load_fonts()
 
     # Imported after QGuiApplication exists (QML types / image provider need it).
-    import app.video.mpv_item  # noqa: F401  registers MpvVideoItem (import Nvr.Video)
     from app.core.context import AppContext
     from app.core.format import Formatter
     from app.core.icons import IconProvider
@@ -79,8 +91,12 @@ def build_app():
     from app.features.nodes.store import NodesStore
     from app.features.playback.store import PlaybackStore
     from app.features.settings.store import SettingsStore
+    from app.video import register_video_types
 
     prefs = Preferences()
+    mode = choose_render_mode(settings.RENDER_MODE or prefs.renderMode)
+    prefs.set_active_render_mode(mode)
+    register_video_types(mode)  # import Nvr.Video: MpvPlayer + MpvSurface (GPU or CPU)
     toasts = ToastBus()
     ctx = AppContext(prefs, toasts)
     cluster = ClusterStore(ctx)

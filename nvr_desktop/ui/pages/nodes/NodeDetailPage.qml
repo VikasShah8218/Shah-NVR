@@ -7,6 +7,9 @@ import "../../components"
 // Port of nvr_client/src/features/nodes/NodeDetailPage.tsx
 PageScroll {
     id: root
+    objectName: "nodeDetail"
+
+    function showTab(name) { NodeDetail.activeTab = name }
 
     readonly property var n: NodeDetail.node
     readonly property var r: n.res ?? ({})
@@ -34,9 +37,37 @@ PageScroll {
     PageHeader {
         visible: root.n.id !== undefined
         title: root.n.name ?? ""
-        description: (root.n.api_url ?? "") + " · media host " + (root.n.media_host ?? "") + " · heartbeat " + Fmt.timeAgo(root.n.last_heartbeat_at)
+        description: (root.n.api_url ?? "") + " · heartbeat " + Fmt.timeAgo(root.n.last_heartbeat_at)
         StatusBadge { status: root.n.state ?? ""; anchors.verticalCenter: parent.verticalCenter }
         NodeActions { nodeId: root.n.id ?? 0; asButton: true }
+    }
+
+    // which address clients get in every live / playback / download / VLC link
+    Rectangle {
+        visible: root.n.id !== undefined
+        Layout.fillWidth: true
+        implicitHeight: addressRow.implicitHeight + 20
+        radius: Theme.radiusLg
+        color: Theme.card
+        border.color: Theme.border
+        Flow {
+            id: addressRow
+            anchors.fill: parent
+            anchors.margins: 10
+            anchors.leftMargin: 16
+            spacing: 16
+            Row {
+                spacing: 6
+                AppText { text: "Clients connect to" }
+                AppText { text: root.n.media_host ?? ""; font.family: Theme.mono; font.weight: Font.DemiBold }
+                AppText { text: "(live, playback, downloads and VLC links)"; variant: "muted" }
+            }
+            AppText {
+                visible: (root.r.otherAddresses ?? []).length > 0
+                text: "Other LAN addresses of this PC: " + (root.r.otherAddresses ?? []).map(a => a.ip + " (" + a.interface + ")").join(", ")
+                variant: "small"
+            }
+        }
     }
 
     // ---------------------------------------------------------------- summary cards
@@ -85,17 +116,17 @@ PageScroll {
             spacing: 12
             UsageMeter {
                 Layout.fillWidth: true
-                label: "Recordings vs quota"
+                label: (root.r.volumes ?? []).length > 1 ? "Recordings vs caps · " + root.r.volumes.length + " storages" : "Recordings vs cap"
                 value: root.r.quota !== null && root.r.quota !== undefined
                     ? Fmt.bytes(root.r.recordings) + " / " + Fmt.bytes(root.r.quota)
-                    : Fmt.bytes(root.r.recordings) + " · no quota"
+                    : Fmt.bytes(root.r.recordings) + " · no cap"
                 percent: root.r.storagePercent
                 warnAt: 80
                 dangerAt: 95
             }
             UsageMeter {
                 Layout.fillWidth: true
-                label: "Disk"
+                label: "Disk of the node's own folder"
                 value: Fmt.bytes(root.r.diskFree) + " free of " + Fmt.bytes(root.r.diskTotal)
                 percent: root.r.diskPercent
                 warnAt: 85
@@ -106,8 +137,8 @@ PageScroll {
             ColumnLayout {
                 spacing: 2
                 Layout.fillWidth: true
-                AppText { text: "Recordings folder"; variant: "muted" }
-                AppText { text: root.s.recordings_dir ?? "—"; variant: "small"; wrapMode: Text.WrapAnywhere; elide: Text.ElideNone; Layout.fillWidth: true }
+                AppText { text: "Recording to"; variant: "muted" }
+                AppText { text: root.r.writingVolume ? root.r.writingVolume.path : (root.s.recordings_dir ?? "—"); variant: "small"; wrapMode: Text.WrapAnywhere; elide: Text.ElideNone; Layout.fillWidth: true }
             }
         }
 
@@ -175,6 +206,7 @@ PageScroll {
         visible: root.n.id !== undefined
         options: [
             { value: "cameras", label: "Cameras" },
+            { value: "storage", label: "Storage" },
             { value: "paths", label: "MediaMTX paths" },
             { value: "chunks", label: "Recorded chunks" },
             { value: "logs", label: "Logs" }
@@ -186,10 +218,15 @@ PageScroll {
     Loader {
         visible: root.n.id !== undefined
         Layout.fillWidth: true
-        sourceComponent: ({ cameras: camerasTab, paths: pathsTab, chunks: chunksTab, logs: logsTab })[NodeDetail.activeTab]
+        sourceComponent: ({ cameras: camerasTab, storage: storageTab, paths: pathsTab, chunks: chunksTab, logs: logsTab })[NodeDetail.activeTab]
     }
 
     // ---------------------------------------------------------------- tab contents
+    Component {
+        id: storageTab
+        StorageTab { node: root.n }
+    }
+
     Component {
         id: camerasTab
         ColumnLayout {

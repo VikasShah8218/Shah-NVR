@@ -2,35 +2,43 @@
 
   MediaMTX writes chunk  ->  scanner finds finished chunk  ->  indexer (byte offsets of keyframe parts)
   ->  LocalSegment row (SQLite, upload queue)  ->  uploader batches metadata to central
-  ->  retention / disk-pressure / storage-quota cleanup deletes files and confirms to central.
+  ->  retention / disk safety / volume caps / overwrite-when-all-full delete files, confirmed to central.
+
+Chunks live on storage volumes (app/storage): MediaMTX writes to the current target volume; the
+scanner walks every healthy volume; LocalSegment.volume_id says where each chunk is.
 """
 
 import asyncio
 import logging
 import os
+import shutil
 import time
 from datetime import timedelta
 from pathlib import Path
 
+from tortoise.expressions import Q
 from tortoise.functions import Sum
 
 from app.node.models import KeyValue
-from app.node.services import disk_info
 from app.node.utils import CentralError, central, runtime
 from app.recordings.models import LocalSegment, SkippedFile
 from app.recordings.utils import Mp4IndexError, index_fmp4, parse_rel_path, segment_uuid
+from app.storage.services import storage
+from app.storage.utils import FREE_BELOW
 from settings.settings import settings
 from utilities.common import utcnow
 
 logger = logging.getLogger("node.recordings")
 
 KV_PENDING_DELETED = "pending_deleted"
-QUOTA_HIGH = 0.95  # start deleting above 95% of the storage quota
-QUOTA_LOW = 0.90  # ...until usage is below 90%
 UPLOAD_BATCH = 200
+SCAN_TIMEOUT_SECONDS = 60  # one volume's folder walk (a dead network share must not hang the scanner)
+OVERWRITE_MAX_CHUNKS = 2000  # per deletion tick
+CAP_TRIM_TO = 0.99  # hard-cap trimming target (fraction of the cap); must stay above storage FREE_BELOW
 RECENT_DAY_DIRS = 2  # after the first full scan, only the newest N day folders are scanned
 
 _known: set[str] = set()
+_reported: set[str] = set()  # cleanup problems already logged (each is logged once until it clears)
 _full_scan_done = False
 _used_cache: tuple[float, int] = (0.0, 0)
 
@@ -38,12 +46,11 @@ _used_cache: tuple[float, int] = (0.0, 0)
 # ---------------------------------------------------------------- scanner
 
 
-def _list_finished_files(full: bool) -> list[str]:
-    """Relative paths of chunks that MediaMTX has finished writing.
+def _list_finished_files(root: Path, full: bool) -> list[str]:
+    """Paths (relative to `root`) of chunks that MediaMTX has finished writing in one volume.
 
     A chunk is finished when a newer chunk exists for the same stream, or when it has not
     been modified for a while (camera disconnected / path stopped)."""
-    root = settings.RECORDINGS_DIR
     idle_after = max(30.0, settings.PART_SECONDS * 10)
     now = time.time()
     finished: list[str] = []
@@ -70,11 +77,15 @@ def _list_finished_files(full: bool) -> list[str]:
     return finished
 
 
-def _index_file(rel: str):
-    path = settings.RECORDINGS_DIR / rel
+def _index_file(root: Path, rel: str):
     info = parse_rel_path(rel)
-    idx = index_fmp4(path, settings.HLS_PART_TARGET_SECONDS)
+    idx = index_fmp4(root / rel, settings.HLS_PART_TARGET_SECONDS)
     return info, idx
+
+
+def _segment_id(key: int | None, rel: str):
+    # The default volume keeps the original id scheme, so chunks indexed before storage volumes keep their ids.
+    return segment_uuid(settings.NODE_NAME, rel if key is None else f"v{key}/{rel}")
 
 
 async def _load_known() -> None:
@@ -88,21 +99,28 @@ async def scan_tick() -> None:
     full = not _full_scan_done
     if full:
         await _load_known()
-    candidates = await asyncio.to_thread(_list_finished_files, full)
+    candidates: list[tuple[int | None, Path, str]] = []
+    for key, root in storage.scan_roots():
+        try:
+            rels = await asyncio.wait_for(asyncio.to_thread(_list_finished_files, root, full), SCAN_TIMEOUT_SECONDS)
+        except (OSError, asyncio.TimeoutError) as exc:
+            logger.warning("Cannot scan %s: %r", root, exc)
+            continue
+        candidates += [(key, root, r) for r in rels]
     if full:
         # First scan also checks old folders, so files written while the agent was down are not lost.
-        old = [r for r in candidates if not await LocalSegment.exists(rel_path=r)]
-        candidates = [r for r in old if not await SkippedFile.exists(rel_path=r)]
+        old = [c for c in candidates if not await LocalSegment.exists(rel_path=c[2])]
+        candidates = [c for c in old if not await SkippedFile.exists(rel_path=c[2])]
         _full_scan_done = True
         if candidates:
             logger.info("Recovery scan: %s unindexed chunk(s) found", len(candidates))
 
-    for rel in candidates:
+    for key, root, rel in candidates:
         try:
-            info, idx = await asyncio.to_thread(_index_file, rel)
+            info, idx = await asyncio.to_thread(_index_file, root, rel)
         except (Mp4IndexError, ValueError, OSError) as exc:
             logger.warning("Skipping chunk %s: %s", rel, exc)
-            await SkippedFile.update_or_create(rel_path=rel, defaults={"reason": str(exc)[:250]})
+            await SkippedFile.update_or_create(rel_path=rel, defaults={"reason": str(exc)[:250], "volume_id": key})
             _known.add(rel)
             continue
 
@@ -110,7 +128,8 @@ async def scan_tick() -> None:
         await LocalSegment.update_or_create(
             rel_path=rel,
             defaults=dict(
-                id=segment_uuid(settings.NODE_NAME, rel),
+                id=_segment_id(key, rel),
+                volume_id=key,
                 camera_id=info.camera_id,
                 profile=info.profile,
                 generation=runtime.generation_for(info.camera_id),
@@ -126,10 +145,10 @@ async def scan_tick() -> None:
             ),
         )
         _known.add(rel)
-        key = (info.camera_id, info.profile)
-        if key not in runtime.last_segment_end or end_time > runtime.last_segment_end[key]:
-            runtime.last_segment_end[key] = end_time
-        logger.debug("Indexed %s (%.1fs, %s parts)", rel, idx.duration_ms / 1000, len(idx.parts))
+        stream = (info.camera_id, info.profile)
+        if stream not in runtime.last_segment_end or end_time > runtime.last_segment_end[stream]:
+            runtime.last_segment_end[stream] = end_time
+        logger.debug("Indexed %s on %s (%.1fs, %s parts)", rel, root, idx.duration_ms / 1000, len(idx.parts))
 
 
 # ---------------------------------------------------------------- uploader
@@ -154,6 +173,7 @@ async def upload_tick() -> None:
                 "size_bytes": s.size_bytes,
                 "codec": s.codec,
                 "file_path": s.rel_path,
+                "volume_id": storage.central_id(s.volume_id),
                 "parts": [p["d"] for p in s.parts],
             }
             for s in batch
@@ -170,14 +190,14 @@ async def upload_tick() -> None:
             return
 
 
-# ---------------------------------------------------------------- deletion (retention + disk pressure)
+# ---------------------------------------------------------------- deletion (retention + storage cleanup)
 
 
-def _delete_file(rel: str) -> None:
-    root = settings.RECORDINGS_DIR.resolve()
+def _delete_file(root: Path, rel: str) -> None:
+    root = root.resolve()
     path = (root / rel).resolve()
     if root not in path.parents:
-        raise ValueError(f"refusing to delete outside recordings dir: {rel}")
+        raise ValueError(f"refusing to delete outside the storage folder: {rel}")
     path.unlink(missing_ok=True)
     # Remove empty day folder.
     try:
@@ -186,18 +206,38 @@ def _delete_file(rel: str) -> None:
         pass
 
 
-async def _delete_local(ids_paths: list[tuple[str, str]]) -> list[str]:
+async def _delete_local(items: list[tuple[str, int | None, str]]) -> list[str]:
+    """Delete chunks given as (segment id, volume key, relative path). Returns the ids actually deleted.
+
+    Chunks on a volume that is offline are skipped (not confirmed), so they are retried later."""
     deleted = []
-    for seg_id, rel in ids_paths:
+    for seg_id, key, rel in items:
+        volume = storage.get(key)
+        if volume is None or not volume.usable:
+            continue
         try:
-            await asyncio.to_thread(_delete_file, rel)
+            await asyncio.to_thread(_delete_file, volume.path, rel)
         except (OSError, ValueError) as exc:
-            logger.error("Could not delete %s: %s", rel, exc)
+            logger.error("Could not delete %s on %s: %s", rel, volume.path, exc)
             continue
         await LocalSegment.filter(id=seg_id).delete()
         _known.discard(rel)
         deleted.append(seg_id)
     return deleted
+
+
+def _as_items(segments) -> list[tuple[str, int | None, str]]:
+    return [(str(s.id), s.volume_id, s.rel_path) for s in segments]
+
+
+def _on_volume(key: int | None) -> Q:
+    return Q(volume_id__isnull=True) if key is None else Q(volume_id=key)
+
+
+def _on_volumes(keys) -> Q:
+    keys = list(keys)
+    q = Q(volume_id__in=[k for k in keys if k is not None])
+    return q | Q(volume_id__isnull=True) if None in keys else q
 
 
 async def _confirm(ids: list[str]) -> None:
@@ -214,26 +254,137 @@ async def _confirm(ids: list[str]) -> None:
     await KeyValue.set_value(KV_PENDING_DELETED, pending)
 
 
-async def disk_pressure_cleanup() -> list[str]:
-    """Emergency cleanup: if the disk is above DISK_MAX_USED_PERCENT, delete the oldest chunks
-    (never newer than DISK_MIN_KEEP_HOURS) until usage drops below DISK_TARGET_USED_PERCENT."""
-    if disk_info()["used_percent"] < settings.DISK_MAX_USED_PERCENT:
-        return []
+def _report_once(key: str, message: str, *args) -> None:
+    if key not in _reported:
+        _reported.add(key)
+        logger.error(message, *args)
+
+
+def _resolved(key: str) -> None:
+    _reported.discard(key)
+
+
+def _disk_percent(path: Path) -> float:
+    usage = shutil.disk_usage(path)
+    return 100 * usage.used / usage.total
+
+
+async def disk_safety_cleanup() -> list[str]:
+    """Protect each volume's disk (often the OS drive): above DISK_MAX_USED_PERCENT, delete that volume's
+    oldest chunks (never newer than DISK_MIN_KEEP_HOURS) until it is below DISK_TARGET_USED_PERCENT."""
     keep_after = utcnow() - timedelta(hours=settings.DISK_MIN_KEEP_HOURS)
     deleted: list[str] = []
-    while disk_info()["used_percent"] > settings.DISK_TARGET_USED_PERCENT:
-        oldest = await LocalSegment.filter(start_time__lt=keep_after).order_by("start_time").limit(50)
-        if not oldest:
-            logger.error("Disk above %.0f%% but nothing old enough to delete", settings.DISK_TARGET_USED_PERCENT)
+    for v in storage.ordered():
+        if not v.usable or (v.disk_used_percent or 0) < settings.DISK_MAX_USED_PERCENT:
+            continue
+        removed = 0
+        while await asyncio.to_thread(_disk_percent, v.path) > settings.DISK_TARGET_USED_PERCENT:
+            oldest = await LocalSegment.filter(_on_volume(v.key), start_time__lt=keep_after).order_by("start_time").limit(50)
+            if not oldest:
+                _report_once(f"disk:{v.key}", "Disk of %s above %.0f%% but none of its chunks is old enough to delete",
+                             v.path, settings.DISK_TARGET_USED_PERCENT)
+                break
+            batch = await _delete_local(_as_items(oldest))
+            if not batch:
+                break
+            removed += len(batch)
+            deleted += batch
+        if removed:
+            logger.warning("Disk pressure on %s: deleted %s oldest chunk(s)", v.path, removed)
+    return deleted
+
+
+async def _volume_used(key: int | None) -> int:
+    rows = await LocalSegment.filter(_on_volume(key)).annotate(total=Sum("size_bytes")).values("total")
+    return int((rows[0]["total"] if rows else 0) or 0)
+
+
+async def cap_cleanup() -> list[str]:
+    """Hard cap: a volume holding more than its cap (e.g. the cap was lowered) loses its oldest chunks
+    down to just under the cap. Recording normally moves on at 95%, so this only trims the overshoot.
+    It deliberately stops above the 90% "free again" mark: the volume stays FULL, so the fill order is kept
+    (trimming further would pull recording back here and skip the later volumes)."""
+    keep_after = utcnow() - timedelta(hours=settings.DISK_MIN_KEEP_HOURS)
+    deleted: list[str] = []
+    for v in storage.ordered():
+        if not v.quota_bytes or not v.usable:
+            continue
+        used = await _volume_used(v.key)
+        if used <= v.quota_bytes:
+            _resolved(f"cap:{v.key}")
+            continue
+        target = v.quota_bytes * CAP_TRIM_TO
+        while used > target:
+            oldest = await LocalSegment.filter(_on_volume(v.key), start_time__lt=keep_after).order_by("start_time").limit(200)
+            if not oldest:
+                _report_once(f"cap:{v.key}", "%s is over its cap but none of its chunks is old enough to delete", v.path)
+                break
+            batch, freed = [], 0
+            for s in oldest:
+                if used - freed <= target:
+                    break
+                batch.append(s)
+                freed += s.size_bytes
+            sizes = {str(s.id): s.size_bytes for s in batch}
+            removed = await _delete_local(_as_items(batch))
+            used -= sum(sizes[i] for i in removed)
+            deleted += removed
+            if not removed:
+                break
+        if deleted:
+            logger.warning("%s was over its cap: now %.2f GB of %.2f GB", v.path, used / 1024**3, v.quota_bytes / 1024**3)
+    return deleted
+
+
+async def overwrite_cleanup() -> list[str]:
+    """Every accepting volume is full: overwrite the oldest recordings (ring buffer).
+
+    Chunks are chosen oldest-first, one at a time, keeping a running estimate of each volume's usage; it
+    stops as soon as one volume would be "free again" (below 90% of its cap and below the disk target).
+    Recording then returns to the first volume with room, in fill order. Deleting more than needed
+    would throw away footage for nothing."""
+    if not storage.all_full():
+        _resolved("overwrite")
+        return []
+    keep_after = utcnow() - timedelta(hours=settings.DISK_MIN_KEEP_HOURS)
+    volumes = {v.key: v for v in storage.ordered() if v.accepting and v.usable}
+    used = {k: v.recordings_bytes for k, v in volumes.items()}
+    disk_used = {k: (v.disk_used_percent or 0) / 100 * (v.total_bytes or 0) for k, v in volumes.items()}
+
+    def free_again(k) -> bool:
+        v = volumes[k]
+        under_cap = not v.quota_bytes or used[k] < v.quota_bytes * FREE_BELOW
+        disk_ok = not v.total_bytes or 100 * disk_used[k] / v.total_bytes < settings.DISK_TARGET_USED_PERCENT
+        return under_cap and disk_ok
+
+    chosen = []
+    offset = 0
+    done = False
+    while not done and len(chosen) < OVERWRITE_MAX_CHUNKS:
+        page = await (LocalSegment.filter(_on_volumes(volumes), start_time__lt=keep_after)
+                      .order_by("start_time").offset(offset).limit(100))
+        if not page:
             break
-        deleted += await _delete_local([(str(s.id), s.rel_path) for s in oldest])
+        offset += len(page)
+        for seg in page:
+            chosen.append(seg)
+            used[seg.volume_id] -= seg.size_bytes
+            disk_used[seg.volume_id] -= seg.size_bytes
+            if free_again(seg.volume_id):
+                done = True
+                break
+    if not chosen:
+        _report_once("overwrite", "All storage is full but no chunk is older than DISK_MIN_KEEP_HOURS (%s h) "
+                     "to overwrite", settings.DISK_MIN_KEEP_HOURS)
+        return []
+    deleted = await _delete_local(_as_items(chosen))
     if deleted:
-        logger.warning("Disk pressure: deleted %s oldest chunk(s)", len(deleted))
+        logger.warning("All storage full: overwrote %s oldest chunk(s)", len(deleted))
     return deleted
 
 
 async def recordings_used_bytes(max_age_seconds: float = 30.0) -> int:
-    """Total size of indexed chunks on this node (cached for `max_age_seconds`)."""
+    """Total size of indexed chunks on this node, all volumes (cached for `max_age_seconds`)."""
     global _used_cache
     if time.monotonic() - _used_cache[0] > max_age_seconds:
         rows = await LocalSegment.all().annotate(total=Sum("size_bytes")).values("total")
@@ -241,63 +392,47 @@ async def recordings_used_bytes(max_age_seconds: float = 30.0) -> int:
     return _used_cache[1]
 
 
-async def quota_cleanup() -> list[str]:
-    """If recordings exceed QUOTA_HIGH of the storage quota set by central, delete the oldest
-    chunks (never newer than DISK_MIN_KEEP_HOURS) until usage drops below QUOTA_LOW."""
-    quota = runtime.storage_quota_bytes
-    if not quota:
+async def _central_deletions() -> list[str]:
+    """Retention decided by central (days per camera)."""
+    if runtime.node_id is None:
         return []
-    used = await recordings_used_bytes(max_age_seconds=0)
-    if used <= quota * QUOTA_HIGH:
+    try:
+        todo = await central.pending_deletions(runtime.node_id)
+    except CentralError as exc:
+        logger.debug("Could not fetch deletions: %s", exc)
         return []
-    keep_after = utcnow() - timedelta(hours=settings.DISK_MIN_KEEP_HOURS)
-    deleted: list[str] = []
-    while used > quota * QUOTA_LOW:
-        # Pick just enough of the oldest chunks to get below QUOTA_LOW.
-        oldest = await LocalSegment.filter(start_time__lt=keep_after).order_by("start_time").limit(200)
-        if not oldest:
-            logger.error("Recordings above storage quota but nothing old enough to delete")
-            break
-        batch, freed = [], 0
-        for s in oldest:
-            if used - freed <= quota * QUOTA_LOW:
-                break
-            batch.append(s)
-            freed += s.size_bytes
-        sizes = {str(s.id): s.size_bytes for s in batch}
-        removed = await _delete_local([(str(s.id), s.rel_path) for s in batch])
-        used -= sum(sizes[i] for i in removed)
-        deleted += removed
-        if not removed:
-            break
+    if not todo:
+        return []
+    local = {str(s.id): s for s in await LocalSegment.filter(id__in=[d["id"] for d in todo])}
+    items = []
+    for d in todo:
+        s = local.get(d["id"])
+        if s is not None:  # trust our own record of where the file is
+            items.append((d["id"], s.volume_id, s.rel_path))
+        else:
+            items.append((d["id"], storage.key_for_central(d.get("volume_id")), d["file_path"]))
+    deleted = await _delete_local(items)
     if deleted:
-        logger.warning("Storage quota: deleted %s oldest chunk(s); now %.2f GB of %.2f GB",
-                       len(deleted), used / 1024**3, quota / 1024**3)
-    await recordings_used_bytes(max_age_seconds=0)
+        logger.info("Retention: deleted %s chunk(s)", len(deleted))
     return deleted
 
 
 async def deletion_tick() -> None:
-    deleted: list[str] = []
-    if runtime.node_id is not None:
-        try:
-            todo = await central.pending_deletions(runtime.node_id)
-        except CentralError as exc:
-            logger.debug("Could not fetch deletions: %s", exc)
-            todo = []
-        if todo:
-            deleted += await _delete_local([(d["id"], d["file_path"]) for d in todo])
-            logger.info("Retention: deleted %s chunk(s)", len(deleted))
-    deleted += await disk_pressure_cleanup()
-    deleted += await quota_cleanup()
+    deleted = await _central_deletions()
+    deleted += await disk_safety_cleanup()
+    deleted += await cap_cleanup()
+    deleted += await overwrite_cleanup()
+    if deleted:
+        await recordings_used_bytes(max_age_seconds=0)
+        await storage.refresh()
     await _confirm(deleted)
 
 
-def read_slice(rel: str, offset: int, size: int) -> bytes:
-    with open(Path(settings.RECORDINGS_DIR) / rel, "rb") as f:
+def read_slice(root: Path, rel: str, offset: int, size: int) -> bytes:
+    with open(root / rel, "rb") as f:
         f.seek(offset)
         return f.read(size)
 
 
-def file_exists(rel: str) -> bool:
-    return os.path.isfile(settings.RECORDINGS_DIR / rel)
+def file_exists(root: Path, rel: str) -> bool:
+    return os.path.isfile(root / rel)

@@ -38,3 +38,8 @@ export function ratio(used: number | null | undefined, total: number | null | un
   if (used == null || !total) return null
   return Math.max(0, Math.min(100, (used / total) * 100))
 }
+
+/** A camera's retention for display: "7 days" or "Until full" (null = keep until storage is full). */
+export function retentionLabel(days: number | null | undefined): string {
+  return days == null ? "Until full" : `${days} day${days === 1 ? "" : "s"}`
+}

@@ -44,6 +44,8 @@ class CameraCreate(BaseModel):
     username: str | None = None
     password: str | None = None
     enabled: bool = True
+    # Days to keep, counted back from the camera's latest recording. Leave out for the default (create) /
+    # unchanged (update); send null to keep recordings until storage is full.
     retention_days: int | None = Field(default=None, ge=1, le=3650)
     streams: list[StreamIn] = Field(min_length=1)
 
@@ -62,6 +64,8 @@ class CameraUpdate(BaseModel):
     username: str | None = None
     password: str | None = None
     enabled: bool | None = None
+    # Days to keep, counted back from the camera's latest recording. Leave out for the default (create) /
+    # unchanged (update); send null to keep recordings until storage is full.
     retention_days: int | None = Field(default=None, ge=1, le=3650)
 
 
@@ -79,7 +83,7 @@ class CameraOut(BaseModel):
     username: str | None
     has_password: bool
     enabled: bool
-    retention_days: int
+    retention_days: int | None  # None = keep until storage is full
     created_at: datetime
     updated_at: datetime
     streams: list[StreamOut]

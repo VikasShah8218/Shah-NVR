@@ -2,7 +2,7 @@ import { ArrowLeft, Download } from "lucide-react"
 import { Link, useParams } from "react-router"
 import { mediaFileUrl } from "@/api/client"
 import { useNode, useNodeAssignments, useNodePaths, useNodeSegments, useNodeStatus } from "@/api/queries"
-import type { MediaNode } from "@/api/types"
+import { type MediaNode, nodeMetrics } from "@/api/types"
 import { EmptyState, ErrorState, Field, Loading, PageHeader } from "@/components/common"
 import { StatusBadge } from "@/components/StatusBadge"
 import { Badge } from "@/components/ui/badge"
@@ -17,6 +17,7 @@ import { LogViewer } from "./LogViewer"
 import { NodeActions } from "./NodeActions"
 import { nodeResources } from "./nodeUtils"
 import { ResourceCharts, useNodeHistory } from "./ResourceCharts"
+import { StorageTab } from "./StorageTab"
 
 export function NodeDetailPage() {
   const nodeId = Number(useParams().id)
@@ -34,7 +35,7 @@ export function NodeDetailPage() {
       </Link>
       <PageHeader
         title={n.name}
-        description={`${n.api_url} · media host ${n.media_host} · heartbeat ${timeAgo(n.last_heartbeat_at)}`}
+        description={`${n.api_url} · heartbeat ${timeAgo(n.last_heartbeat_at)}`}
         actions={
           <>
             <StatusBadge status={n.state} />
@@ -42,17 +43,22 @@ export function NodeDetailPage() {
           </>
         }
       />
+      <ClientAddress node={n} />
       <ResourceSummary node={n} />
       <ResourceCharts points={points} />
       <Tabs defaultValue="cameras">
         <TabsList>
           <TabsTrigger value="cameras">Cameras</TabsTrigger>
+          <TabsTrigger value="storage">Storage</TabsTrigger>
           <TabsTrigger value="paths">MediaMTX paths</TabsTrigger>
           <TabsTrigger value="chunks">Recorded chunks</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
         <TabsContent value="cameras">
           <NodeCameras apiUrl={n.api_url} />
+        </TabsContent>
+        <TabsContent value="storage">
+          <StorageTab node={n} />
         </TabsContent>
         <TabsContent value="paths">
           <NodePaths apiUrl={n.api_url} />
@@ -111,14 +117,14 @@ function ResourceSummary({ node }: { node: MediaNode }) {
         </CardHeader>
         <CardContent className="space-y-3">
           <UsageMeter
-            label="Recordings vs quota"
-            value={r.quota != null ? `${formatBytes(r.recordings)} / ${formatBytes(r.quota)}` : `${formatBytes(r.recordings)} · no quota`}
+            label={r.volumes.length > 1 ? `Recordings vs caps · ${r.volumes.length} storages` : "Recordings vs cap"}
+            value={r.quota != null ? `${formatBytes(r.recordings)} / ${formatBytes(r.quota)}` : `${formatBytes(r.recordings)} · no cap`}
             percent={r.storagePercent}
             warnAt={80}
             dangerAt={95}
           />
           <UsageMeter
-            label="Disk"
+            label="Disk of the node's own folder"
             value={`${formatBytes(r.diskFree)} free of ${formatBytes(r.diskTotal)}`}
             percent={r.diskPercent}
             warnAt={85}
@@ -126,8 +132,8 @@ function ResourceSummary({ node }: { node: MediaNode }) {
           />
           <Field label="Usable for recordings">{formatBytes(r.usable)}</Field>
           <Field label="Room left">{formatBytes(r.remaining)}</Field>
-          <Field label="Recordings folder">
-            <span className="break-all text-xs">{s?.recordings_dir ?? "—"}</span>
+          <Field label="Recording to">
+            <span className="break-all text-xs">{r.writingVolume?.path ?? s?.recordings_dir ?? "—"}</span>
           </Field>
         </CardContent>
       </Card>
@@ -298,5 +304,23 @@ function NodeChunks({ apiUrl }: { apiUrl: string }) {
         </TableBody>
       </Table>
     </Card>
+  )
+}
+
+/** Which address clients get in every live/playback link, and the node's other LAN addresses. */
+function ClientAddress({ node }: { node: MediaNode }) {
+  const others = (nodeMetrics(node).addresses ?? []).filter((a) => a.usable && a.ip !== node.media_host)
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border bg-card px-4 py-2.5 text-sm">
+      <span>
+        Clients connect to <b className="font-mono">{node.media_host}</b>
+        <span className="text-muted-foreground"> (live, playback, downloads and VLC links)</span>
+      </span>
+      {others.length > 0 && (
+        <span className="text-xs text-muted-foreground">
+          Other LAN addresses of this PC: {others.map((a) => `${a.ip} (${a.interface})`).join(", ")}
+        </span>
+      )}
+    </div>
   )
 }

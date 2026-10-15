@@ -9,7 +9,7 @@ The React + TypeScript web UI for Shah-NVR. Use it to test the central manager a
 ```bash
 cd nvr_client
 npm install
-cp .env.example .env          # set VITE_CENTRAL_URL, e.g. http://100.64.182.102:8000
+cp .env.example .env          # set VITE_CENTRAL_URL, e.g. http://192.168.1.3:8000 (the server's LAN IP)
 npm run dev                   # http://localhost:5180
 ```
 

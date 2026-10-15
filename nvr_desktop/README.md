@@ -63,7 +63,7 @@ API clients (against mocked HTTP with `respx`).
 ## Code map
 
 ```
-main.py                  start-up: libmpv, OpenGL scene graph, fonts, stores -> QML singletons, ui/Main.qml
+main.py                  start-up: libmpv, render mode (GPU/CPU), fonts, stores -> QML singletons, ui/Main.qml
 settings/settings.py     first-run defaults (.env)
 app/core/                shared plumbing, no page knowledge
   api/                   CentralApi / NodeApi (httpx) + pydantic models = the API contract
@@ -72,11 +72,17 @@ app/core/                shared plumbing, no page knowledge
   poller.py, list_model.py, preferences.py (QSettings), format.py, status.py, toasts.py, router.py, icons.py
 app/features/<page>/     one folder per page: store.py (state + @Slot actions for QML) + pure logic modules
 app/video/               the video engine (see below)
+  player.py              MpvPlayer: one libmpv player + all playback logic (state, reconnect, seek...)
+  gl_surface.py          MpvSurface in GPU mode: OpenGL drawing (QQuickFramebufferObject)
+  sw_surface.py          MpvSurface in CPU mode: libswscale into memory, Qt software renderer
+  render_context.py      safe ctypes wrappers of libmpv's render API (GL and SW)
+  render_mode.py         Auto / CPU / GPU selection at startup
+  profiles.py            mpv options per stream type (live / playback) and render mode
 ui/                      QML: layout and bindings only, no business logic
   theme/Theme.qml        Dusk slate tokens (same hex values as nvr_client/src/index.css)
   components/            Button, Card, Table, Select, Sheet, Dialog, Timeline, ... (shadcn look-alikes)
   pages/<page>/          one folder per page
-  video/VideoView.qml    MpvVideoItem + connecting / error / info overlays
+  video/VideoView.qml    MpvPlayer + MpvSurface + connecting / error / info overlays
 assets/                  Geist fonts (OFL), Lucide icons (ISC)
 tests/                   pytest
 ```
@@ -84,13 +90,30 @@ tests/                   pytest
 Each logic module notes which web file it ports (for example "port of nodeUtils.ts"), so the two
 clients can be compared side by side.
 
+## Render modes: GPU and CPU
+
+Settings → **Video rendering**: Auto (default) / CPU / GPU. The mode is chosen once at startup, so a
+change needs a restart. `RENDER_MODE=cpu|gpu` in `.env` overrides Settings.
+
+- **GPU**: mpv draws with OpenGL (hardware decoding optional, Settings → Hardware decoding).
+- **CPU**: like a web browser. Each frame is decoded on the processor, then converted and scaled to
+  the tile's pixel size in one libswscale pass (about 1.6 ms for a 1080p frame). Qt's software
+  renderer repaints only the tiles that changed. No graphics card is needed at all.
+- **Auto** uses GPU when a real OpenGL driver is present and CPU otherwise (no GPU, or only
+  Windows' CPU-emulated OpenGL).
+
+Why CPU mode exists: without a GPU, Qt falls back to a CPU-emulated OpenGL, and mpv's GPU pipeline
+then runs on the CPU at full resolution: about 74% CPU and 1–2 fps for 16 tiles. CPU mode drew the
+same 16 tiles at about 8–11% CPU in testing.
+
 ## Video engine: rules that must not be broken
 
-These rules come from crashes found during development (`app/video/mpv_item.py` explains each one):
+These rules come from crashes found during development (the docstrings of `player.py`,
+`gl_surface.py` and `sw_surface.py` explain each one):
 
-1. **The OpenGL scene graph and the `basic` render loop** are set in `main.py` before
-   QGuiApplication exists. The mpv render API is OpenGL, and the basic loop keeps all rendering on
-   the GUI thread, so Python never runs on Qt's render thread.
+1. **The `basic` render loop** (both modes) and, in GPU mode, the OpenGL scene graph are set in
+   `main.py` before the first window. The basic loop keeps all rendering on the GUI thread, so
+   Python never runs on Qt's render thread.
 2. **Qt owns the FBO.** Never override `createFramebufferObject` in Python; that caused a double
    free.
 3. **Our own render-context wrapper** (`render_context.py`). python-mpv's `MpvRenderContext`
@@ -102,17 +125,26 @@ These rules come from crashes found during development (`app/video/mpv_item.py` 
    so empty tiles cost nothing. Its render context is freed before the player is destroyed.
 6. **No mpv Lua scripts** (`load_*` options in `profiles.py`). They aren't needed, and each one
    costs a Lua VM and a thread per tile.
-7. **No property named `state` on a QQuickItem.** It shadows QML's own `state`, so the item uses
-   `playState`.
+7. **No property named `state` on a QQuickItem.** It shadows QML's own `state`, so the player
+   uses `playState`.
+8. **Render calls never wait.** `BLOCK_FOR_TARGET_TIME=0` in both render contexts. libmpv's default
+   blocks each render until the frame's display time (a whole frame interval), which made CPU
+   rendering look 25 times slower than it is.
+9. **Never call `self.window()` from Python in a surface.** PySide ties the returned window wrapper
+   to the item, and the whole app window was deleted together with a removed tile. CPU mode gets the
+   pixel ratio from the screen under the tile instead.
+10. **No letterbox bars from mpv in CPU mode.** mpv clears bars to `0,0,0,0`, which Qt's RGBX format
+    shows as transparent (white). The surface renders at the picture's own aspect ratio
+    (`keepaspect=no`) and centres it on the background.
 
 Playback wall clock: the media node rebases recorded timestamps to time since
 2020-01-01 UTC, and mpv runs with `rebase-start-time=no`. So `time-pos` *is* the recording time:
-`wall clock = 2020-01-01 UTC + time-pos` (`MpvVideoItem.wallClockMs()`).
+`wall clock = 2020-01-01 UTC + time-pos` (`MpvPlayer.wallClockMs()`).
 
 ## Troubleshooting
 
 - **"libmpv-2.dll not found"**: see Setup step 2. `MPV_DLL_DIR` in `.env` can point elsewhere.
-- **Video is black and the info label says "CPU"**: the GPU decoder was refused. Pick another one
+- **Video is black and the info label says "CPU decode"** (GPU mode): the GPU decoder was refused. Pick another one
   in Settings → Hardware decoding (`d3d11va-copy` works on any DirectX 11 GPU).
 - **Live tile keeps "Retrying…"**: check that the node's RTSP port (8554) is reachable from this
   PC, or switch the grid to LL-HLS.

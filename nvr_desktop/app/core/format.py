@@ -97,6 +97,13 @@ def fmt_day(value) -> str:
     return d.strftime("%d %b %Y") if d else "—"
 
 
+def retention_label(days: int | None) -> str:
+    """A camera's retention for display: "7 days" or "Until full" (None = keep until storage is full)."""
+    if days is None:
+        return "Until full"
+    return f"{days} day{'' if days == 1 else 's'}"
+
+
 class Formatter(QObject):
     """QML singleton `Fmt`: Fmt.bytes(x), Fmt.timeAgo(iso)..."""
 
@@ -115,6 +122,10 @@ class Formatter(QObject):
     @Slot("QVariant", result=str)
     def duration(self, ms) -> str:
         return format_duration(None if ms is None else float(ms))
+
+    @Slot("QVariant", result=str)
+    def retention(self, days) -> str:
+        return retention_label(None if days is None else int(days))
 
     @Slot("QVariant", result=str)
     def timeAgo(self, iso) -> str:

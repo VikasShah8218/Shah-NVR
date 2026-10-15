@@ -10,6 +10,8 @@ ScrollView {
     default property alias content: column.data
     property int gap: 16 // space between sections
 
+    function scrollToEnd() { contentItem.contentY = Math.max(0, contentHeight - height) }
+
     clip: true
     contentWidth: availableWidth
     contentHeight: column.implicitHeight + Theme.pagePadding * 2
