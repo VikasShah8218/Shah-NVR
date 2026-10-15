@@ -22,8 +22,15 @@ nvr_desktop/bin/
 /requirements
 requirements
 
+# Development plans / internal architecture notes (local only)
 CLAUDE.md
+.claude/
 docs
+IMPLEMENTATION_PLAN.md
+Initial_archetecture.txt
+*PLAN*.md
+*[Aa]rchitecture*
+*[Aa]rchetecture*
 
 # OS / editors
 .DS_Store
