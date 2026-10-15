@@ -160,6 +160,44 @@ class NodeDetailStore(BaseStore):
             self._tab_error = ""
             self.logsChanged.emit()
 
+    # ------------------------------------------------------------------ storage volumes (Storage tab)
+    def _volume_act(self, fn, success) -> None:
+        self.act(fn, success=success, after=lambda _r: self.refresh())
+
+    @Slot(str, "QVariant")
+    def addVolume(self, path: str, quota_gb) -> None:
+        """quota_gb: GB, or null for "use the whole disk". The node checks the folder on its next heartbeat."""
+        nid = self._node_id
+        self._volume_act(lambda: self.api.add_volume(nid, path.strip(), _gb(quota_gb)).to_qml(),
+                         lambda v: f"Storage added: {v['path']}")
+
+    @Slot(int, "QVariant")
+    def updateVolumeCap(self, volume_id: int, quota_gb) -> None:
+        nid = self._node_id
+        self._volume_act(lambda: self.api.update_volume(nid, volume_id, {"quota_gb": _gb(quota_gb)}), "Storage updated")
+
+    @Slot(int, bool)
+    def setVolumeAccepting(self, volume_id: int, accepting: bool) -> None:
+        nid = self._node_id
+        self._volume_act(lambda: self.api.update_volume(nid, volume_id, {"accepting": accepting}),
+                         "New recordings resumed" if accepting else "New recordings stopped on this storage")
+
+    @Slot(int, int)
+    def moveVolume(self, index: int, delta: int) -> None:
+        """Move the volume at `index` (fill order) up (-1) or down (+1)."""
+        nid = self._node_id
+        ids = [v["id"] for v in self._node.get("volumes") or []]
+        target = index + delta
+        if not 0 <= index < len(ids) or not 0 <= target < len(ids):
+            return
+        ids.insert(target, ids.pop(index))
+        self._volume_act(lambda: self.api.reorder_volumes(nid, ids), "Fill order saved")
+
+    @Slot(int, bool)
+    def removeVolume(self, volume_id: int, force: bool) -> None:
+        nid = self._node_id
+        self._volume_act(lambda: self.api.delete_volume(nid, volume_id, force), "Storage removed")
+
     @Slot("QVariant")
     def download(self, chunk) -> None:
         """chunk: a row of the Recorded chunks tab."""
@@ -187,3 +225,12 @@ def _path_row(path: dict) -> dict:
         "bytesReceived": path.get("bytesReceived") or 0,
         "bytesSent": path.get("bytesSent") or 0,
     }
+
+
+def _gb(value) -> float | None:
+    """QML number/null -> GB for the API (None = whole disk)."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
