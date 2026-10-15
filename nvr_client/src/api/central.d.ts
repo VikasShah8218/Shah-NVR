@@ -626,7 +626,7 @@ export interface components {
             /** Enabled */
             enabled: boolean;
             /** Retention Days */
-            retention_days: number;
+            retention_days: number | null;
             /**
              * Created At
              * Format: date-time
