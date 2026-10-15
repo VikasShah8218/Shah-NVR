@@ -49,7 +49,7 @@ class Camera(ApiModel):
     username: str | None = None
     has_password: bool = False
     enabled: bool = True
-    retention_days: int = 7
+    retention_days: int | None = 7  # None = keep until storage is full
     created_at: datetime
     updated_at: datetime
     streams: list[Stream] = []
