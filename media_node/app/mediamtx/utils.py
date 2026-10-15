@@ -43,6 +43,13 @@ class MediaMTXClient:
             pass
         return None
 
+    async def patch_global(self, conf: dict) -> None:
+        try:
+            r = await self._client.patch("/v3/config/global/patch", json=conf)
+            r.raise_for_status()
+        except httpx.HTTPError:
+            pass  # applied from the config file on the next MediaMTX start anyway
+
     async def list_config_paths(self) -> dict[str, dict]:
         return {p["name"]: p for p in await self._paged("/v3/config/paths/list")}
 
@@ -104,6 +111,8 @@ hlsAllowOrigins: ["*"]
 webrtc: true
 webrtcAddress: :{settings.WEBRTC_PORT}
 webrtcLocalUDPAddress: :{settings.WEBRTC_UDP_PORT}
+# Always offer the advertised LAN address as an ICE candidate (browsers on other PCs connect to it).
+webrtcAdditionalHosts: ["{settings.public_host}"]
 
 pathDefaults:
   record: false
