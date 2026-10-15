@@ -46,7 +46,7 @@ projects) is building their **own NVR / VMS** (Network Video Recorder / Video Ma
 7. **The user asked**: how to register a camera, and how the RTSP link was found (both answered briefly).
 8. **React UI** (plan approved in plan mode):
    - User choices: Dusk slate theme, Tailwind with shadcn/ui, WebRTC with HLS fallback, and backend additions (CORS, node logs, delete node, a nodes resources page with CPU/GPU/RAM/storage and a **per-node storage quota**).
-   - Built and tested with Playwright and the headless Chrome already installed, both locally and against the real server and camera over Tailscale.
+   - Built and tested with Playwright and the headless Chrome already installed, both locally and against the real server and camera remotely.
    - Deployed the backend changes plus an Aerich migration to the server.
 9. **The user rewrote git history** to drop the Co-Authored-By trailers and pushed to GitHub (`afd25cb`).
 10. **The user asked for this memory dump** (2026-10-13).

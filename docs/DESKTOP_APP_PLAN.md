@@ -160,7 +160,7 @@ nvr_desktop/
 ## 8. Verification (end to end)
 1. `pytest nvr_desktop/tests` passes (pure logic ported from the web, plus the API client against mocked responses).
 2. Run the local stack (central on SQLite, node, `tools/camera_simulator.py --count 2`) and `py main.py` in `nvr_desktop`. Walk every page **side by side with `nvr_client`**: same data, same actions.
-3. Against the server (`CENTRAL_URL=http://100.64.182.102:8000`) with the Axis camera:
+3. Against the server (`CENTRAL_URL=http://192.168.1.3:8000`) with the Axis camera:
    - Live: 16 tiles; check the `hwdec-current` overlay and delay.
    - Playback: wall clock matches the camera on-screen time.
    - Node page: quota edit takes effect.

@@ -18,7 +18,7 @@
 | D13 | Single central instance, asyncio lock in the scheduler | Simplicity. A PostgreSQL advisory lock is the planned leader election. |
 | D14 | Storage quota enforced **on the node**, configured centrally, cached locally | It works while central is down; deletes exactly enough (95% → 90%). |
 | D15 | Front end: React + TS + Tailwind + shadcn/ui (user's choice over the recommended Mantine), Dusk slate theme | The user wanted a clean, soft-dark UI. Plain shadcn tables were used instead of TanStack Table (small data sets). |
-| D16 | Live player: WebRTC (WHEP) first, LL-HLS fallback (user's choice) | Lowest latency; the fallback covers networks where ICE fails. Verified over Tailscale. |
+| D16 | Live player: WebRTC (WHEP) first, LL-HLS fallback (user's choice) | Lowest latency; the fallback covers networks where ICE fails. Verified remotely. |
 | D17 | API types generated from FastAPI OpenAPI (`openapi-typescript` + `openapi-fetch`) | Keeps the UI in sync; offline export script avoids needing running servers. |
 | D18 | No auth / JWT / nginx in this phase | Explicit user instruction. The plan originally had JWT and nginx `auth_request`; postponed. |
 
@@ -44,7 +44,7 @@
 - MediaMTX v1.21.2 config keys verified from its bundled `mediamtx.yml`: `recordPath` must contain `%s` or `%Y %m %d %H %M %S`; `%path` with `/` creates subfolders; date subfolders work; API path names with `/` work.
 - MediaMTX `/v3/config/paths/list` returns `source` unredacted (credentials included), so the diff/patch logic doesn't loop.
 - `sourceOnDemand` paths connect on the first reader (WebRTC, HLS or RTSP), so the status IDLE is expected.
-- In WebRTC through MediaMTX, ICE uses interface IPs, including the Tailscale 100.x address. This worked across Tailscale.
+- In WebRTC through MediaMTX, ICE uses interface IPs; the node also offers its advertised LAN IP (`webrtcAdditionalHosts`).
 - Axis: RTSP `/axis-media/media.amp` with URL parameters `videocodec, resolution, fps, videokeyframeinterval` (per stream; doesn't change the camera's saved settings). VAPIX: `/axis-cgi/param.cgi?action=list&group=root.Brand,...` with digest auth.
 - The Axis M1125 scene compresses to about 180 kbps at 1080p30 (≈1.3 MB per minute). Size estimates must use real cameras.
 - Aerich 0.10 + Tortoise 1.1.8: `aerich init` writes `[tool.tortoise]` (not `[tool.aerich]`) in pyproject; it works despite the "native migrations" warning.

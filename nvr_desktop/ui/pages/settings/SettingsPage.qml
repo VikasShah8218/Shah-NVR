@@ -31,7 +31,7 @@ PageScroll {
             AppInput {
                 id: urlField
                 text: Prefs.centralUrl
-                placeholderText: "http://100.64.182.102:8000"
+                placeholderText: "http://192.168.1.3:8000"
                 Layout.fillWidth: true
                 onAccepted: SettingsPage.saveCentralUrl(text)
             }

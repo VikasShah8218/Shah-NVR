@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UsageMeter } from "@/components/UsageBar"
 import { formatBytes, formatDuration, formatMbps, formatPercent, timeAgo } from "@/lib/format"
 import { fmtDateTime } from "@/lib/time"
-import { cn } from "@/lib/utils"
 import { LogViewer } from "./LogViewer"
 import { NodeActions } from "./NodeActions"
 import { nodeResources } from "./nodeUtils"
@@ -308,34 +307,18 @@ function NodeChunks({ apiUrl }: { apiUrl: string }) {
   )
 }
 
-const isOverlayAddress = (host: string) => {
-  const m = host.match(/^100\.(\d+)\./) // 100.64.0.0/10: Tailscale and other VPN overlays
-  return !!m && +m[1] >= 64 && +m[1] <= 127
-}
-
-/** Which address clients get in every live/playback link, and the node's other addresses. */
+/** Which address clients get in every live/playback link, and the node's other LAN addresses. */
 function ClientAddress({ node }: { node: MediaNode }) {
-  const addresses = (nodeMetrics(node).addresses ?? []).filter((a) => a.ip !== node.media_host && a.ip !== "127.0.0.1")
-  const overlay = isOverlayAddress(node.media_host)
+  const others = (nodeMetrics(node).addresses ?? []).filter((a) => a.usable && a.ip !== node.media_host)
   return (
-    <div
-      className={cn(
-        "flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border px-4 py-2.5 text-sm",
-        overlay ? "border-warning/40 bg-warning/10" : "bg-card",
-      )}
-    >
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border bg-card px-4 py-2.5 text-sm">
       <span>
         Clients connect to <b className="font-mono">{node.media_host}</b>
-        <span className="text-muted-foreground"> (live, playback and downloads)</span>
+        <span className="text-muted-foreground"> (live, playback, downloads and VLC links)</span>
       </span>
-      {overlay && (
-        <span className="text-warning">
-          This is a Tailscale/VPN address: only PCs on that VPN can play video. Set PUBLIC_HOST=auto in the node's .env.
-        </span>
-      )}
-      {addresses.length > 0 && (
+      {others.length > 0 && (
         <span className="text-xs text-muted-foreground">
-          Other addresses on this node: {addresses.map((a) => `${a.ip} (${a.interface})`).join(", ")}
+          Other LAN addresses of this PC: {others.map((a) => `${a.ip} (${a.interface})`).join(", ")}
         </span>
       )}
     </div>

@@ -113,7 +113,7 @@ Design (`app/video/`):
   It picks CPU when the renderer is a software one (llvmpipe, GDI Generic, Basic Render…) or missing.
   Settings → Video rendering can force CPU or GPU (restart needed). `RENDER_MODE` in `.env` overrides both.
 
-Measured on the dev laptop (16 tiles of the server's 8 cameras ×2, over Tailscale):
+Measured on the dev laptop (16 tiles of the server's 8 cameras ×2, remotely):
 
 | Mode | CPU | GPU 3D |
 |---|---|---|

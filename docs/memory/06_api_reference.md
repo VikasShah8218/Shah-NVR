@@ -39,9 +39,9 @@ There is no authentication yet. Swagger: central `:8000/docs`, node `:7100/docs`
 // LiveOut
 { "camera_id": 1, "node_id": 1, "node_name": "...", "generation": 1,
   "streams": [ { "profile": "main", "codec_note": "...",
-                 "rtsp": "rtsp://100.64.182.102:8554/cam-1/main",
-                 "hls": "http://100.64.182.102:8888/cam-1/main/index.m3u8",
-                 "webrtc": "http://100.64.182.102:8889/cam-1/main" } ] }   // WHEP = webrtc + "/whep"
+                 "rtsp": "rtsp://192.168.1.3:8554/cam-1/main",
+                 "hls": "http://192.168.1.3:8888/cam-1/main/index.m3u8",
+                 "webrtc": "http://192.168.1.3:8889/cam-1/main" } ] }   // WHEP = webrtc + "/whep"
 
 // TimelineOut
 { "camera_id": 1, "profile": "main", "start": "...", "end": "...", "recorded_seconds": 147.99,

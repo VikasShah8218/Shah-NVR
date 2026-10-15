@@ -29,7 +29,7 @@ media_node/
 |---|---|---|
 | NODE_NAME | node-1 | unique per node; server uses `shah-ho-node-1` |
 | HOST / PORT | 0.0.0.0 / 7100 | agent API |
-| PUBLIC_HOST | auto | **Host put into every client link** (live RTSP/HLS/WebRTC, playback, downloads). `auto` = this PC's LAN IP via `utilities/netaddr.py`, skipping Tailscale/CGNAT 100.64/10, link-local and VMware/Hyper-V/WSL/Docker/VPN adapters. It prefers the default-route IP, re-detects every `ADDRESS_CHECK_INTERVAL_SECONDS` (120) and re-registers on change. An explicit IP/hostname overrides it. It also feeds MediaMTX `webrtcAdditionalHosts`. The heartbeat reports `addresses` for the UI. |
+| PUBLIC_HOST | auto | **Host put into every client link** (live RTSP/HLS/WebRTC, playback, downloads). `auto` = this PC's LAN IP via `utilities/netaddr.py`, skipping VPN-overlay 100.64/10, link-local and VMware/Hyper-V/WSL/Docker/VPN adapters. It prefers the default-route IP, re-detects every `ADDRESS_CHECK_INTERVAL_SECONDS` (120) and re-registers on change. An explicit IP/hostname overrides it. It also feeds MediaMTX `webrtcAdditionalHosts`. The heartbeat reports `addresses` for the UI. |
 | CAPACITY_CAMERAS | 100 | sent on register (the central UI can change it) |
 | CENTRAL_URL | http://127.0.0.1:8000 | |
 | DATA_DIR / RECORDINGS_DIR | ./data / ./data/recordings | |

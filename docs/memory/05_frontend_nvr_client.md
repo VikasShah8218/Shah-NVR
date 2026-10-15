@@ -105,7 +105,7 @@ Status colours are consistent everywhere:
 - **Reconnect:** a fatal error or a WebRTC `failed`/`disconnected` state triggers a retry with backoff `2 s × 2^failures` (max 30 s). The failure count is a ref that resets on the `playing` event; the `attempt` state bump re-runs the effect.
 - The effect deps are `[stream.webrtc, stream.hls, protocol, attempt]`, so the player reconnects when a camera moves node.
 - Overlay: `WxH · WebRTC|HLS · N ms`. `saveSnapshot(video, name)` downloads a PNG.
-- **Verified:** locally WebRTC at about 10 ms; against the server over Tailscale with the Axis camera, 1080p main at 41 ms and 640×360 sub at 21 ms.
+- **Verified:** locally WebRTC at about 10 ms; against the server remotely with the Axis camera, 1080p main at 41 ms and 640×360 sub at 21 ms.
 
 ## 7. Playback internals
 - `PlaybackPage` state: cameraId, profile, day (local midnight), zoom (ms), viewStart, playFrom, **playTo** (fixed when playback starts, so the playlist URL stays stable; an early bug rebuilt it with `Date.now()` on every render), playhead.

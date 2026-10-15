@@ -1,8 +1,9 @@
 """Which IP address this node gives to clients (cameras' live/playback links are built from it).
 
-PUBLIC_HOST=auto (the default) picks this PC's real LAN address. VPN/overlay and virtual adapters are
-never chosen: a Tailscale IP (100.64.0.0/10) or a VMware/Hyper-V host-only address only works for PCs on
-that overlay, so clients on the normal network could not play any video.
+Rule: every link uses this PC's real LAN address (e.g. 192.168.x.x). VPN/overlay addresses
+(100.64.0.0/10), loopback, link-local and virtual adapters (VMware, Hyper-V, WSL, Docker, VPN clients) are
+never used: clients on the normal network cannot reach them. This holds even if PUBLIC_HOST in .env names
+such an address; it is ignored with a warning.
 """
 
 from __future__ import annotations
@@ -19,9 +20,9 @@ logger = logging.getLogger("node.netaddr")
 _EXCLUDED_NETS = [
     ipaddress.ip_network("127.0.0.0/8"),     # loopback
     ipaddress.ip_network("169.254.0.0/16"),  # link-local (no DHCP)
-    ipaddress.ip_network("100.64.0.0/10"),   # CGNAT: Tailscale and other overlays
+    ipaddress.ip_network("100.64.0.0/10"),   # CGNAT range used by VPN overlays
 ]
-# Interface names of VPN / virtual adapters (compared lower-case, substring).
+# Interface names of VPN / virtual adapters (compared lower-case, substring); never advertised.
 _EXCLUDED_ADAPTERS = ("tailscale", "zerotier", "wireguard", "vmware", "virtualbox", "vethernet", "hyper-v",
                       "wsl", "docker", "loopback", "npcap", "vpn", "tap-", "tun")
 _PRIVATE_NETS = [ipaddress.ip_network(n) for n in ("192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12")]
@@ -79,10 +80,28 @@ def detect_lan_ip() -> str:
     return ip
 
 
+def _is_lan_ip_or_hostname(value: str) -> bool:
+    """A hostname, or an IP that is not loopback / link-local / VPN-overlay."""
+    try:
+        addr = ipaddress.ip_address(value)
+    except ValueError:
+        return True  # a hostname: the admin's choice
+    return not any(addr in net for net in _EXCLUDED_NETS)
+
+
 def resolve_public_host(setting: str) -> str:
-    """PUBLIC_HOST value -> the host put into client links ("auto" = this PC's LAN IP)."""
+    """PUBLIC_HOST value -> the host put into client links ("auto" = this PC's LAN IP).
+
+    A VPN/loopback/link-local IP is never used, even when written in .env: the LAN IP is used instead."""
     value = (setting or "").strip()
-    return detect_lan_ip() if value.lower() in ("", "auto") else value
+    if value.lower() in ("", "auto"):
+        return detect_lan_ip()
+    if not _is_lan_ip_or_hostname(value):
+        lan = detect_lan_ip()
+        logger.warning("PUBLIC_HOST=%s is not a LAN address; using this PC's LAN IP %s instead "
+                       "(set PUBLIC_HOST=auto in .env)", value, lan)
+        return lan
+    return value
 
 
 _current: str | None = None

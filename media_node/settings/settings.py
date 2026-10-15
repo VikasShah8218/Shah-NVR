@@ -19,8 +19,8 @@ class Settings(BaseSettings):
     NODE_NAME: str = "node-1"
     HOST: str = "0.0.0.0"
     PORT: int = 7100
-    # Host/IP put into every client link (live, playback, downloads). "auto" = this PC's LAN IP, never a
-    # Tailscale/VPN or virtual adapter address (utilities/netaddr.py). Set an IP/hostname only to override.
+    # Host/IP put into every client link (live, playback, downloads). "auto" = this PC's LAN IP
+    # (utilities/netaddr.py). VPN/virtual addresses are never used, even if written here.
     PUBLIC_HOST: str = "auto"
     CAPACITY_CAMERAS: int = 100
     LOG_LEVEL: str = "INFO"

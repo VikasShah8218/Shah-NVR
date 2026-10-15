@@ -15,7 +15,7 @@ The server repo is at the pre-rewrite hash `188b919` (same tree as `afd25cb`). S
 
 ## 2. What is done and verified
 - [x] Recording: real AXIS M1125 at 1080p30 and the simulator. 60 s fMP4 chunks, indexing, PostgreSQL catalog.
-- [x] Live: RTSP (VLC), LL-HLS, WebRTC (browser, over Tailscale), substream on demand.
+- [x] Live: RTSP (VLC), LL-HLS, WebRTC (browser, remotely), substream on demand.
 - [x] Playback: HLS VOD across chunks and nodes, exact wall clock, gaps and discontinuities, chunk download.
 - [x] Scheduler, leases, failover (about 43 s), self-fencing, crash recovery of truncated chunks.
 - [x] Retention, disk-pressure cleanup, per-node storage quota.

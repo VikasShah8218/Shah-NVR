@@ -3,15 +3,15 @@
 ## 1. Machines
 | Machine | Role | Facts |
 |---|---|---|
-| **Dev PC** (user's laptop) | development | Windows 11, `D:\Drive-1\Shah-Secret-Project\Shah-NVR`, Python 3.13.3, venv `C:\Users\Mr. Shah\Envs\nvr`, Node 22.14 / npm 10.9, FFmpeg at `C:\ffmpeg-2026-01-22\bin`, Chrome and Edge installed, local PostgreSQL on 5432 (password unknown to Claude; tests use SQLite), RTX 3050 Laptop GPU, Tailscale IP `100.64.14.13`, Wi-Fi `192.168.1.37`. Port 5173 is used by the HID Trinetra Vite app. |
-| **Server `shah-ho-1`** | test/prod node + central | Windows (build 26200), user `shah`, repo `F:\Drive-1\Shah-NVR`, Python 3.12.0, venv `C:\Users\Shah\Envs\nvr` (has onvif-zeep + project deps), **no FFmpeg**, PostgreSQL 5432 with DB `nvr`, 20 cores, 16 GB RAM, RTX 3050 8 GB, F: drive ~200 GB, Tailscale `100.64.182.102` (MagicDNS `shah-ho-1.tail6dae1b.ts.net`), LAN `192.168.1.3`. OpenSSH server enabled; the default shell is cmd. |
+| **Dev PC** (user's laptop) | development | Windows 11, `D:\Drive-1\Shah-Secret-Project\Shah-NVR`, Python 3.13.3, venv `C:\Users\Mr. Shah\Envs\nvr`, Node 22.14 / npm 10.9, FFmpeg at `C:\ffmpeg-2026-01-22\bin`, Chrome and Edge installed, local PostgreSQL on 5432 (password unknown to Claude; tests use SQLite), RTX 3050 Laptop GPU, Wi-Fi `192.168.1.x` (DHCP). Port 5173 is used by the HID Trinetra Vite app. |
+| **Server `shah-ho-1`** | test/prod node + central | Windows (build 26200), user `shah`, repo `F:\Drive-1\Shah-NVR`, Python 3.12.0, venv `C:\Users\Shah\Envs\nvr` (has onvif-zeep + project deps), **no FFmpeg**, PostgreSQL 5432 with DB `nvr`, 20 cores, 16 GB RAM, RTX 3050 8 GB, F: drive ~200 GB, LAN `192.168.1.3`. OpenSSH server enabled; the default shell is cmd. |
 | **Camera** | AXIS M1125, fw 6.50.1.3 | `192.168.1.241` (LAN of the server). VAPIX works with digest auth; ONVIF returns "Sender not authorized" for root. Image is 1920×1080, rotation 180. Default GOP is 32 frames @30 fps. |
 
 Credentials for all three are in **`docs/memory/environment.local.md`** (git-ignored).
 
 ## 2. Server layout and service control
 - `F:\Drive-1\Shah-NVR\central_manager\.env`: `DB_PASSWORD=<see local file>`, everything else default.
-- `F:\Drive-1\Shah-NVR\media_node\.env`: `NODE_NAME=shah-ho-node-1`, `PUBLIC_HOST=100.64.182.102` until 2026-10-15. **Change it to `PUBLIC_HOST=auto`**: a Tailscale IP made every video link Tailscale-only, so LAN PCs without Tailscale could not play anything.
+- `F:\Drive-1\Shah-NVR\media_node\.env`: `NODE_NAME=shah-ho-node-1`, `PUBLIC_HOST=auto` (LAN IP; a VPN IP here is ignored by the node).
 - `F:\Drive-1\Shah-NVR\media_node\bin\mediamtx.exe`: v1.21.2 (downloaded with curl and unpacked with `tar -xf` on the server).
 - Recordings: `F:\Drive-1\Shah-NVR\media_node\data\recordings\`.
 - Logs: `C:\Users\Shah\nvr-logs\central_manager.log`, `media_node.log`. The MediaMTX log is in `media_node\data\logs\mediamtx.log`.

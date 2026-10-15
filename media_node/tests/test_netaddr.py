@@ -6,7 +6,7 @@ def addrs(*pairs):
     return [{"interface": i, "ip": ip, "usable": netaddr._usable(i, ip)} for i, ip in pairs]
 
 
-def test_skips_tailscale_and_prefers_lan():
+def test_skips_vpn_overlay_and_prefers_lan():
     table = addrs(("Tailscale", "100.64.182.102"), ("Ethernet", "192.168.1.3"))
     assert choose_lan_ip(table, "100.64.182.102") == "192.168.1.3"
 
@@ -36,3 +36,10 @@ def test_explicit_value_is_kept(monkeypatch):
     assert resolve_public_host("nvr-server.local") == "nvr-server.local"
     assert resolve_public_host("auto") == "192.168.1.3"
     assert resolve_public_host("") == "192.168.1.3"
+
+
+def test_vpn_or_loopback_ip_in_env_is_ignored(monkeypatch):
+    monkeypatch.setattr(netaddr, "detect_lan_ip", lambda: "192.168.1.3")
+    assert resolve_public_host("100.64.182.102") == "192.168.1.3"
+    assert resolve_public_host("127.0.0.1") == "192.168.1.3"
+    assert resolve_public_host("192.168.1.50") == "192.168.1.50"  # another LAN IP is the admin's choice
