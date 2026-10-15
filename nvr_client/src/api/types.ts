@@ -45,6 +45,8 @@ export interface NodeMetrics {
   pending_uploads?: number
   /** Local fixed drives of the node (offered in "Add storage"). */
   drives?: DriveInfo[]
+  /** The node's IPv4 addresses; `usable` = a LAN address (not VPN/virtual). */
+  addresses?: { interface: string; ip: string; usable: boolean }[]
   /** The node's own recordings folder (its default storage volume). */
   default_recordings_dir?: string | null
 }
