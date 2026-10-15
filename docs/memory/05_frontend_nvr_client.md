@@ -146,3 +146,10 @@ Run `py tools/export_openapi.py` (repo root, nvr venv) before `gen:api`. It impo
 - **Dashboard alerts** now cover offline storage and all-storage-full.
 - **Edit limits** keeps only camera capacity.
 - `StatusBadge` gains the volume states OK, FULL, PENDING and ERROR.
+
+
+## 11. Camera form: retention (2026-10-15)
+- "Keep recordings [N] days" plus a **"Until storage is full"** switch (sends `retention_days: null`), with help text.
+- "Camera enabled" moved to its own row: it used to sit next to the days field and was mistaken for a retention
+  switch.
+- Display: `retentionLabel()` in `lib/format.ts` shows "N days" / "Until full".
