@@ -19,7 +19,7 @@ from tortoise.contrib.fastapi import RegisterTortoise
 from app.mediamtx.services import reconcile_tick, supervisor
 from app.mediamtx.utils import mtx
 from app.node.router import router as node_router
-from app.node.services import heartbeat_tick, load_local_state, register, stream_status_tick
+from app.node.services import check_public_host, heartbeat_tick, load_local_state, register, stream_status_tick
 from app.node.utils import central
 from app.recordings.router import router as recordings_router
 from app.recordings.services import deletion_tick, scan_tick, upload_tick
@@ -43,6 +43,7 @@ async def lifespan(app: FastAPI):
     # Local SQLite state; tables are created automatically.
     async with RegisterTortoise(app, config=TORTOISE_ORM, generate_schemas=True):
         await migrate()  # bring an older local database up to date
+        logger.info("Clients reach this node at %s (PUBLIC_HOST=%s)", settings.public_host, settings.PUBLIC_HOST)
         await load_local_state()
         await storage.load()
         await storage.refresh()  # pick the recording target before MediaMTX gets its first paths
@@ -59,6 +60,7 @@ async def lifespan(app: FastAPI):
                 ("stream-status", settings.STATUS_INTERVAL_SECONDS, stream_status_tick),
                 ("deletion", settings.DELETION_INTERVAL_SECONDS, deletion_tick),
                 ("storage", settings.STORAGE_CHECK_INTERVAL_SECONDS, storage_tick),
+                ("address", settings.ADDRESS_CHECK_INTERVAL_SECONDS, check_public_host),
             )
         ]
         logger.info("Media node '%s' started; API %s", settings.NODE_NAME, settings.api_url)
