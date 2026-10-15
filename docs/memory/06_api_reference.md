@@ -51,6 +51,8 @@ There is no authentication yet. Swagger: central `:8000/docs`, node `:7100/docs`
   "gaps": [ { "start_time": "...", "end_time": "...", "seconds": 14.79 } ] }
 ```
 
+`retention_days` (cameras): an int of days, counted back from the camera's latest recording, or `null` = keep until storage is full. Omitted on create = 7.
+
 ### Playback
 | GET | `/playback/{camera_id}/index.m3u8?profile=main&start=&end=` or `&minutes=N` | → `application/vnd.apple.mpegurl` HLS VOD; 404 if nothing is playable |
 |---|---|---|
