@@ -2611,6 +2611,15 @@
             "title": "Pending Uploads",
             "default": 0
           },
+          "addresses": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Addresses",
+            "default": []
+          },
           "default_recordings_dir": {
             "anyOf": [
               {
