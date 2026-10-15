@@ -45,3 +45,11 @@ def test_time_ago():
 def test_parse_iso_accepts_z_suffix():
     assert parse_iso("2026-10-14T00:00:00Z") == datetime(2026, 10, 14, tzinfo=timezone.utc)
     assert parse_iso(None) is None
+
+
+def test_retention_label():
+    from app.core.format import retention_label
+
+    assert retention_label(None) == "Until full"
+    assert retention_label(1) == "1 day"
+    assert retention_label(30) == "30 days"
