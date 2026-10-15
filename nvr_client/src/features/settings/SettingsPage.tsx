@@ -49,7 +49,7 @@ export function SettingsPage() {
           <div className="grid gap-1.5">
             <Label htmlFor="url">API URL</Label>
             <div className="flex gap-2">
-              <Input id="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://100.64.182.102:8000" />
+              <Input id="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://192.168.1.3:8000" />
               <Button variant="outline" onClick={testConnection} disabled={test.kind === "testing"}>
                 {test.kind === "testing" && <Loader2 className="size-4 animate-spin" />} Test
               </Button>
