@@ -11,7 +11,7 @@ Credentials for all three are in **`docs/memory/environment.local.md`** (git-ign
 
 ## 2. Server layout and service control
 - `F:\Drive-1\Shah-NVR\central_manager\.env`: `DB_PASSWORD=<see local file>`, everything else default.
-- `F:\Drive-1\Shah-NVR\media_node\.env`: `NODE_NAME=shah-ho-node-1`, `PUBLIC_HOST=100.64.182.102`, others default.
+- `F:\Drive-1\Shah-NVR\media_node\.env`: `NODE_NAME=shah-ho-node-1`, `PUBLIC_HOST=100.64.182.102` until 2026-10-15. **Change it to `PUBLIC_HOST=auto`**: a Tailscale IP made every video link Tailscale-only, so LAN PCs without Tailscale could not play anything.
 - `F:\Drive-1\Shah-NVR\media_node\bin\mediamtx.exe`: v1.21.2 (downloaded with curl and unpacked with `tar -xf` on the server).
 - Recordings: `F:\Drive-1\Shah-NVR\media_node\data\recordings\`.
 - Logs: `C:\Users\Shah\nvr-logs\central_manager.log`, `media_node.log`. The MediaMTX log is in `media_node\data\logs\mediamtx.log`.
@@ -99,7 +99,7 @@ After pulling:
 | Stream IDLE | Normal for `record=false` profiles: they connect on demand. |
 | NOT_RECORDING | The stream is up but no chunk finished in 2×segment + 30 s. Check disk, permissions, MediaMTX log. |
 | Playback 404 "No playable recordings" | No AVAILABLE segments in range (the newest chunk isn't finished yet), or the node holding them is UNREACHABLE. |
-| Browser can't open node tabs / media | `PUBLIC_HOST` isn't reachable from the browser (use the Tailscale or LAN IP), or a firewall. |
+| Browser can't open node tabs / media | The node advertises an address the browser can't reach: Node page → "Clients connect to …". Use `PUBLIC_HOST=auto` (LAN IP). Otherwise check Windows Firewall for TCP 7100/8000/8554/8888/8889 and UDP 8189 on the LAN (Private/Public) profile. |
 | ONVIF "Sender not authorized" (Axis) | Axis keeps a separate ONVIF user list. Use VAPIX `param.cgi` or the known RTSP format instead. |
 | `aerich` warning "use native migrations for tortoise>=1.0" | Harmless; Aerich works with Tortoise 1.1.8. |
 | npm ERESOLVE with openapi-typescript | Already handled by the `overrides` in package.json. |
