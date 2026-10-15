@@ -125,12 +125,28 @@ Stress-verified in both modes: 40 × 9 tiles torn down while connecting, and 20 
 Still to do: the acceptance run on `shah-ho-1` with both GPUs disabled (needs the user's desktop session), and
 64 tiles in 4 windows.
 
-## Pending: storage volumes UI (2026-10-15)
-Central, node and web support several storage volumes per node (see 04 §10). On purpose, the desktop app has **not
-been updated yet** (user's decision: confirm on server + node + web first).
-- It keeps working: `NodeOut` stays compatible, and its "Edit limits" quota field now caps the node's default volume
-  through the deprecated `storage_quota_gb`.
-- To do: a Storage tab like the web one, the volume state tones in `status.py`, and `node_resources` summing volumes.
+## Storage volumes UI (added 2026-10-15, after the web version was confirmed)
+- **Node detail → Storage tab** (`ui/pages/nodes/StorageTab.qml`), the same as the web client:
+  - Fill order with ↑↓, folder (network icon / node's own folder / recording here now / new recordings stopped), state
+    badge + detail, recordings/cap bar, disk free, and a menu (Edit cap, Stop/Resume, Remove with a force switch).
+  - Banners for "all full" and "offline".
+- **Dialogs:**
+  - `AddStorageDialog.qml`: drive picked from `metrics.drives` or a UNC path, with the `cmdkey` help.
+  - `VolumeCapDialog.qml`.
+  - Shared `CapField.qml`.
+- **Actions** in `NodeDetailStore`: `addVolume`, `updateVolumeCap`, `setVolumeAccepting`, `moveVolume`, `removeVolume`
+  (`CentralApi.add_volume` / `update_volume` / `reorder_volumes` / `delete_volume`; pydantic `StorageVolume`).
+- **Elsewhere:**
+  - `node_resources` sums the volumes (`volume_room`, `volume_usable`, `writingVolume`, `volumesOffline`, `allFull`,
+    `otherAddresses`).
+  - Status tones OK/FULL/PENDING/ERROR. Dashboard alerts for offline storage and all-full.
+  - The node page has a "Clients connect to <LAN IP>" line.
+  - Edit limits = camera capacity only.
+- Verified against the live server: every action on a temporary test volume, with the recording target untouched.
+- Harness helpers: `PageScroll.scrollToEnd()`, `StorageTab.openAdd()` (objectName `storageTab`), `shoot.py` env
+  `THEN=obj.method` for a second call.
+- Rule (again): no `self.window()` from Python; long paths in table cells need `Layout.preferredWidth: 1` on the
+  flexible column, plus min/max widths on the fixed ones.
 
 ## Dev harness (not in the repo)
 Claude used a scratchpad script `shoot.py OUTDIR "page,page=id,page+objName.method(arg),page+@Store.slot(a;b)" waitms`.
