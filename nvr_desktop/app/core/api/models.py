@@ -104,6 +104,25 @@ class Timeline(ApiModel):
 
 
 # ---------------------------------------------------------------- nodes
+class StorageVolume(ApiModel):
+    """A place where a node records: its own folder, another drive or a network share (fill in order)."""
+
+    id: int
+    path: str
+    kind: str  # local | network
+    position: int
+    quota_bytes: int | None = None  # None = whole disk
+    accepting: bool = True
+    is_default: bool = False
+    state: str  # PENDING | OK | FULL | UNAVAILABLE | ERROR
+    state_detail: str | None = None
+    total_bytes: int | None = None
+    free_bytes: int | None = None
+    recordings_bytes: int | None = None
+    writing: bool = False
+    last_report_at: datetime | None = None
+
+
 class MediaNode(ApiModel):
     id: int
     name: str
@@ -113,7 +132,8 @@ class MediaNode(ApiModel):
     hls_port: int
     webrtc_port: int
     capacity_cameras: int
-    storage_quota_bytes: int | None = None
+    storage_quota_bytes: int | None = None  # total of the volume caps (None if any volume is uncapped)
+    volumes: list[StorageVolume] = []
     version: str | None = None
     mediamtx_version: str | None = None
     state: str
