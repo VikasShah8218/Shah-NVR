@@ -22,6 +22,9 @@ nvr_desktop/bin/
 /requirements
 requirements
 
+CLAUDE.md
+docs
+
 # OS / editors
 .DS_Store
 Thumbs.db
