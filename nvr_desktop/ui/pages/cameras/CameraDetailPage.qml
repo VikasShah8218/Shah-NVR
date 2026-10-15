@@ -127,7 +127,7 @@ PageScroll {
                     }
                     FieldRow { label: "Username"; value: root.c.username ?? "—" }
                     FieldRow { label: "Password"; value: root.c.has_password ? "Set" : "Not set" }
-                    FieldRow { label: "Keep recordings"; value: (root.c.retention_days ?? "") + " days" }
+                    FieldRow { label: "Keep recordings"; value: Fmt.retention(root.c.retention_days) }
                     FieldRow { label: "Added"; value: Fmt.dateTime(root.c.created_at) }
                 }
 
