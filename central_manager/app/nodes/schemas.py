@@ -79,6 +79,8 @@ class HeartbeatIn(BaseModel):
     paths_configured: int = 0
     paths_ready: int = 0
     pending_uploads: int = 0
+    # the node's IPv4 addresses [{interface, ip, usable}] (it advertises one of them as media_host)
+    addresses: list[dict[str, Any]] = []
     # storage volumes (nodes older than 2026-10-15 send none of these)
     default_recordings_dir: str | None = None
     drives: list[DriveInfo] = []
