@@ -29,7 +29,7 @@ media_node/
 |---|---|---|
 | NODE_NAME | node-1 | unique per node; server uses `shah-ho-node-1` |
 | HOST / PORT | 0.0.0.0 / 7100 | agent API |
-| PUBLIC_HOST | 127.0.0.1 | **IP that clients and central use to reach this node.** Goes into live URLs and playlist URLs. Server: Tailscale `100.64.182.102` (use `192.168.1.3` for LAN-only clients) |
+| PUBLIC_HOST | auto | **Host put into every client link** (live RTSP/HLS/WebRTC, playback, downloads). `auto` = this PC's LAN IP via `utilities/netaddr.py`, skipping Tailscale/CGNAT 100.64/10, link-local and VMware/Hyper-V/WSL/Docker/VPN adapters. It prefers the default-route IP, re-detects every `ADDRESS_CHECK_INTERVAL_SECONDS` (120) and re-registers on change. An explicit IP/hostname overrides it. It also feeds MediaMTX `webrtcAdditionalHosts`. The heartbeat reports `addresses` for the UI. |
 | CAPACITY_CAMERAS | 100 | sent on register (the central UI can change it) |
 | CENTRAL_URL | http://127.0.0.1:8000 | |
 | DATA_DIR / RECORDINGS_DIR | ./data / ./data/recordings | |
@@ -44,7 +44,7 @@ media_node/
 | HEARTBEAT/RECONCILE/SCAN/UPLOAD/STATUS/DELETION intervals | 5/5/5/3/10/60 s | |
 | DISK_MAX_USED_PERCENT / DISK_TARGET_USED_PERCENT / DISK_MIN_KEEP_HOURS | 95 / 92 / 1 | disk-pressure cleanup |
 
-`settings.api_url` = `http://PUBLIC_HOST:PORT`; `settings.mediamtx_api` = `http://127.0.0.1:<api port>`; `settings.db_path` = `DATA_DIR/node_state.sqlite3`.
+`settings.api_url` = `http://<settings.public_host>:PORT` (`public_host` resolves `auto`); `settings.mediamtx_api` = `http://127.0.0.1:<api port>`; `settings.db_path` = `DATA_DIR/node_state.sqlite3`.
 
 ## 3. MediaMTX integration
 - **Generated config** (`render_config()`, rewritten on every start):
