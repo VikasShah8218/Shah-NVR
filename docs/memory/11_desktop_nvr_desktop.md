@@ -162,3 +162,10 @@ The local test stack:
 - Packaging (Nuitka standalone with libmpv bundled), plus a check on a clean PC.
 - Real-server check: the Axis camera on `shah-ho-1`, 16 tiles over the network, delay versus the web client.
 - Optional: keyboard shortcuts for the playback controls (space, arrows); a per-tile audio toggle (audio is off by default).
+
+
+## Retention UI (2026-10-15)
+- Same as the web: `CameraFormSheet.qml` has the days field + an "Until storage is full" switch + help text, and
+  "Camera enabled" on its own row.
+- `forms.py`: `keep_until_full` → `retention_days: None`.
+- `Fmt.retention()` (`format.retention_label`) shows "N days" / "Until full".
