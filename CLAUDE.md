@@ -37,7 +37,7 @@ cd nvr_client && npm run dev              # :5180 (NOT 5173 – another local ap
 - After changing central models: `cd central_manager && aerich migrate --name <x> && aerich upgrade`.
 
 ## Production-like test server
-- Windows host `shah-ho-1`, Tailscale IP `100.64.182.102`, LAN `192.168.1.3`. The repo is at `F:\Drive-1\Shah-NVR`.
+- Windows host `shah-ho-1`, LAN `192.168.1.3`; the Tailscale IP `100.64.182.102` is only for remote admin (SSH). Client links must use the LAN IP (`PUBLIC_HOST=auto`). The repo is at `F:\Drive-1\Shah-NVR`.
 - The real camera is an **AXIS M1125** at `192.168.1.241`. Its RTSP address is `/axis-media/media.amp?videocodec=h264&resolution=1920x1080&fps=30&videokeyframeinterval=30`. ONVIF refuses the root user.
 - Services run detached. Start them with `C:\Users\Shah\nvr-start.ps1 <central_manager|media_node>` and stop them with `nvr-stop.ps1`. Logs are in `C:\Users\Shah\nvr-logs\`.
 - See `docs/memory/07_operations_and_deployment.md`. Credentials are in `environment.local.md`.
