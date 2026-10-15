@@ -2,7 +2,7 @@ import { ArrowLeft, Download } from "lucide-react"
 import { Link, useParams } from "react-router"
 import { mediaFileUrl } from "@/api/client"
 import { useNode, useNodeAssignments, useNodePaths, useNodeSegments, useNodeStatus } from "@/api/queries"
-import type { MediaNode } from "@/api/types"
+import { type MediaNode, nodeMetrics } from "@/api/types"
 import { EmptyState, ErrorState, Field, Loading, PageHeader } from "@/components/common"
 import { StatusBadge } from "@/components/StatusBadge"
 import { Badge } from "@/components/ui/badge"
@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UsageMeter } from "@/components/UsageBar"
 import { formatBytes, formatDuration, formatMbps, formatPercent, timeAgo } from "@/lib/format"
 import { fmtDateTime } from "@/lib/time"
+import { cn } from "@/lib/utils"
 import { LogViewer } from "./LogViewer"
 import { NodeActions } from "./NodeActions"
 import { nodeResources } from "./nodeUtils"
@@ -35,7 +36,7 @@ export function NodeDetailPage() {
       </Link>
       <PageHeader
         title={n.name}
-        description={`${n.api_url} · media host ${n.media_host} · heartbeat ${timeAgo(n.last_heartbeat_at)}`}
+        description={`${n.api_url} · heartbeat ${timeAgo(n.last_heartbeat_at)}`}
         actions={
           <>
             <StatusBadge status={n.state} />
@@ -43,6 +44,7 @@ export function NodeDetailPage() {
           </>
         }
       />
+      <ClientAddress node={n} />
       <ResourceSummary node={n} />
       <ResourceCharts points={points} />
       <Tabs defaultValue="cameras">
@@ -303,5 +305,39 @@ function NodeChunks({ apiUrl }: { apiUrl: string }) {
         </TableBody>
       </Table>
     </Card>
+  )
+}
+
+const isOverlayAddress = (host: string) => {
+  const m = host.match(/^100\.(\d+)\./) // 100.64.0.0/10: Tailscale and other VPN overlays
+  return !!m && +m[1] >= 64 && +m[1] <= 127
+}
+
+/** Which address clients get in every live/playback link, and the node's other addresses. */
+function ClientAddress({ node }: { node: MediaNode }) {
+  const addresses = (nodeMetrics(node).addresses ?? []).filter((a) => a.ip !== node.media_host && a.ip !== "127.0.0.1")
+  const overlay = isOverlayAddress(node.media_host)
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border px-4 py-2.5 text-sm",
+        overlay ? "border-warning/40 bg-warning/10" : "bg-card",
+      )}
+    >
+      <span>
+        Clients connect to <b className="font-mono">{node.media_host}</b>
+        <span className="text-muted-foreground"> (live, playback and downloads)</span>
+      </span>
+      {overlay && (
+        <span className="text-warning">
+          This is a Tailscale/VPN address: only PCs on that VPN can play video. Set PUBLIC_HOST=auto in the node's .env.
+        </span>
+      )}
+      {addresses.length > 0 && (
+        <span className="text-xs text-muted-foreground">
+          Other addresses on this node: {addresses.map((a) => `${a.ip} (${a.interface})`).join(", ")}
+        </span>
+      )}
+    </div>
   )
 }
