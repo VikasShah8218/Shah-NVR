@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { timeAgo } from "@/lib/format"
+import { retentionLabel, timeAgo } from "@/lib/format"
 import { CameraFormSheet } from "./CameraFormSheet"
 
 export function CamerasPage() {
@@ -120,7 +120,7 @@ function CameraRow({ camera: c, onEdit }: { camera: Camera; onEdit: () => void }
           <span className="text-muted-foreground">—</span>
         )}
       </TableCell>
-      <TableCell className="tabular-nums">{c.retention_days} days</TableCell>
+      <TableCell className="tabular-nums">{retentionLabel(c.retention_days)}</TableCell>
       <TableCell className="text-xs text-muted-foreground">{lastSegment ? timeAgo(lastSegment) : "—"}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <Switch checked={c.enabled} disabled={update.isPending} onCheckedChange={(v) => update.mutate({ id: c.id, body: { enabled: v } })} />
@@ -152,7 +152,7 @@ function CameraRow({ camera: c, onEdit }: { camera: Camera; onEdit: () => void }
           open={confirmDelete}
           onOpenChange={setConfirmDelete}
           title={`Delete ${c.name}?`}
-          description="Only cameras without recordings can be deleted. If it has recordings, disable it instead; they are removed by retention."
+          description="Only cameras without recordings can be deleted. If it has recordings, disable it instead; they stay until their retention or storage space removes them."
           confirmLabel="Delete camera"
           destructive
           onConfirm={() => del.mutate(c.id)}
