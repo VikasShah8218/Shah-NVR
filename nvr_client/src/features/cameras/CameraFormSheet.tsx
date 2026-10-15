@@ -61,6 +61,8 @@ export function CameraFormSheet({
   const [username, setUsername] = useState(camera?.username ?? "")
   const [password, setPassword] = useState("")
   const [retention, setRetention] = useState(String(camera?.retention_days ?? 7))
+  // null retention = keep recordings until storage is full
+  const [untilFull, setUntilFull] = useState(camera ? camera.retention_days == null : false)
   const [enabled, setEnabled] = useState(camera?.enabled ?? true)
   const [streams, setStreams] = useState<StreamDraft[]>(() => draftFromCamera(camera))
   const [errors, setErrors] = useState<string[]>([])
@@ -80,7 +82,7 @@ export function CameraFormSheet({
       if (!/^(rtsps?|rtmp|srt|https?):\/\//i.test(s.source_url.trim())) errs.push(`Profile "${s.profile}": URL must start with rtsp://`)
     }
     const r = Number(retention)
-    if (!Number.isInteger(r) || r < 1) errs.push("Retention must be a whole number of days (1 or more).")
+    if (!untilFull && (!Number.isInteger(r) || r < 1)) errs.push("Retention must be a whole number of days (1 or more).")
     return errs
   }
 
@@ -111,7 +113,7 @@ export function CameraFormSheet({
         description: description.trim() || null,
         username: username.trim() || null,
         password: password || null,
-        retention_days: Number(retention),
+        retention_days: untilFull ? null : Number(retention),
         enabled,
         streams: used.map(toIn),
       })
@@ -122,7 +124,7 @@ export function CameraFormSheet({
           name: name.trim(),
           description: description.trim() || null,
           username: username.trim() || null,
-          retention_days: Number(retention),
+          retention_days: untilFull ? null : Number(retention),
           enabled,
           ...(password ? { password } : {}),
         },
@@ -182,15 +184,38 @@ export function CameraFormSheet({
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 items-end gap-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="ret">Keep recordings (days)</Label>
-              <Input id="ret" type="number" min={1} value={retention} onChange={(e) => setRetention(e.target.value)} />
+          <div className="grid gap-1.5">
+            <Label htmlFor="ret">Keep recordings</Label>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Input
+                  id="ret"
+                  type="number"
+                  min={1}
+                  className="w-28"
+                  disabled={untilFull}
+                  value={retention}
+                  onChange={(e) => setRetention(e.target.value)}
+                />
+                <span className={untilFull ? "text-sm text-muted-foreground" : "text-sm"}>days</span>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <Switch checked={untilFull} onCheckedChange={setUntilFull} /> Until storage is full
+              </label>
             </div>
-            <label className="flex h-9 items-center gap-2 text-sm">
-              <Switch checked={enabled} onCheckedChange={setEnabled} /> Enabled
-            </label>
+            <span className="text-xs text-muted-foreground">
+              {untilFull
+                ? "Recordings are never deleted by age; the oldest are replaced only when all storage is full."
+                : "Days count back from the camera's latest recording, so a stopped camera keeps its history. When all storage is full the oldest recordings are always replaced."}
+            </span>
           </div>
+          <label className="flex items-center justify-between rounded-md border px-3 py-2.5 text-sm">
+            <span>
+              Camera enabled
+              <span className="block text-xs text-muted-foreground">Off: the camera is not pulled; no live view, no new recording.</span>
+            </span>
+            <Switch checked={enabled} onCheckedChange={setEnabled} />
+          </label>
 
           <Separator />
           <div className="flex items-center justify-between">
