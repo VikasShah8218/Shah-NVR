@@ -108,3 +108,17 @@ central_manager/
   the desktop app keep working.
 - Deleting the default volume returns 409. A volume with catalog rows returns 409 unless `force` (which drops its rows).
 - Tests: `central_manager/tests`, run with `DATABASE_URL=sqlite://:memory: py -m pytest`.
+
+
+## 9. Retention (changed 2026-10-15)
+- **`Camera.retention_days` is nullable.** None = **keep until storage is full** (never deleted by age).
+  Migration `3_20261015225649_retention_optional.py`. **Deploy: `aerich upgrade`.**
+- **API:** leaving the field out means default 7 (create) or unchanged (update). An explicit `null` means keep until
+  full. The router checks `model_fields_set`.
+- **`retention_tick` counts back from each camera's newest AVAILABLE chunk per profile:**
+  - It computes `anchor = min(newest, now)` and marks chunks with `end_time < anchor − days`.
+  - A camera that keeps recording gets a rolling window. A stopped, faulty or disabled camera keeps its last N days
+    indefinitely.
+  - Raising the days (1 → 30) keeps everything still on disk.
+- **Space always wins:** the node's overwrite-when-all-full cleanup still deletes the oldest regardless of retention.
+- Tests: `central_manager/tests/test_retention.py`. It also passed on a throwaway PostgreSQL database.
