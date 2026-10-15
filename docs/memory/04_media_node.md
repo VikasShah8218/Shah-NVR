@@ -166,3 +166,13 @@ A node records to a list of **volumes**, configured in central (Node → Storage
 - Removing a volume in central: the node forgets its local rows (the files are left on disk).
 - Tests: `media_node/tests` (rules, config mapping, SQLite migration, overwrite selection), run with
   `py -m pytest` (`DATA_DIR` set to a scratch folder).
+
+
+## 11. Age vs space (2026-10-15)
+Two independent ways recordings are deleted:
+1. **Age:** central marks them (see 03 §9), counting back from the camera's latest recording; it is off when
+   `retention_days` is null.
+2. **Space:** this node deletes the oldest only when every storage is full (§10).
+
+A camera that stops recording never loses footage to age; it only loses footage to space when the storage it shares
+with recording cameras fills up.
