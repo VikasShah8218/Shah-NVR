@@ -2111,7 +2111,14 @@
             "title": "Enabled"
           },
           "retention_days": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Retention Days"
           },
           "created_at": {
