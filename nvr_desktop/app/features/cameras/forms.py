@@ -1,7 +1,7 @@
 """Camera form validation and stream diff. Port of nvr_client/src/features/cameras/CameraFormSheet.tsx.
 
 The form arrives from QML as a dict:
-  {name, description, username, password, retention_days, enabled,
+  {name, description, username, password, retention_days, keep_until_full, enabled,
    streams: [{profile, source_url, record, rtsp_transport, existing}]}
 """
 
@@ -40,12 +40,13 @@ def validate(form: dict) -> list[str]:
             errors.append(f'Profile "{profile}": use lowercase letters, digits, - or _.')
         if not URL_RE.match((s.get("source_url") or "").strip()):
             errors.append(f'Profile "{profile}": URL must start with rtsp://')
-    try:
-        retention = int(form.get("retention_days"))
-        if retention < 1:
-            raise ValueError
-    except (TypeError, ValueError):
-        errors.append("Retention must be a whole number of days (1 or more).")
+    if not form.get("keep_until_full"):
+        try:
+            retention = int(form.get("retention_days"))
+            if retention < 1:
+                raise ValueError
+        except (TypeError, ValueError):
+            errors.append("Retention must be a whole number of days (1 or more).")
     return errors
 
 
@@ -58,13 +59,18 @@ def _stream_body(s: dict) -> dict:
     }
 
 
+def retention_value(form: dict) -> int | None:
+    """Days to keep, or None = keep until storage is full (age never deletes)."""
+    return None if form.get("keep_until_full") else int(form["retention_days"])
+
+
 def create_body(form: dict) -> dict:
     return {
         "name": form["name"].strip(),
         "description": (form.get("description") or "").strip() or None,
         "username": (form.get("username") or "").strip() or None,
         "password": form.get("password") or None,
-        "retention_days": int(form["retention_days"]),
+        "retention_days": retention_value(form),
         "enabled": bool(form.get("enabled", True)),
         "streams": [_stream_body(s) for s in used_streams(form)],
     }
@@ -75,7 +81,7 @@ def update_body(form: dict) -> dict:
         "name": form["name"].strip(),
         "description": (form.get("description") or "").strip() or None,
         "username": (form.get("username") or "").strip() or None,
-        "retention_days": int(form["retention_days"]),
+        "retention_days": retention_value(form),
         "enabled": bool(form.get("enabled", True)),
     }
     if form.get("password"):  # empty = keep the current password
