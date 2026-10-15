@@ -794,6 +794,13 @@ export interface components {
              * @default 0
              */
             pending_uploads: number;
+            /**
+             * Addresses
+             * @default []
+             */
+            addresses: {
+                [key: string]: unknown;
+            }[];
             /** Default Recordings Dir */
             default_recordings_dir?: string | null;
             /**
