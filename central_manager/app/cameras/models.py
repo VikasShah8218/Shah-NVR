@@ -26,6 +26,20 @@ class Camera(Model):
     # Max days of recordings, counted back from the camera's latest recording (app/recordings/services.py).
     # None = keep until storage is full (only space-based cleanup on the node removes recordings).
     retention_days = fields.IntField(default=7, null=True)
+
+    # ONVIF device (H1). Filled when added through discovery or on the first Device-page refresh; all optional,
+    # so manually added cameras keep working. Credentials are the camera's username/password above.
+    onvif_host = fields.CharField(max_length=255, null=True)
+    onvif_port = fields.IntField(null=True)
+    manufacturer = fields.CharField(max_length=128, null=True)
+    model = fields.CharField(max_length=128, null=True)
+    firmware = fields.CharField(max_length=128, null=True)
+    serial = fields.CharField(max_length=128, null=True)
+    mac = fields.CharField(max_length=32, null=True)
+    onvif_services = fields.JSONField(null=True)  # ONVIF service namespaces the device offers
+    onvif_reachable = fields.BooleanField(null=True)  # last ONVIF check (no login) answered
+    clock_offset_seconds = fields.FloatField(null=True)  # camera clock minus node clock
+    onvif_checked_at = fields.DatetimeField(null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
@@ -47,6 +61,7 @@ class CameraStream(Model):
     source_url = fields.CharField(max_length=1024)
     record = fields.BooleanField(default=True)
     rtsp_transport = fields.CharField(max_length=16, default="tcp")
+    onvif_profile_token = fields.CharField(max_length=128, null=True)  # ONVIF media profile behind source_url
 
     # Runtime state reported by the owning media node.
     status = fields.CharEnumField(StreamStatus, max_length=32, default=StreamStatus.UNASSIGNED)
