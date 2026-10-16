@@ -18,6 +18,7 @@ class SegmentIn(BaseModel):
     duration_ms: int = Field(ge=0)
     size_bytes: int = Field(ge=0)
     codec: str | None = None
+    config_signature: str | None = Field(None, max_length=64)
     file_path: str  # relative to the volume's folder
     volume_id: int | None = None  # None = the node's default folder (nodes older than storage volumes)
     parts: list[int] = Field(min_length=1)

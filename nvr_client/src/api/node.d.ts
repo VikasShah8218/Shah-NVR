@@ -276,6 +276,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/onvif/encoder/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Encoder Read */
+        post: operations["encoder_read_api_v1_onvif_encoder_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/encoder/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Encoder Check */
+        post: operations["encoder_check_api_v1_onvif_encoder_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/encoder/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Encoder Apply */
+        post: operations["encoder_apply_api_v1_onvif_encoder_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -383,6 +434,183 @@ export interface components {
             profiles: string[];
             /** Interface Ip */
             interface_ip: string;
+        };
+        /** EncoderApplyIn */
+        EncoderApplyIn: {
+            /** Host */
+            host: string;
+            /**
+             * Port
+             * @default 80
+             */
+            port: number;
+            /**
+             * Username
+             * @default
+             */
+            username: string;
+            /**
+             * Password
+             * @default
+             */
+            password: string;
+            /** Xaddr */
+            xaddr?: string | null;
+            /** Profile Token */
+            profile_token?: string | null;
+            /** Revision */
+            revision: string;
+            values: components["schemas"]["EncoderValues"];
+            /**
+             * Acknowledge Shared
+             * @default false
+             */
+            acknowledge_shared: boolean;
+            /** Camera Ids */
+            camera_ids?: number[];
+        };
+        /** EncoderOption */
+        EncoderOption: {
+            /** Encoding */
+            encoding: string;
+            /**
+             * Resolutions
+             * @default []
+             */
+            resolutions: number[][];
+            /** Fps Range */
+            fps_range?: number[] | null;
+            /**
+             * Frame Rates
+             * @default []
+             */
+            frame_rates: number[];
+            /** Bitrate Range */
+            bitrate_range?: number[] | null;
+            /** Gop Range */
+            gop_range?: number[] | null;
+            /** Quality Range */
+            quality_range?: number[] | null;
+            /**
+             * Codec Profiles
+             * @default []
+             */
+            codec_profiles: string[];
+            /**
+             * Rate Controls
+             * @default []
+             */
+            rate_controls: string[];
+        };
+        /** EncoderProfile */
+        EncoderProfile: {
+            /** Token */
+            token: string;
+            /** Name */
+            name?: string | null;
+            /** Encoder Token */
+            encoder_token?: string | null;
+        };
+        /** EncoderReadIn */
+        EncoderReadIn: {
+            /** Host */
+            host: string;
+            /**
+             * Port
+             * @default 80
+             */
+            port: number;
+            /**
+             * Username
+             * @default
+             */
+            username: string;
+            /**
+             * Password
+             * @default
+             */
+            password: string;
+            /** Xaddr */
+            xaddr?: string | null;
+            /** Profile Token */
+            profile_token?: string | null;
+        };
+        /** EncoderResult */
+        EncoderResult: {
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "verified" | "mismatch" | "unknown";
+            before: components["schemas"]["EncoderState"];
+            after?: components["schemas"]["EncoderState"] | null;
+            /** Message */
+            message: string;
+            /**
+             * Recovery
+             * @default {}
+             */
+            recovery: {
+                [key: string]: unknown;
+            };
+        };
+        /** EncoderState */
+        EncoderState: {
+            /** Api */
+            api: string;
+            /** Profile Token */
+            profile_token: string | null;
+            /** Encoder Token */
+            encoder_token?: string | null;
+            /** Revision */
+            revision?: string | null;
+            current?: components["schemas"]["EncoderValues"] | null;
+            /**
+             * Options
+             * @default []
+             */
+            options: components["schemas"]["EncoderOption"][];
+            /**
+             * Profiles
+             * @default []
+             */
+            profiles: components["schemas"]["EncoderProfile"][];
+            /**
+             * Shared Profiles
+             * @default []
+             */
+            shared_profiles: string[];
+            /**
+             * Use Count
+             * @default 0
+             */
+            use_count: number;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
+        /** EncoderValues */
+        EncoderValues: {
+            /** Encoding */
+            encoding?: ("H264" | "H265") | null;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Fps */
+            fps?: number | null;
+            /** Bitrate Kbps */
+            bitrate_kbps?: number | null;
+            /** Gop */
+            gop?: number | null;
+            /** Quality */
+            quality?: number | null;
+            /** Rate Control */
+            rate_control?: ("CBR" | "VBR") | null;
+            /** Codec Profile */
+            codec_profile?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1088,6 +1316,105 @@ export interface operations {
                 };
                 content: {
                     "image/jpeg": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    encoder_read_api_v1_onvif_encoder_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncoderReadIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncoderState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    encoder_check_api_v1_onvif_encoder_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncoderApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncoderState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    encoder_apply_api_v1_onvif_encoder_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncoderApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncoderResult"];
                 };
             };
             /** @description Validation Error */

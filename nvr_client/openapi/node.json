@@ -649,6 +649,129 @@
         }
       }
     },
+    "/api/v1/onvif/encoder/read": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Encoder Read",
+        "operationId": "encoder_read_api_v1_onvif_encoder_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncoderReadIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncoderState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/encoder/check": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Encoder Check",
+        "operationId": "encoder_check_api_v1_onvif_encoder_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncoderApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncoderState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/encoder/apply": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Encoder Apply",
+        "operationId": "encoder_apply_api_v1_onvif_encoder_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncoderApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncoderResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "tags": [
@@ -929,6 +1052,536 @@
           "interface_ip"
         ],
         "title": "DiscoveredDevice"
+      },
+      "EncoderApplyIn": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "default": 80
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "default": ""
+          },
+          "xaddr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xaddr"
+          },
+          "profile_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Token"
+          },
+          "revision": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Revision"
+          },
+          "values": {
+            "$ref": "#/components/schemas/EncoderValues"
+          },
+          "acknowledge_shared": {
+            "type": "boolean",
+            "title": "Acknowledge Shared",
+            "default": false
+          },
+          "camera_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Camera Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host",
+          "revision",
+          "values"
+        ],
+        "title": "EncoderApplyIn"
+      },
+      "EncoderOption": {
+        "properties": {
+          "encoding": {
+            "type": "string",
+            "title": "Encoding"
+          },
+          "resolutions": {
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Resolutions",
+            "default": []
+          },
+          "fps_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps Range"
+          },
+          "frame_rates": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Frame Rates",
+            "default": []
+          },
+          "bitrate_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bitrate Range"
+          },
+          "gop_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gop Range"
+          },
+          "quality_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Range"
+          },
+          "codec_profiles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Codec Profiles",
+            "default": []
+          },
+          "rate_controls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rate Controls",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "encoding"
+        ],
+        "title": "EncoderOption"
+      },
+      "EncoderProfile": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "encoder_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoder Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "EncoderProfile"
+      },
+      "EncoderReadIn": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "default": 80
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "default": ""
+          },
+          "xaddr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xaddr"
+          },
+          "profile_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host"
+        ],
+        "title": "EncoderReadIn"
+      },
+      "EncoderResult": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "mismatch",
+              "unknown"
+            ],
+            "title": "Outcome"
+          },
+          "before": {
+            "$ref": "#/components/schemas/EncoderState"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EncoderState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "recovery": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Recovery",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome",
+          "before",
+          "message"
+        ],
+        "title": "EncoderResult"
+      },
+      "EncoderState": {
+        "properties": {
+          "api": {
+            "type": "string",
+            "title": "Api"
+          },
+          "profile_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Token"
+          },
+          "encoder_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoder Token"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EncoderValues"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/EncoderOption"
+            },
+            "type": "array",
+            "title": "Options",
+            "default": []
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/EncoderProfile"
+            },
+            "type": "array",
+            "title": "Profiles",
+            "default": []
+          },
+          "shared_profiles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Shared Profiles",
+            "default": []
+          },
+          "use_count": {
+            "type": "integer",
+            "title": "Use Count",
+            "default": 0
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "api",
+          "profile_token"
+        ],
+        "title": "EncoderState"
+      },
+      "EncoderValues": {
+        "properties": {
+          "encoding": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "H264",
+                  "H265"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoding"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "fps": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps"
+          },
+          "bitrate_kbps": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bitrate Kbps"
+          },
+          "gop": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gop"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality"
+          },
+          "rate_control": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "CBR",
+                  "VBR"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Control"
+          },
+          "codec_profile": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codec Profile"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EncoderValues"
       },
       "HTTPValidationError": {
         "properties": {

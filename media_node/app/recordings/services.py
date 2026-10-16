@@ -22,7 +22,7 @@ from tortoise.functions import Sum
 from app.node.models import KeyValue
 from app.node.utils import CentralError, central, runtime
 from app.recordings.models import LocalSegment, SkippedFile
-from app.recordings.utils import Mp4IndexError, index_fmp4, parse_rel_path, segment_uuid
+from app.recordings.utils import Mp4IndexError, decoder_signature, index_fmp4, parse_rel_path, segment_uuid
 from app.storage.services import storage
 from app.storage.utils import FREE_BELOW
 from settings.settings import settings
@@ -172,6 +172,7 @@ async def upload_tick() -> None:
                 "duration_ms": s.duration_ms,
                 "size_bytes": s.size_bytes,
                 "codec": s.codec,
+                "config_signature": decoder_signature(s.tracks),
                 "file_path": s.rel_path,
                 "volume_id": storage.central_id(s.volume_id),
                 "parts": [p["d"] for p in s.parts],

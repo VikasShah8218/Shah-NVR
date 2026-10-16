@@ -20,6 +20,7 @@ import { LivePlayer } from "../live/LivePlayer"
 import { Timeline } from "../playback/Timeline"
 import { CameraFormSheet } from "./CameraFormSheet"
 import { DeviceTab } from "./DeviceTab"
+import { VideoTab } from "./VideoTab"
 
 export function CameraDetailPage() {
   const id = Number(useParams().id)
@@ -59,6 +60,7 @@ export function CameraDetailPage() {
           <TabsTrigger value="recordings">Recordings</TabsTrigger>
           <TabsTrigger value="assignment">Assignment</TabsTrigger>
           <TabsTrigger value="device">Device</TabsTrigger>
+          <TabsTrigger value="video">Video</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
           <Overview camera={c} />
@@ -71,6 +73,9 @@ export function CameraDetailPage() {
         </TabsContent>
         <TabsContent value="device">
           <DeviceTab camera={c} active={tab === "device"} />
+        </TabsContent>
+        <TabsContent value="video">
+          <VideoTab key={c.id} camera={c} active={tab === "video"} />
         </TabsContent>
       </Tabs>
       {editing && <CameraFormSheet camera={c} open onOpenChange={setEditing} />}

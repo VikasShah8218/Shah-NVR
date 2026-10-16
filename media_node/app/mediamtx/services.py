@@ -101,6 +101,7 @@ class MediaMTXSupervisor:
 
 
 supervisor = MediaMTXSupervisor()
+path_update_lock = asyncio.Lock()
 
 
 def record_path(root) -> str:
@@ -133,6 +134,32 @@ def desired_paths() -> dict[str, dict]:
 
 
 async def reconcile_tick() -> None:
+    async with path_update_lock:
+        await _reconcile_tick()
+
+
+async def restart_camera_paths(camera_ids: list[int]) -> dict:
+    """Reload only affected assigned paths; periodic reconcile repairs a failed add."""
+    async with path_update_lock:
+        await refresh_assignments()
+        desired = desired_paths()
+        prefixes = tuple(f"cam-{cid}/" for cid in camera_ids)
+        results = {}
+        for name, conf in desired.items():
+            if not name.startswith(prefixes):
+                continue
+            try:
+                await mtx.delete_path(name)
+                runtime.ready_since.pop(name, None)
+                await mtx.add_path(name, conf)
+                results[name] = "pending" if conf["record"] else "on_demand"
+            except Exception:
+                # Do not expose authenticated RTSP URLs from HTTP exception messages.
+                results[name] = "restart_failed"
+        return results
+
+
+async def _reconcile_tick() -> None:
     """Make MediaMTX run exactly the camera paths assigned to this node (level-triggered)."""
     await refresh_assignments()
     if not await mtx.ping():

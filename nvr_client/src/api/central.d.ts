@@ -505,6 +505,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Encoder */
+        get: operations["get_encoder_api_v1_cameras__camera_id__streams__profile__encoder_get"];
+        /** Put Encoder */
+        put: operations["put_encoder_api_v1_cameras__camera_id__streams__profile__encoder_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/mapping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Map Encoder */
+        put: operations["map_encoder_api_v1_cameras__camera_id__streams__profile__encoder_mapping_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Encoder */
+        post: operations["check_encoder_api_v1_cameras__camera_id__streams__profile__encoder_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Encoder History */
+        get: operations["encoder_history_api_v1_cameras__camera_id__streams__profile__encoder_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Encoder */
+        post: operations["resolve_encoder_api_v1_cameras__camera_id__streams__profile__encoder_resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Encoder Recovery */
+        get: operations["encoder_recovery_api_v1_cameras__camera_id__streams__profile__encoder_recovery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/nodes/register": {
         parameters: {
             query?: never;
@@ -818,6 +921,33 @@ export interface components {
             /** Retention Days */
             retention_days?: number | null;
         };
+        /** ChangeOut */
+        ChangeOut: {
+            /** Id */
+            id: string;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            before?: components["schemas"]["EncoderState"] | null;
+            result?: components["schemas"]["ChangeResult"] | null;
+        };
+        /** ChangeResult */
+        ChangeResult: {
+            after?: components["schemas"]["EncoderState"] | null;
+            /** Message */
+            message: string;
+            /**
+             * Recovery
+             * @default {}
+             */
+            recovery: {
+                [key: string]: string;
+            };
+        };
         /** ClockOut */
         ClockOut: {
             /** Offset Seconds */
@@ -992,6 +1122,121 @@ export interface components {
             /** Free Bytes */
             free_bytes: number;
         };
+        /** EncoderOption */
+        EncoderOption: {
+            /** Encoding */
+            encoding: string;
+            /**
+             * Resolutions
+             * @default []
+             */
+            resolutions: number[][];
+            /** Fps Range */
+            fps_range?: number[] | null;
+            /**
+             * Frame Rates
+             * @default []
+             */
+            frame_rates: number[];
+            /** Bitrate Range */
+            bitrate_range?: number[] | null;
+            /** Gop Range */
+            gop_range?: number[] | null;
+            /** Quality Range */
+            quality_range?: number[] | null;
+            /**
+             * Codec Profiles
+             * @default []
+             */
+            codec_profiles: string[];
+            /**
+             * Rate Controls
+             * @default []
+             */
+            rate_controls: string[];
+        };
+        /** EncoderProfile */
+        EncoderProfile: {
+            /** Token */
+            token: string;
+            /** Name */
+            name?: string | null;
+            /** Encoder Token */
+            encoder_token?: string | null;
+        };
+        /** EncoderState */
+        EncoderState: {
+            /** Api */
+            api: string;
+            /** Profile Token */
+            profile_token: string | null;
+            /** Encoder Token */
+            encoder_token?: string | null;
+            /** Revision */
+            revision?: string | null;
+            current?: components["schemas"]["EncoderValues"] | null;
+            /**
+             * Options
+             * @default []
+             */
+            options: components["schemas"]["EncoderOption"][];
+            /**
+             * Profiles
+             * @default []
+             */
+            profiles: components["schemas"]["EncoderProfile"][];
+            /**
+             * Shared Profiles
+             * @default []
+             */
+            shared_profiles: string[];
+            /**
+             * Use Count
+             * @default 0
+             */
+            use_count: number;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
+        /** EncoderValues */
+        EncoderValues: {
+            /** Encoding */
+            encoding?: ("H264" | "H265") | null;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Fps */
+            fps?: number | null;
+            /** Bitrate Kbps */
+            bitrate_kbps?: number | null;
+            /** Gop */
+            gop?: number | null;
+            /** Quality */
+            quality?: number | null;
+            /** Rate Control */
+            rate_control?: ("CBR" | "VBR") | null;
+            /** Codec Profile */
+            codec_profile?: string | null;
+        };
+        /** EncoderWrite */
+        EncoderWrite: {
+            /** Operation Id */
+            operation_id: string;
+            /** Revision */
+            revision: string;
+            values: components["schemas"]["EncoderValues"];
+            /**
+             * Acknowledge Shared
+             * @default false
+             */
+            acknowledge_shared: boolean;
+            /** Restore From */
+            restore_from?: string | null;
+        };
         /** GapOut */
         GapOut: {
             /**
@@ -1116,6 +1361,12 @@ export interface components {
              */
             volumes: components["schemas"]["VolumeConfig"][];
         };
+        /** HistoryOut */
+        HistoryOut: {
+            /** Changes */
+            changes: components["schemas"]["ChangeOut"][];
+            pending: components["schemas"]["ChangeOut"] | null;
+        };
         /** LiveOut */
         LiveOut: {
             /** Camera Id */
@@ -1149,6 +1400,11 @@ export interface components {
         ManualAssignIn: {
             /** Node Id */
             node_id: number;
+        };
+        /** MappingIn */
+        MappingIn: {
+            /** Profile Token */
+            profile_token: string;
         };
         /** MessageOut */
         MessageOut: {
@@ -1384,6 +1640,23 @@ export interface components {
             /** Snapshot */
             snapshot: string | null;
         };
+        /** RecoveryOut */
+        RecoveryOut: {
+            /** Status */
+            status: string;
+            /** Fresh Status */
+            fresh_status: boolean;
+            /** New Recording */
+            new_recording: boolean | null;
+            /** Recording Expected */
+            recording_expected: boolean;
+            /** Last Status At */
+            last_status_at: string | null;
+            /** Last Segment At */
+            last_segment_at: string | null;
+            /** Message */
+            message: string;
+        };
         /** SegmentBatchIn */
         SegmentBatchIn: {
             /** Node Id */
@@ -1432,6 +1705,8 @@ export interface components {
             size_bytes: number;
             /** Codec */
             codec?: string | null;
+            /** Config Signature */
+            config_signature?: string | null;
             /** File Path */
             file_path: string;
             /** Volume Id */
@@ -2908,6 +3183,242 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_encoder_api_v1_cameras__camera_id__streams__profile__encoder_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncoderState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_encoder_api_v1_cameras__camera_id__streams__profile__encoder_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncoderWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    map_encoder_api_v1_cameras__camera_id__streams__profile__encoder_mapping_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MappingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncoderState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_encoder_api_v1_cameras__camera_id__streams__profile__encoder_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncoderWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncoderState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    encoder_history_api_v1_cameras__camera_id__streams__profile__encoder_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_encoder_api_v1_cameras__camera_id__streams__profile__encoder_resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    encoder_recovery_api_v1_cameras__camera_id__streams__profile__encoder_recovery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryOut"];
                 };
             };
             /** @description Validation Error */

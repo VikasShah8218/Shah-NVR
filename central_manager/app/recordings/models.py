@@ -26,6 +26,7 @@ class RecordingSegment(Model):
     duration_ms = fields.IntField()
     size_bytes = fields.BigIntField()
     codec = fields.CharField(max_length=32, null=True)
+    config_signature = fields.CharField(max_length=64, null=True)
     file_path = fields.CharField(max_length=512)  # relative to the volume's folder
     parts = fields.JSONField()  # HLS part durations in ms; part N is served at .../part/N.m4s
     status = fields.CharEnumField(SegmentStatus, max_length=16, default=SegmentStatus.AVAILABLE)

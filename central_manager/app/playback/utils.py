@@ -28,6 +28,7 @@ def build_vod_playlist(
     cursor = start
     prev_end: datetime | None = None
     prev_codec: str | None = None
+    prev_config: str | None = None
     for seg in segments:
         node = nodes.get(seg.node_id)
         if node is None or node.state in UNAVAILABLE_NODE_STATES:
@@ -48,11 +49,13 @@ def build_vod_playlist(
         cursor = max(cursor, chosen[-1][3])
 
         # Nodes serve parts on one absolute timeline, so consecutive chunks join seamlessly.
-        # A discontinuity is only needed at a real gap in the recording or a codec change.
+        # A decoder configuration change (including resolution/SPS/PPS) needs a fresh boundary.
         base = f"{node.api_url.rstrip('/')}/api/v1/media/{seg.id}"
-        if body and (seg.codec != prev_codec or chosen[0][2] - prev_end > GAP_TOLERANCE):
+        config = seg.config_signature
+        if body and (seg.codec != prev_codec or config != prev_config or chosen[0][2] - prev_end > GAP_TOLERANCE):
             body.append("#EXT-X-DISCONTINUITY")
         prev_end, prev_codec = chosen[-1][3], seg.codec
+        prev_config = config
         body.append(f'#EXT-X-MAP:URI="{base}/init.mp4"')
         body.append(f"#EXT-X-PROGRAM-DATE-TIME:{_iso(chosen[0][2])}")
         for index, dur_ms, _, _ in chosen:

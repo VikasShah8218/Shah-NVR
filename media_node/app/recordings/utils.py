@@ -12,6 +12,8 @@ see time jump backwards. Only those header bytes change; video data is untouched
 """
 
 import os
+import hashlib
+import json
 import struct
 import uuid
 from dataclasses import dataclass, field
@@ -41,6 +43,7 @@ class Track:
     codec: str | None = None
     default_duration: int = 0
     default_flags: int = 0
+    config_signature: str | None = None
 
 
 @dataclass
@@ -116,6 +119,8 @@ def _parse_moov(moov: bytes) -> dict[int, Track]:
             if stsd and stsd[0] + 16 <= stsd[1]:
                 fourcc = moov[stsd[0] + 12 : stsd[0] + 16]
                 track.codec = CODEC_NAMES.get(fourcc, fourcc.decode("ascii", "replace").strip())
+                # Includes sample entry dimensions + avcC/hvcC (SPS/PPS/VPS), but not per-file timestamps.
+                track.config_signature = hashlib.sha256(moov[stsd[0]:stsd[1]]).hexdigest()
             tracks[track_id] = track
         elif typ == b"mvex":
             for t2, s2, _ in _children(moov, s, e):
@@ -277,8 +282,17 @@ def index_fmp4(path: Path, part_target_seconds: float) -> Mp4Index:
         duration_ms=sum(p["d"] for p in parts),
         codec="+".join(codecs) or None,
         parts=parts,
-        tracks={str(tid): {"ts": t.timescale, "t0": first_tfdt.get(tid, 0)} for tid, t in tracks.items() if t.timescale},
+        tracks={str(tid): {"ts": t.timescale, "t0": first_tfdt.get(tid, 0), "config": t.config_signature}
+                for tid, t in tracks.items() if t.timescale},
     )
+
+
+def decoder_signature(tracks: dict[str, dict]) -> str | None:
+    """Stable decoding configuration across chunks. Legacy indexes have no signature."""
+    if not tracks or any(not t.get("config") for t in tracks.values()):
+        return None
+    config = sorted((tid, t["ts"], t["config"]) for tid, t in tracks.items())
+    return hashlib.sha256(json.dumps(config).encode()).hexdigest()
 
 
 def rebase_timestamps(data: bytearray, tracks: dict[str, dict], start_time: datetime) -> bytearray:

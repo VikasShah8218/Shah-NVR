@@ -1748,6 +1748,389 @@
         }
       }
     },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder": {
+      "get": {
+        "tags": [
+          "Encoder"
+        ],
+        "summary": "Get Encoder",
+        "operationId": "get_encoder_api_v1_cameras__camera_id__streams__profile__encoder_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncoderState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Encoder"
+        ],
+        "summary": "Put Encoder",
+        "operationId": "put_encoder_api_v1_cameras__camera_id__streams__profile__encoder_put",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncoderWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/mapping": {
+      "put": {
+        "tags": [
+          "Encoder"
+        ],
+        "summary": "Map Encoder",
+        "operationId": "map_encoder_api_v1_cameras__camera_id__streams__profile__encoder_mapping_put",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MappingIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncoderState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/check": {
+      "post": {
+        "tags": [
+          "Encoder"
+        ],
+        "summary": "Check Encoder",
+        "operationId": "check_encoder_api_v1_cameras__camera_id__streams__profile__encoder_check_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncoderWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncoderState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/history": {
+      "get": {
+        "tags": [
+          "Encoder"
+        ],
+        "summary": "Encoder History",
+        "operationId": "encoder_history_api_v1_cameras__camera_id__streams__profile__encoder_history_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/resolve": {
+      "post": {
+        "tags": [
+          "Encoder"
+        ],
+        "summary": "Resolve Encoder",
+        "operationId": "resolve_encoder_api_v1_cameras__camera_id__streams__profile__encoder_resolve_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/recovery": {
+      "get": {
+        "tags": [
+          "Encoder"
+        ],
+        "summary": "Encoder Recovery",
+        "operationId": "encoder_recovery_api_v1_cameras__camera_id__streams__profile__encoder_recovery_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/nodes/register": {
       "post": {
         "tags": [
@@ -2728,6 +3111,81 @@
         "type": "object",
         "title": "CameraUpdate"
       },
+      "ChangeOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EncoderState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChangeResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "created_at"
+        ],
+        "title": "ChangeOut"
+      },
+      "ChangeResult": {
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EncoderState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "recovery": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Recovery",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChangeResult"
+      },
       "ClockOut": {
         "properties": {
           "offset_seconds": {
@@ -3290,6 +3748,404 @@
         "title": "DriveInfo",
         "description": "A local fixed drive of the node (offered in \"Add storage\")."
       },
+      "EncoderOption": {
+        "properties": {
+          "encoding": {
+            "type": "string",
+            "title": "Encoding"
+          },
+          "resolutions": {
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Resolutions",
+            "default": []
+          },
+          "fps_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps Range"
+          },
+          "frame_rates": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Frame Rates",
+            "default": []
+          },
+          "bitrate_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bitrate Range"
+          },
+          "gop_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gop Range"
+          },
+          "quality_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Range"
+          },
+          "codec_profiles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Codec Profiles",
+            "default": []
+          },
+          "rate_controls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rate Controls",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "encoding"
+        ],
+        "title": "EncoderOption"
+      },
+      "EncoderProfile": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "encoder_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoder Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "EncoderProfile"
+      },
+      "EncoderState": {
+        "properties": {
+          "api": {
+            "type": "string",
+            "title": "Api"
+          },
+          "profile_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Token"
+          },
+          "encoder_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoder Token"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EncoderValues"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/EncoderOption"
+            },
+            "type": "array",
+            "title": "Options",
+            "default": []
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/EncoderProfile"
+            },
+            "type": "array",
+            "title": "Profiles",
+            "default": []
+          },
+          "shared_profiles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Shared Profiles",
+            "default": []
+          },
+          "use_count": {
+            "type": "integer",
+            "title": "Use Count",
+            "default": 0
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "api",
+          "profile_token"
+        ],
+        "title": "EncoderState"
+      },
+      "EncoderValues": {
+        "properties": {
+          "encoding": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "H264",
+                  "H265"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoding"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "fps": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps"
+          },
+          "bitrate_kbps": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bitrate Kbps"
+          },
+          "gop": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gop"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality"
+          },
+          "rate_control": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "CBR",
+                  "VBR"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Control"
+          },
+          "codec_profile": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codec Profile"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EncoderValues"
+      },
+      "EncoderWrite": {
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 16,
+            "pattern": "^[a-zA-Z0-9-]+$",
+            "title": "Operation Id"
+          },
+          "revision": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Revision"
+          },
+          "values": {
+            "$ref": "#/components/schemas/EncoderValues"
+          },
+          "acknowledge_shared": {
+            "type": "boolean",
+            "title": "Acknowledge Shared",
+            "default": false
+          },
+          "restore_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restore From"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operation_id",
+          "revision",
+          "values"
+        ],
+        "title": "EncoderWrite"
+      },
       "GapOut": {
         "properties": {
           "start_time": {
@@ -3609,6 +4465,33 @@
         ],
         "title": "HeartbeatOut"
       },
+      "HistoryOut": {
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeOut"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "pending": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChangeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "changes",
+          "pending"
+        ],
+        "title": "HistoryOut"
+      },
       "LiveOut": {
         "properties": {
           "camera_id": {
@@ -3690,6 +4573,21 @@
           "node_id"
         ],
         "title": "ManualAssignIn"
+      },
+      "MappingIn": {
+        "properties": {
+          "profile_token": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Profile Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_token"
+        ],
+        "title": "MappingIn"
       },
       "MessageOut": {
         "properties": {
@@ -4394,6 +5292,72 @@
         ],
         "title": "ProfileOut"
       },
+      "RecoveryOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "fresh_status": {
+            "type": "boolean",
+            "title": "Fresh Status"
+          },
+          "new_recording": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Recording"
+          },
+          "recording_expected": {
+            "type": "boolean",
+            "title": "Recording Expected"
+          },
+          "last_status_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status At"
+          },
+          "last_segment_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Segment At"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "fresh_status",
+          "new_recording",
+          "recording_expected",
+          "last_status_at",
+          "last_segment_at",
+          "message"
+        ],
+        "title": "RecoveryOut"
+      },
       "SegmentBatchIn": {
         "properties": {
           "node_id": {
@@ -4489,6 +5453,18 @@
               }
             ],
             "title": "Codec"
+          },
+          "config_signature": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Signature"
           },
           "file_path": {
             "type": "string",

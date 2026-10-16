@@ -1,0 +1,274 @@
+"""Capability-gated encoder edits. Never retry a Set or fall back after sending it."""
+from __future__ import annotations
+
+import asyncio
+import copy
+import hashlib
+import json
+import math
+import weakref
+
+from fastapi import HTTPException
+from lxml import etree
+
+from app.onvif.services import OnvifDevice, _t
+from app.onvif.soap import NS, Fault, NotAuthorized, NotSupported, OnvifError
+
+_locks: weakref.WeakValueDictionary = weakref.WeakValueDictionary()
+
+
+def device_lock(host: str, port: int) -> asyncio.Lock:
+    key = (host.lower().rstrip("."), port)
+    lock = _locks.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _locks[key] = lock
+    return lock
+
+
+def fail(code: str, message: str, status: int = 422):
+    raise HTTPException(status, {"code": code, "message": message})
+
+
+def number(text):
+    try:
+        value = float(text)
+        return value if math.isfinite(value) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def codec(text):
+    return "H265" if text == "HEVC" else text
+
+
+def request(ns, action, **fields):
+    el = etree.Element(etree.QName(NS[ns], action), nsmap={ns: NS[ns], "tt": NS["tt"]})
+    for key, value in fields.items():
+        if value is not None:
+            etree.SubElement(el, etree.QName(NS[ns], key)).text = str(value)
+    return el
+
+
+async def call(dev, url, el):
+    return await dev.soap.call(url, etree.tostring(el, encoding="unicode"))
+
+
+def values(conf, ns):
+    rate = conf.find("tt:RateControl", NS)
+    mode = rate.get("ConstantBitRate", "false") if rate is not None and ns == "tr2" else None
+    # AverageBitRate overrides ConstantBitRate; do not mislabel it as CBR.
+    if number(_t(rate, "tt:AverageBitRate")) not in (None, 0):
+        mode = None
+    return {
+        "encoding": codec(_t(conf, "tt:Encoding")),
+        "width": number(_t(conf, "tt:Resolution/tt:Width")),
+        "height": number(_t(conf, "tt:Resolution/tt:Height")),
+        "fps": number(_t(rate, "tt:FrameRateLimit")),
+        "bitrate_kbps": number(_t(rate, "tt:BitrateLimit")),
+        "gop": number(conf.get("GovLength") if ns == "tr2" else _t(conf, "tt:H264/tt:GovLength")),
+        "quality": number(_t(conf, "tt:Quality")),
+        "codec_profile": conf.get("Profile") if ns == "tr2" else _t(conf, "tt:H264/tt:H264Profile"),
+        "rate_control": ("CBR" if mode in ("true", "1") else "VBR") if mode is not None else None,
+    }
+
+
+def limits(el, path):
+    lo, hi = number(_t(el, path + "/tt:Min")), number(_t(el, path + "/tt:Max"))
+    return [lo, hi] if lo is not None and hi is not None and lo <= hi else None
+
+
+def parse_options(body, ns):
+    out = []
+    for opt in body.findall(".//" + ns + ":Options", NS):
+        entries = [(codec(_t(opt, "tt:Encoding")), opt)] if ns == "tr2" else [
+            ("H264", opt.find("tt:H264", NS))]
+        for encoding, detail in entries:
+            if detail is None or encoding not in ("H264", "H265"):
+                continue
+            gop = [number(x) for x in detail.get("GovLengthRange", "").split()]
+            bitrate = limits(detail, "tt:BitrateRange")
+            if ns == "trt":
+                bitrate = limits(opt, "tt:Extension/tt:H264/tt:BitrateRange")
+            out.append({
+                "encoding": encoding,
+                "resolutions": [[int(_t(r, "tt:Width")), int(_t(r, "tt:Height"))]
+                                for r in detail.findall("tt:ResolutionsAvailable", NS)],
+                "fps_range": limits(detail, "tt:FrameRateRange") if ns == "trt" else None,
+                "frame_rates": [float(x) for x in detail.get("FrameRatesSupported", "").split()],
+                "bitrate_range": bitrate,
+                "gop_range": gop if len(gop) == 2 and None not in gop else limits(detail, "tt:GovLengthRange"),
+                "quality_range": limits(opt, "tt:QualityRange"),
+                "codec_profiles": detail.get("ProfilesSupported", "").split() if ns == "tr2" else [
+                    e.text for e in detail.findall("tt:H264ProfilesSupported", NS) if e.text],
+                "rate_controls": ["VBR", "CBR"] if detail.get("ConstantBitRateSupported") in ("true", "1") else [],
+            })
+    return out
+
+
+def semantic(el):
+    """Namespace-prefix/whitespace-independent revision, including vendor fields."""
+    return [el.tag, sorted(el.attrib.items()), (el.text or "").strip(), [semantic(c) for c in el]]
+
+
+async def read(dev: OnvifDevice, profile_token: str | None, api: str | None = None):
+    services = await dev.services()
+    candidates = [("tr2", services[NS["tr2"]])] if NS["tr2"] in services else []
+    if NS["trt"] in services:
+        candidates.append(("trt", services[NS["trt"]]))
+    if not candidates:
+        candidates = [("trt", dev.device_url)]
+    if api:
+        candidates = [(ns, url) for ns, url in candidates if ns == api]
+    for index, (ns, url) in enumerate(candidates):
+        try:
+            profiles_body = await call(dev, url, request(ns, "GetProfiles", **({"Type": "All"} if ns == "tr2" else {})))
+            profiles, configs = [], {}
+            for p in profiles_body.findall(".//" + ns + ":Profiles", NS):
+                conf = p.find("tr2:Configurations/tr2:VideoEncoder" if ns == "tr2" else "tt:VideoEncoderConfiguration", NS)
+                token = p.get("token")
+                profiles.append({"token": token, "name": _t(p, ns + ":Name") or _t(p, "tt:Name"),
+                                 "encoder_token": conf.get("token") if conf is not None else None})
+                if conf is not None:
+                    configs[token] = conf
+            state = {"api": ns, "profile_token": profile_token, "profiles": profiles, "options": [],
+                     "shared_profiles": [], "warnings": []}
+            if not profile_token:
+                return state, None, url
+            if profile_token not in configs:
+                if index + 1 < len(candidates):
+                    continue
+                fail("profile_mapping_required", "Select an ONVIF profile that has a video encoder.")
+            token = configs[profile_token].get("token")
+            if not token:
+                raise NotSupported("The profile has no encoder configuration token")
+            action = "GetVideoEncoderConfigurations" if ns == "tr2" else "GetVideoEncoderConfiguration"
+            reply = await call(dev, url, request(ns, action, ConfigurationToken=token))
+            conf = next((e for e in reply.findall(".//" + ns + (":Configurations" if ns == "tr2" else ":Configuration"), NS)
+                         if e.get("token") == token), None)
+            if conf is None:
+                raise NotSupported("The camera did not return the requested encoder configuration")
+            current = values(conf, ns)
+            if current["encoding"] not in ("H264", "H265"):
+                raise NotSupported("Only H264/H265 encoder configurations are editable")
+            try:
+                options = await call(dev, url, request(ns, "GetVideoEncoderConfigurationOptions",
+                                                      ConfigurationToken=token, ProfileToken=profile_token))
+                state["options"] = parse_options(options, ns)
+            except (NotSupported, Fault):
+                # Try Media1 before returning a read-only Media2 result.
+                if index + 1 < len(candidates):
+                    continue
+                state["warnings"].append("Encoder options unavailable; settings are read-only.")
+            shared = sorted(p["token"] for p in profiles if p["encoder_token"] == token)
+            revision = hashlib.sha256(json.dumps([ns, semantic(conf), shared], sort_keys=True).encode()).hexdigest()
+            state.update(encoder_token=token, current=current, revision=revision, shared_profiles=shared,
+                         use_count=int(number(_t(conf, "tt:UseCount")) or 0))
+            if len(shared) > 1 or state["use_count"] > 1:
+                state["warnings"].append("This encoder is shared. All listed ONVIF profiles will change.")
+            if current["bitrate_kbps"] and current["bitrate_kbps"] >= 1_000_000:
+                state["warnings"].append("Camera reports an unlimited bitrate; storage estimate is unavailable.")
+            if number(_t(conf, "tt:RateControl/tt:AverageBitRate")) not in (None, 0):
+                for option in state["options"]:
+                    option["rate_controls"] = []
+                state["warnings"].append("Average bitrate overrides CBR/VBR on this camera; rate mode is read-only.")
+            return state, conf, url
+        except (NotSupported, Fault):
+            if index + 1 == len(candidates):
+                raise
+    raise NotSupported("No compatible media service/profile")
+
+
+def validate(state, proposed, acknowledge_shared=False):
+    current = state.get("current")
+    if not current:
+        fail("profile_mapping_required", "Map this stream to an ONVIF profile first.")
+    changes = {k: v for k, v in proposed.items() if v is not None and v != current.get(k)}
+    if any(current.get(k) is None for k in changes):
+        fail("unsupported", "Cannot safely edit a field absent from the current encoder configuration.")
+    target = {**current, **changes}
+    options = [o for o in state["options"] if o["encoding"] == target["encoding"]]
+    if len(options) != 1:
+        fail("unsupported", "The camera does not advertise unambiguous options for this codec.")
+    option = options[0]
+    if (len(state["shared_profiles"]) > 1 or state.get("use_count", 0) > 1) and not acknowledge_shared:
+        fail("shared_encoder", "Acknowledge the shared encoder before applying.", 409)
+    switched = "encoding" in changes
+    if (switched or {"width", "height"} & changes.keys()) and [target["width"], target["height"]] not in option["resolutions"]:
+        fail("unsupported", "Resolution is not supported for this codec.")
+    for key, bounds in (("fps", "fps_range"), ("bitrate_kbps", "bitrate_range"),
+                        ("gop", "gop_range"), ("quality", "quality_range")):
+        if key not in changes and not switched:
+            continue
+        value = target[key]
+        if value is None:
+            continue
+        span = option[bounds]
+        if key == "fps" and option["frame_rates"]:
+            valid = value in option["frame_rates"]
+        else:
+            valid = span is not None and span[0] <= value <= span[1]
+        if not valid:
+            fail("unsupported", f"{key} is outside advertised options (or the camera did not advertise a range).")
+    for key, choices in (("codec_profile", "codec_profiles"), ("rate_control", "rate_controls")):
+        if (key in changes or switched) and target[key] is not None and target[key] not in option[choices]:
+            fail("unsupported", f"{key} is not supported for this codec.")
+    if state["api"] == "trt" and target["fps"] is not None and target["fps"] != int(target["fps"]):
+        fail("unsupported", "Media1 requires an integer frame rate.")
+    return changes, target
+
+
+def updated_xml(conf, ns, changes):
+    conf = copy.deepcopy(conf)
+    paths = {"encoding": "tt:Encoding", "width": "tt:Resolution/tt:Width", "height": "tt:Resolution/tt:Height",
+             "fps": "tt:RateControl/tt:FrameRateLimit", "bitrate_kbps": "tt:RateControl/tt:BitrateLimit",
+             "quality": "tt:Quality", "gop": "tt:H264/tt:GovLength", "codec_profile": "tt:H264/tt:H264Profile"}
+    for key, value in changes.items():
+        if ns == "tr2" and key in ("gop", "codec_profile"):
+            conf.set("GovLength" if key == "gop" else "Profile", str(value))
+        elif key == "rate_control":
+            rate = conf.find("tt:RateControl", NS)
+            if rate is None:
+                fail("unsupported", "RateControl is missing; refusing to invent a configuration.")
+            rate.set("ConstantBitRate", str(value == "CBR").lower())
+            average = rate.find("tt:AverageBitRate", NS)
+            if average is not None:
+                average.text = "0"  # otherwise this overrides the user's CBR/VBR selection
+        else:
+            el = conf.find(paths[key], NS)
+            if el is None:
+                fail("unsupported", f"{key} is absent from this configuration; cannot safely edit it.")
+            el.text = str(int(value)) if isinstance(value, (int, float)) and float(value).is_integer() else str(value)
+    conf.tag = etree.QName(NS[ns], "Configuration")
+    body = request(ns, "SetVideoEncoderConfiguration")
+    body.append(conf)
+    if ns == "trt":
+        etree.SubElement(body, etree.QName(NS[ns], "ForcePersistence")).text = "true"
+    return body
+
+
+async def apply(dev, profile_token, revision, proposed, acknowledge_shared):
+    before, conf, url = await read(dev, profile_token)
+    if revision != before.get("revision"):
+        fail("stale_encoder", "Settings changed since you loaded them. Reload before applying.", 409)
+    changes, target = validate(before, proposed, acknowledge_shared)
+    if not changes:
+        return {"outcome": "verified", "before": before, "after": before, "message": "Already configured; no write sent."}
+    body = updated_xml(conf, before["api"], changes)
+    error = None
+    try:
+        await call(dev, url, body)  # exactly one Set; never a blind retry or write fallback
+    except NotAuthorized:
+        raise
+    except OnvifError as exc:
+        error = exc.code
+    try:
+        after, _, _ = await read(dev, profile_token, api=before["api"])
+    except (OnvifError, HTTPException):
+        return {"outcome": "unknown", "before": before, "after": None,
+                "message": "Write outcome unknown. Read the camera again before any further action; do not retry blindly."}
+    matches = all(after["current"].get(k) == v for k, v in target.items() if v is not None)
+    return {"outcome": "verified" if matches else ("unknown" if error else "mismatch"),
+            "before": before, "after": after,
+            "message": "Camera settings verified by readback." if matches else
+                       "Readback differs from the request. Review actual values; no automatic retry or rollback was sent."}

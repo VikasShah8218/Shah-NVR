@@ -78,3 +78,24 @@ class CameraStream(Model):
     def path_name(self) -> str:
         """MediaMTX path name, shared by live URLs and recording folders."""
         return f"cam-{self.camera_id}/{self.profile}"  # type: ignore[attr-defined]
+
+
+class EncoderChange(Model):
+    """Durable H2 journal and cross-worker device mutex. Contains no credentials or raw XML."""
+    id = fields.CharField(max_length=64, primary_key=True)
+    camera_id = fields.IntField(db_index=True)
+    profile = fields.CharField(max_length=32)
+    profile_token = fields.CharField(max_length=128)
+    device_key = fields.CharField(max_length=300)
+    active_key = fields.CharField(max_length=300, null=True, unique=True)
+    node_id = fields.IntField()
+    request = fields.JSONField()
+    before = fields.JSONField(null=True)
+    result = fields.JSONField(null=True)
+    status = fields.CharField(max_length=32, default="pending")
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "encoder_changes"
+        ordering = ["-created_at"]
