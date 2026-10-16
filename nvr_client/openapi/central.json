@@ -1408,6 +1408,346 @@
         }
       }
     },
+    "/api/v1/onvif/discover": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Find ONVIF cameras on the nodes' LANs",
+        "operationId": "discover_api_v1_onvif_discover_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscoverIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DiscoveredOut"
+                  },
+                  "type": "array",
+                  "title": "Response Discover Api V1 Onvif Discover Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/probe": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Identity, clock and stream profiles of one device",
+        "operationId": "probe_api_v1_onvif_probe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProbeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/snapshot": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Preview JPEG of a profile (through the node)",
+        "operationId": "snapshot_api_v1_onvif_snapshot_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnapshotIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "image/jpeg": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/cameras": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Add a camera from ONVIF: streams filled from its profiles (main recorded, sub live)",
+        "operationId": "add_camera_api_v1_onvif_cameras_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnvifCameraCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CameraOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/cameras/{camera_id}/device": {
+      "get": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Live device info, clock and settings (also refreshes the saved device fields)",
+        "operationId": "camera_device_api_v1_onvif_cameras__camera_id__device_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceStateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/cameras/{camera_id}/time-sync": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Set the camera clock to the node's time",
+        "operationId": "camera_time_sync_api_v1_onvif_cameras__camera_id__time_sync_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClockOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/cameras/{camera_id}/ntp": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Point the camera at NTP servers (or the ones DHCP gives)",
+        "operationId": "camera_ntp_api_v1_onvif_cameras__camera_id__ntp_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NtpIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/cameras/{camera_id}/reboot": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Reboot the camera",
+        "operationId": "camera_reboot_api_v1_onvif_cameras__camera_id__reboot_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/nodes/register": {
       "post": {
         "tags": [
@@ -1984,6 +2324,28 @@
             },
             "type": "array",
             "title": "Streams"
+          },
+          "onvif_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Host"
+          },
+          "onvif_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Port"
           }
         },
         "type": "object",
@@ -2121,6 +2483,131 @@
             ],
             "title": "Retention Days"
           },
+          "onvif_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Host"
+          },
+          "onvif_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Port"
+          },
+          "manufacturer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "firmware": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firmware"
+          },
+          "serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial"
+          },
+          "mac": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mac"
+          },
+          "onvif_services": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Services"
+          },
+          "onvif_reachable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Reachable"
+          },
+          "clock_offset_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock Offset Seconds"
+          },
+          "onvif_checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Checked At"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -2241,6 +2728,62 @@
         "type": "object",
         "title": "CameraUpdate"
       },
+      "ClockOut": {
+        "properties": {
+          "offset_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset Seconds"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
+          "camera_utc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "offset_seconds",
+          "source",
+          "timezone",
+          "camera_utc"
+        ],
+        "title": "ClockOut"
+      },
       "ClusterHealthOut": {
         "properties": {
           "cameras_total": {
@@ -2331,6 +2874,347 @@
           "file_path"
         ],
         "title": "DeletionItem"
+      },
+      "DeviceIn": {
+        "properties": {
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "host": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "default": 80
+          },
+          "xaddr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xaddr"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "host"
+        ],
+        "title": "DeviceIn"
+      },
+      "DeviceInfoOut": {
+        "properties": {
+          "manufacturer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "firmwareversion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firmwareversion"
+          },
+          "serialnumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serialnumber"
+          },
+          "hardwareid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hardwareid"
+          }
+        },
+        "type": "object",
+        "title": "DeviceInfoOut"
+      },
+      "DeviceStateOut": {
+        "properties": {
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "title": "Port"
+          },
+          "clock": {
+            "$ref": "#/components/schemas/ClockOut"
+          },
+          "info": {
+            "$ref": "#/components/schemas/DeviceInfoOut"
+          },
+          "services": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "ntp": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NtpOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hostname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hostname"
+          },
+          "network": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "node_id",
+          "host",
+          "port",
+          "clock",
+          "info",
+          "services",
+          "ntp",
+          "hostname",
+          "network",
+          "checked_at"
+        ],
+        "title": "DeviceStateOut"
+      },
+      "DiscoverIn": {
+        "properties": {
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "seconds": {
+            "type": "number",
+            "maximum": 15.0,
+            "minimum": 1.0,
+            "title": "Seconds",
+            "default": 3.0
+          }
+        },
+        "type": "object",
+        "title": "DiscoverIn"
+      },
+      "DiscoveredOut": {
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "title": "Port"
+          },
+          "xaddr": {
+            "type": "string",
+            "title": "Xaddr"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "hardware": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hardware"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "mac": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mac"
+          },
+          "profiles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Profiles"
+          },
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "node_name": {
+            "type": "string",
+            "title": "Node Name"
+          },
+          "camera_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera Id"
+          },
+          "camera_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "endpoint",
+          "host",
+          "port",
+          "xaddr",
+          "name",
+          "hardware",
+          "location",
+          "mac",
+          "profiles",
+          "node_id",
+          "node_name",
+          "camera_id",
+          "camera_name"
+        ],
+        "title": "DiscoveredOut"
       },
       "DiskInfo": {
         "properties": {
@@ -2654,6 +3538,14 @@
             "title": "Volumes",
             "default": []
           },
+          "onvif": {
+            "items": {
+              "$ref": "#/components/schemas/OnvifHealthIn"
+            },
+            "type": "array",
+            "title": "Onvif",
+            "default": []
+          },
           "extra": {
             "anyOf": [
               {
@@ -2798,6 +3690,68 @@
           "node_id"
         ],
         "title": "ManualAssignIn"
+      },
+      "MessageOut": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "MessageOut"
+      },
+      "NetworkOut": {
+        "properties": {
+          "mac": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mac"
+          },
+          "dhcp": {
+            "type": "boolean",
+            "title": "Dhcp"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "prefix_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefix Length"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mac",
+          "dhcp",
+          "ip",
+          "prefix_length"
+        ],
+        "title": "NetworkOut"
       },
       "NodeOut": {
         "properties": {
@@ -3059,6 +4013,387 @@
         "type": "object",
         "title": "NodeUpdate"
       },
+      "NtpIn": {
+        "properties": {
+          "from_dhcp": {
+            "type": "boolean",
+            "title": "From Dhcp",
+            "default": false
+          },
+          "servers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Servers",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "NtpIn"
+      },
+      "NtpOut": {
+        "properties": {
+          "from_dhcp": {
+            "type": "boolean",
+            "title": "From Dhcp"
+          },
+          "servers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Servers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_dhcp",
+          "servers"
+        ],
+        "title": "NtpOut"
+      },
+      "OnvifCameraCreate": {
+        "properties": {
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "host": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "default": 80
+          },
+          "xaddr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xaddr"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "default": ""
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "retention_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retention Days"
+          },
+          "streams": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/StreamPick"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Streams"
+          },
+          "allow_duplicate": {
+            "type": "boolean",
+            "title": "Allow Duplicate",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "host"
+        ],
+        "title": "OnvifCameraCreate"
+      },
+      "OnvifHealthIn": {
+        "properties": {
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "reachable": {
+            "type": "boolean",
+            "title": "Reachable"
+          },
+          "clock_offset_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock Offset Seconds"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "reachable",
+          "checked_at"
+        ],
+        "title": "OnvifHealthIn"
+      },
+      "ProbeOut": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "title": "Port"
+          },
+          "device_url": {
+            "type": "string",
+            "title": "Device Url"
+          },
+          "clock": {
+            "$ref": "#/components/schemas/ClockOut"
+          },
+          "info": {
+            "$ref": "#/components/schemas/DeviceInfoOut"
+          },
+          "services": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileOut"
+            },
+            "type": "array",
+            "title": "Profiles"
+          },
+          "suggested": {
+            "$ref": "#/components/schemas/SuggestedOut"
+          },
+          "camera_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "host",
+          "port",
+          "device_url",
+          "clock",
+          "info",
+          "services",
+          "profiles",
+          "suggested",
+          "camera_id"
+        ],
+        "title": "ProbeOut"
+      },
+      "ProfileOut": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "api": {
+            "type": "string",
+            "title": "Api"
+          },
+          "encoding": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoding"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "fps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps"
+          },
+          "bitrate_kbps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bitrate Kbps"
+          },
+          "has_audio": {
+            "type": "boolean",
+            "title": "Has Audio"
+          },
+          "has_ptz": {
+            "type": "boolean",
+            "title": "Has Ptz"
+          },
+          "rtsp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rtsp"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "name",
+          "api",
+          "encoding",
+          "width",
+          "height",
+          "fps",
+          "bitrate_kbps",
+          "has_audio",
+          "has_ptz",
+          "rtsp",
+          "snapshot"
+        ],
+        "title": "ProfileOut"
+      },
       "SegmentBatchIn": {
         "properties": {
           "node_id": {
@@ -3268,6 +4603,65 @@
         ],
         "title": "SegmentStatus"
       },
+      "SnapshotIn": {
+        "properties": {
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "host": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "default": 80
+          },
+          "xaddr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xaddr"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "default": ""
+          },
+          "uri": {
+            "type": "string",
+            "title": "Uri"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host",
+          "uri"
+        ],
+        "title": "SnapshotIn"
+      },
       "StreamAssignment": {
         "properties": {
           "profile": {
@@ -3400,6 +4794,17 @@
               }
             ],
             "title": "Last Segment At"
+          },
+          "onvif_profile_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Profile Token"
           }
         },
         "type": "object",
@@ -3416,6 +4821,33 @@
           "last_segment_at"
         ],
         "title": "StreamOut"
+      },
+      "StreamPick": {
+        "properties": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]{1,32}$",
+            "title": "Profile",
+            "examples": [
+              "main"
+            ]
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "record": {
+            "type": "boolean",
+            "title": "Record",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile",
+          "token"
+        ],
+        "title": "StreamPick"
       },
       "StreamStatus": {
         "type": "string",
@@ -3525,6 +4957,38 @@
         },
         "type": "object",
         "title": "StreamUpdate"
+      },
+      "SuggestedOut": {
+        "properties": {
+          "main": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main"
+          },
+          "sub": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub"
+          }
+        },
+        "type": "object",
+        "required": [
+          "main",
+          "sub"
+        ],
+        "title": "SuggestedOut"
       },
       "TimelineOut": {
         "properties": {
