@@ -10,6 +10,7 @@ import { SettingsProvider } from "@/lib/settings"
 const AssignmentsPage = lazy(() => import("@/features/assignments/AssignmentsPage").then((m) => ({ default: m.AssignmentsPage })))
 const CameraDetailPage = lazy(() => import("@/features/cameras/CameraDetailPage").then((m) => ({ default: m.CameraDetailPage })))
 const CamerasPage = lazy(() => import("@/features/cameras/CamerasPage").then((m) => ({ default: m.CamerasPage })))
+const DiscoverPage = lazy(() => import("@/features/onvif/DiscoverPage").then((m) => ({ default: m.DiscoverPage })))
 const DashboardPage = lazy(() => import("@/features/dashboard/DashboardPage").then((m) => ({ default: m.DashboardPage })))
 const LivePage = lazy(() => import("@/features/live/LivePage").then((m) => ({ default: m.LivePage })))
 const NodeDetailPage = lazy(() => import("@/features/nodes/NodeDetailPage").then((m) => ({ default: m.NodeDetailPage })))
@@ -34,6 +35,7 @@ export default function App() {
                 <Route path="playback" element={<PlaybackPage />} />
                 <Route path="cameras" element={<CamerasPage />} />
                 <Route path="cameras/:id" element={<CameraDetailPage />} />
+                <Route path="discover" element={<DiscoverPage />} />
                 <Route path="nodes" element={<NodesPage />} />
                 <Route path="nodes/:id" element={<NodeDetailPage />} />
                 <Route path="assignments" element={<AssignmentsPage />} />
