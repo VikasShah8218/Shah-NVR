@@ -12,17 +12,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { formatBytes, retentionLabel, timeAgo } from "@/lib/format"
+import { deviceLabel } from "@/lib/onvif"
 import { useSettings } from "@/lib/settings"
 import { DAY, fmtDateTime } from "@/lib/time"
 import { MoveCameraDialog } from "../assignments/MoveCameraDialog"
 import { LivePlayer } from "../live/LivePlayer"
 import { Timeline } from "../playback/Timeline"
 import { CameraFormSheet } from "./CameraFormSheet"
+import { DeviceTab } from "./DeviceTab"
 
 export function CameraDetailPage() {
   const id = Number(useParams().id)
   const camera = useCamera(id)
   const [editing, setEditing] = useState(false)
+  const [tab, setTab] = useState("overview")
 
   if (camera.isLoading) return <Loading />
   if (camera.error || !camera.data) return <ErrorState error={camera.error ?? "Camera not found"} />
@@ -50,11 +53,12 @@ export function CameraDetailPage() {
           </>
         }
       />
-      <Tabs defaultValue="overview">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="recordings">Recordings</TabsTrigger>
           <TabsTrigger value="assignment">Assignment</TabsTrigger>
+          <TabsTrigger value="device">Device</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
           <Overview camera={c} />
@@ -64,6 +68,9 @@ export function CameraDetailPage() {
         </TabsContent>
         <TabsContent value="assignment">
           <AssignmentTab camera={c} />
+        </TabsContent>
+        <TabsContent value="device">
+          <DeviceTab camera={c} active={tab === "device"} />
         </TabsContent>
       </Tabs>
       {editing && <CameraFormSheet camera={c} open onOpenChange={setEditing} />}
@@ -119,6 +126,7 @@ function Overview({ camera: c }: { camera: Camera }) {
             <Field label="Username">{c.username ?? "—"}</Field>
             <Field label="Password">{c.has_password ? "Set" : "Not set"}</Field>
             <Field label="Keep recordings">{retentionLabel(c.retention_days)}</Field>
+            {c.model && <Field label="Device">{deviceLabel(c.manufacturer, c.model)}</Field>}
             <Field label="Added">{fmtDateTime(new Date(c.created_at))}</Field>
           </CardContent>
         </Card>
