@@ -36,6 +36,7 @@ class StreamOut(BaseModel):
     bytes_received: int
     last_status_at: datetime | None
     last_segment_at: datetime | None
+    onvif_profile_token: str | None = None  # ONVIF media profile behind source_url
 
 
 class CameraCreate(BaseModel):
@@ -84,6 +85,18 @@ class CameraOut(BaseModel):
     has_password: bool
     enabled: bool
     retention_days: int | None  # None = keep until storage is full
+    # ONVIF device (null for cameras never seen over ONVIF)
+    onvif_host: str | None = None
+    onvif_port: int | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    firmware: str | None = None
+    serial: str | None = None
+    mac: str | None = None
+    onvif_services: list[str] | None = None
+    onvif_reachable: bool | None = None
+    clock_offset_seconds: float | None = None  # camera clock minus node clock
+    onvif_checked_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     streams: list[StreamOut]
