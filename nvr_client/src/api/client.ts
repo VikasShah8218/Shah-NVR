@@ -4,17 +4,23 @@ import type { paths as NodePaths } from "./node"
 
 export class ApiError extends Error {
   readonly status: number
+  /** Machine-readable reason when the server sends {"detail": {"code", "message"}} (ONVIF calls). */
+  readonly code?: string
+  readonly detail?: Record<string, unknown>
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, detail?: Record<string, unknown>) {
     super(message)
     this.status = status
+    this.detail = detail
+    this.code = typeof detail?.code === "string" ? detail.code : undefined
   }
 }
 
-/** FastAPI errors: {"detail": "text"} or {"detail": [{"msg": ...}, ...]} for validation errors. */
+/** FastAPI errors: {"detail": "text"}, {"detail": {"code", "message"}} or {"detail": [{"msg": ...}, ...]}. */
 function errorMessage(error: unknown, status: number): string {
   const detail = (error as { detail?: unknown } | undefined)?.detail
   if (typeof detail === "string") return detail
+  if (detail && typeof detail === "object" && !Array.isArray(detail) && "message" in detail) return String(detail.message)
   if (Array.isArray(detail)) {
     return detail
       .map((d: { loc?: unknown[]; msg?: string }) => `${(d.loc ?? []).slice(1).join(".")}: ${d.msg ?? ""}`)
@@ -32,7 +38,11 @@ export async function unwrap<T>(call: Promise<{ data?: T; error?: unknown; respo
     throw new ApiError(0, "Server unreachable")
   }
   const { data, error, response } = result
-  if (error !== undefined || !response.ok) throw new ApiError(response.status, errorMessage(error, response.status))
+  if (error !== undefined || !response.ok) {
+    const detail = (error as { detail?: unknown } | undefined)?.detail
+    const obj = detail && typeof detail === "object" && !Array.isArray(detail) ? (detail as Record<string, unknown>) : undefined
+    throw new ApiError(response.status, errorMessage(error, response.status), obj)
+  }
   return data as T
 }
 
