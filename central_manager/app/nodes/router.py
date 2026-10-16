@@ -25,6 +25,7 @@ from app.nodes.schemas import (
     VolumeUpdate,
 )
 from app.nodes.utils import gb_to_bytes, total_quota
+from app.onvif.services import apply_onvif_health
 from app.recordings.models import RecordingSegment
 from settings.settings import settings
 from utilities.common import utcnow
@@ -234,12 +235,13 @@ async def heartbeat(node_id: int, body: HeartbeatIn):
             logger.info("Node %s (%s) is reachable again", node.id, node.name)
         node.state = NodeState.ACTIVE if assigned else NodeState.READY
     node.last_heartbeat_at = now
-    node.metrics = body.model_dump(exclude={"volumes"})
+    node.metrics = body.model_dump(exclude={"volumes", "onvif"})
     await node.save(update_fields=["state", "last_heartbeat_at", "metrics", "updated_at"])
 
     await vol.ensure_default_volume(node, body.default_recordings_dir)
     await vol.apply_reports(node.id, body.volumes)
     volumes = await vol.node_volumes(node.id)
+    await apply_onvif_health(node.id, body.onvif)
 
     return HeartbeatOut(
         node_id=node.id,
@@ -276,6 +278,8 @@ async def node_assignments(node_id: int):
                     )
                     for s in cam.streams
                 ],
+                onvif_host=cam.onvif_host,
+                onvif_port=cam.onvif_port,
             )
         )
     return AssignmentsOut(node_id=node.id, state=node.state, cameras=cameras)

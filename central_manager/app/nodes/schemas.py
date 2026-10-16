@@ -64,6 +64,13 @@ class VolumeReport(BaseModel):
     writing: bool = False
 
 
+class OnvifHealthIn(BaseModel):
+    camera_id: int
+    reachable: bool
+    clock_offset_seconds: float | None = None
+    checked_at: datetime
+
+
 class HeartbeatIn(BaseModel):
     cpu_percent: float | None = None
     cpu_count: int | None = None
@@ -85,6 +92,7 @@ class HeartbeatIn(BaseModel):
     default_recordings_dir: str | None = None
     drives: list[DriveInfo] = []
     volumes: list[VolumeReport] = []
+    onvif: list[OnvifHealthIn] = []  # fresh ONVIF checks of this node's cameras
     extra: dict[str, Any] | None = None
 
 
@@ -121,6 +129,8 @@ class CameraAssignmentOut(BaseModel):
     camera_name: str
     generation: int
     streams: list[StreamAssignment]
+    onvif_host: str | None = None  # the node checks reachability + clock (no login) when set
+    onvif_port: int | None = None
 
 
 class AssignmentsOut(BaseModel):

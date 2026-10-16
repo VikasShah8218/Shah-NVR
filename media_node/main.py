@@ -21,6 +21,8 @@ from app.mediamtx.utils import mtx
 from app.node.router import router as node_router
 from app.node.services import check_public_host, heartbeat_tick, load_local_state, register, stream_status_tick
 from app.node.utils import central
+from app.onvif.health import onvif_tick
+from app.onvif.router import router as onvif_router
 from app.recordings.router import router as recordings_router
 from app.recordings.services import deletion_tick, scan_tick, upload_tick
 from app.storage.services import storage, storage_tick
@@ -61,6 +63,7 @@ async def lifespan(app: FastAPI):
                 ("deletion", settings.DELETION_INTERVAL_SECONDS, deletion_tick),
                 ("storage", settings.STORAGE_CHECK_INTERVAL_SECONDS, storage_tick),
                 ("address", settings.ADDRESS_CHECK_INTERVAL_SECONDS, check_public_host),
+                ("onvif-health", settings.ONVIF_CHECK_INTERVAL_SECONDS, onvif_tick),
             )
         ]
         logger.info("Media node '%s' started; API %s", settings.NODE_NAME, settings.api_url)
@@ -79,6 +82,7 @@ app = FastAPI(title=f"Shah-NVR Media Node ({settings.NODE_NAME})", version="0.1.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])
 app.include_router(node_router)
 app.include_router(recordings_router)
+app.include_router(onvif_router)
 
 
 @app.get("/", tags=["System"])

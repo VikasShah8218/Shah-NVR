@@ -7,6 +7,7 @@ import { StatusBadge, toneOf } from "@/components/StatusBadge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { UsageBar, UsageMeter } from "@/components/UsageBar"
 import { formatBytes, formatMbps, formatPercent, timeAgo } from "@/lib/format"
+import { CLOCK_DRIFT_ALERT_SECONDS, formatOffset } from "@/lib/onvif"
 import { cn } from "@/lib/utils"
 import { isNodeHealthy, nodeResources } from "../nodes/nodeUtils"
 
@@ -47,6 +48,10 @@ function buildAlerts(cameras: Camera[], nodes: MediaNode[]): Alert[] {
           to: `/cameras/${c.id}`,
         })
     }
+    if (c.onvif_reachable === false)
+      alerts.push({ level: "warning", title: `${c.name}: ONVIF not answering`, detail: `last check ${timeAgo(c.onvif_checked_at)}`, to: `/cameras/${c.id}` })
+    else if (c.clock_offset_seconds != null && Math.abs(c.clock_offset_seconds) > CLOCK_DRIFT_ALERT_SECONDS)
+      alerts.push({ level: "warning", title: `${c.name}: camera clock ${formatOffset(c.clock_offset_seconds)} off`, detail: "Open the Device tab to sync the time or set NTP", to: `/cameras/${c.id}` })
   }
   return alerts.sort((a, b) => (a.level === b.level ? 0 : a.level === "danger" ? -1 : 1))
 }

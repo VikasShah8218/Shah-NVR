@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException, status
-from tortoise.transactions import in_transaction
 
 from app.assignments.models import CameraAssignment
 from app.cameras.models import Camera, CameraStream, StreamStatus
@@ -13,6 +12,7 @@ from app.cameras.schemas import (
     StreamOut,
     StreamUpdate,
 )
+from app.cameras.services import create_camera_with_streams
 from app.cameras.utils import camera_to_out
 from app.recordings.models import RecordingSegment
 from settings.settings import settings
@@ -29,19 +29,19 @@ async def _get_camera(camera_id: int) -> Camera:
 
 @router.post("", response_model=CameraOut, status_code=status.HTTP_201_CREATED)
 async def create_camera(body: CameraCreate):
-    async with in_transaction():
-        camera = await Camera.create(
-            name=body.name,
-            description=body.description,
-            username=body.username,
-            password=body.password,
-            enabled=body.enabled,
+    camera = await create_camera_with_streams(
+        {
+            "name": body.name,
+            "description": body.description,
+            "username": body.username,
+            "password": body.password,
+            "enabled": body.enabled,
             # omitted -> default; explicit null -> keep until storage is full
-            retention_days=body.retention_days if "retention_days" in body.model_fields_set
+            "retention_days": body.retention_days if "retention_days" in body.model_fields_set
             else settings.DEFAULT_RETENTION_DAYS,
-        )
-        for s in body.streams:
-            await CameraStream.create(camera=camera, **s.model_dump())
+        },
+        [s.model_dump() for s in body.streams],
+    )
     return await camera_to_out(camera)
 
 

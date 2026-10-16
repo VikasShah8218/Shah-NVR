@@ -140,6 +140,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/onvif/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** WS-Discovery on this node's LAN */
+        post: operations["onvif_discover_api_v1_onvif_discover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Identity, clock and stream profiles of one device */
+        post: operations["onvif_probe_api_v1_onvif_probe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/device": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Live identity, clock and read-only settings */
+        post: operations["onvif_device_state_api_v1_onvif_device_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/device/clock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Camera clock offset (no login needed on most cameras) */
+        post: operations["onvif_clock_api_v1_onvif_device_clock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/device/time-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set the camera clock to this node's UTC time */
+        post: operations["onvif_time_sync_api_v1_onvif_device_time_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/device/ntp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Point the camera at NTP servers (or DHCP-provided ones) */
+        post: operations["onvif_ntp_api_v1_onvif_device_ntp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/device/reboot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reboot the camera */
+        post: operations["onvif_reboot_api_v1_onvif_device_reboot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** JPEG snapshot through the node (for previews while adding cameras) */
+        post: operations["onvif_snapshot_api_v1_onvif_snapshot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -161,6 +297,93 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ClockOut */
+        ClockOut: {
+            /** Offset Seconds */
+            offset_seconds: number | null;
+            /** Source */
+            source: string | null;
+            /** Timezone */
+            timezone: string | null;
+            /** Camera Utc */
+            camera_utc: string | null;
+        };
+        /**
+         * DeviceIn
+         * @description How to reach one device. Credentials are used for this request only, never stored on the node.
+         */
+        DeviceIn: {
+            /** Host */
+            host: string;
+            /**
+             * Port
+             * @default 80
+             */
+            port: number;
+            /**
+             * Username
+             * @default
+             */
+            username: string;
+            /**
+             * Password
+             * @default
+             */
+            password: string;
+            /** Xaddr */
+            xaddr?: string | null;
+        };
+        /**
+         * DeviceStateOut
+         * @description Live device page: identity, clock and read-only settings.
+         */
+        DeviceStateOut: {
+            clock: components["schemas"]["ClockOut"];
+            /** Info */
+            info: {
+                [key: string]: unknown;
+            };
+            /** Services */
+            services: string[];
+            ntp: components["schemas"]["NtpOut"] | null;
+            /** Hostname */
+            hostname: string | null;
+            network: components["schemas"]["NetworkOut"] | null;
+        };
+        /** DiscoverIn */
+        DiscoverIn: {
+            /**
+             * Seconds
+             * @default 3
+             */
+            seconds: number;
+        };
+        /** DiscoveredDevice */
+        DiscoveredDevice: {
+            /** Endpoint */
+            endpoint: string;
+            /** Host */
+            host: string;
+            /** Port */
+            port: number;
+            /** Xaddr */
+            xaddr: string;
+            /** Name */
+            name?: string | null;
+            /** Hardware */
+            hardware?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Mac */
+            mac?: string | null;
+            /**
+             * Profiles
+             * @default []
+             */
+            profiles: string[];
+            /** Interface Ip */
+            interface_ip: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -202,6 +425,17 @@ export interface components {
             /** Uploaded */
             uploaded: boolean;
         };
+        /** NetworkOut */
+        NetworkOut: {
+            /** Mac */
+            mac: string | null;
+            /** Dhcp */
+            dhcp: boolean;
+            /** Ip */
+            ip: string | null;
+            /** Prefix Length */
+            prefix_length: number | null;
+        };
         /** NodeStatusOut */
         NodeStatusOut: {
             /** Node Name */
@@ -241,6 +475,127 @@ export interface components {
             pending_uploads: number;
             /** Local Segments */
             local_segments: number;
+        };
+        /** NtpIn */
+        NtpIn: {
+            /** Host */
+            host: string;
+            /**
+             * Port
+             * @default 80
+             */
+            port: number;
+            /**
+             * Username
+             * @default
+             */
+            username: string;
+            /**
+             * Password
+             * @default
+             */
+            password: string;
+            /** Xaddr */
+            xaddr?: string | null;
+            /**
+             * From Dhcp
+             * @default false
+             */
+            from_dhcp: boolean;
+            /**
+             * Servers
+             * @default []
+             */
+            servers: string[];
+        };
+        /** NtpOut */
+        NtpOut: {
+            /** From Dhcp */
+            from_dhcp: boolean;
+            /** Servers */
+            servers: string[];
+        };
+        /** ProbeOut */
+        ProbeOut: {
+            /** Host */
+            host: string;
+            /** Port */
+            port: number;
+            /** Device Url */
+            device_url: string;
+            clock: components["schemas"]["ClockOut"];
+            /** Info */
+            info: {
+                [key: string]: unknown;
+            };
+            /** Services */
+            services: string[];
+            /** Profiles */
+            profiles: components["schemas"]["ProfileOut"][];
+            suggested: components["schemas"]["SuggestedOut"];
+        };
+        /** ProfileOut */
+        ProfileOut: {
+            /** Token */
+            token: string;
+            /** Name */
+            name: string | null;
+            /** Api */
+            api: string;
+            /** Encoding */
+            encoding: string | null;
+            /** Width */
+            width: number | null;
+            /** Height */
+            height: number | null;
+            /** Fps */
+            fps: number | null;
+            /** Bitrate Kbps */
+            bitrate_kbps: number | null;
+            /** Has Audio */
+            has_audio: boolean;
+            /** Has Ptz */
+            has_ptz: boolean;
+            /** Rtsp */
+            rtsp: string | null;
+            /** Snapshot */
+            snapshot: string | null;
+        };
+        /** RebootOut */
+        RebootOut: {
+            /** Message */
+            message: string;
+        };
+        /** SnapshotIn */
+        SnapshotIn: {
+            /** Host */
+            host: string;
+            /**
+             * Port
+             * @default 80
+             */
+            port: number;
+            /**
+             * Username
+             * @default
+             */
+            username: string;
+            /**
+             * Password
+             * @default
+             */
+            password: string;
+            /** Xaddr */
+            xaddr?: string | null;
+            /** Uri */
+            uri: string;
+        };
+        /** SuggestedOut */
+        SuggestedOut: {
+            /** Main */
+            main: string | null;
+            /** Sub */
+            sub: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -469,6 +824,270 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LocalSegmentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    onvif_discover_api_v1_onvif_discover_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DiscoverIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveredDevice"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    onvif_probe_api_v1_onvif_probe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProbeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    onvif_device_state_api_v1_onvif_device_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    onvif_clock_api_v1_onvif_device_clock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClockOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    onvif_time_sync_api_v1_onvif_device_time_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClockOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    onvif_ntp_api_v1_onvif_device_ntp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NtpIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    onvif_reboot_api_v1_onvif_device_reboot_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RebootOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    onvif_snapshot_api_v1_onvif_snapshot_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnapshotIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": unknown;
                 };
             };
             /** @description Validation Error */

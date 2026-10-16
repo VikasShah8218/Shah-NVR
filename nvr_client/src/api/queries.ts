@@ -1,7 +1,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { onvifErrorText } from "@/lib/onvif"
 import { useSettings } from "@/lib/settings"
-import { centralClient, nodeClient, nodeGet, unwrap } from "./client"
+import { ApiError, centralClient, nodeClient, nodeGet, unwrap } from "./client"
 import type {
   Assignment,
   AssignmentHistory,
@@ -17,6 +18,13 @@ import type {
   NodeLogs,
   NodeStatus,
   NodeUpdate,
+  OnvifCameraCreate,
+  OnvifClock,
+  OnvifDeviceIn,
+  OnvifDeviceState,
+  OnvifDiscovered,
+  OnvifNtpIn,
+  OnvifProbe,
   StreamIn,
   StorageVolume,
   StreamUpdate,
@@ -188,7 +196,7 @@ export function useNodeLogs(apiUrl: string | undefined, source: "agent" | "media
 
 function useCentralMutation<TVars, TResult>(
   fn: (api: ReturnType<typeof useCentral>["api"], vars: TVars) => Promise<TResult>,
-  opts: { success?: string | ((r: TResult, v: TVars) => string); invalidate?: string[] } = {},
+  opts: { success?: string | ((r: TResult, v: TVars) => string); invalidate?: string[]; errorText?: (err: Error) => string } = {},
 ) {
   const { url, api } = useCentral()
   const qc = useQueryClient()
@@ -199,7 +207,7 @@ function useCentralMutation<TVars, TResult>(
       keys.forEach((k) => qc.invalidateQueries({ queryKey: [url, k] }))
       if (opts.success) toast.success(typeof opts.success === "function" ? opts.success(result, vars) : opts.success)
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => toast.error(opts.errorText ? opts.errorText(err) : err.message),
   })
 }
 
@@ -334,3 +342,86 @@ export const useRunScheduler = () =>
   useCentralMutation((api) => unwrap(api.POST("/api/v1/assignments/run-scheduler")), {
     success: "Scheduler cycle finished",
   })
+
+// ================================================================ ONVIF (H1): discovery, add, device management
+
+/** Scan the LAN of one node (or all online nodes). Errors are shown by the page, not as toasts. */
+export function useOnvifDiscover() {
+  const { api } = useCentral()
+  return useMutation({
+    mutationFn: (body: { node_id?: number | null; seconds?: number }) =>
+      unwrap<OnvifDiscovered[]>(api.POST("/api/v1/onvif/discover", { body: { seconds: 3, ...body } })),
+  })
+}
+
+/** Probe one device (identity, clock, profiles). One login attempt; the caller shows the error. */
+export function useOnvifProbeCall() {
+  const { api } = useCentral()
+  return (body: OnvifDeviceIn) => unwrap<OnvifProbe>(api.POST("/api/v1/onvif/probe", { body }))
+}
+
+/** Add one camera from ONVIF; the caller shows per-camera results (no toast here). */
+export function useOnvifAddCall() {
+  const { url, api } = useCentral()
+  const qc = useQueryClient()
+  return async (body: OnvifCameraCreate) => {
+    const cam = await unwrap<Camera>(api.POST("/api/v1/onvif/cameras", { body }))
+    ;["cameras", "assignments", "cluster-health"].forEach((k) => qc.invalidateQueries({ queryKey: [url, k] }))
+    return cam
+  }
+}
+
+/** JPEG preview through central -> node -> camera, as an object URL (revoke it when done). */
+export function useOnvifSnapshotCall() {
+  const { url } = useCentral()
+  return async (body: OnvifDeviceIn & { uri: string }): Promise<string> => {
+    let res: Response
+    try {
+      res = await fetch(`${url}/api/v1/onvif/snapshot`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+    } catch {
+      throw new ApiError(0, "Server unreachable")
+    }
+    if (!res.ok) throw new ApiError(res.status, `Snapshot failed (HTTP ${res.status})`)
+    return URL.createObjectURL(await res.blob())
+  }
+}
+
+/** Live device state of a camera (calls the camera, so no polling: refresh on demand). */
+export function useCameraDevice(cameraId: number, enabled: boolean) {
+  const { url, api } = useCentral()
+  return useQuery({
+    queryKey: [url, "onvif-device", cameraId],
+    enabled,
+    retry: false,
+    staleTime: 30_000,
+    queryFn: () =>
+      unwrap<OnvifDeviceState>(api.GET("/api/v1/onvif/cameras/{camera_id}/device", { params: { path: { camera_id: cameraId } } })),
+  })
+}
+
+const DEVICE_KEYS = ["cameras", "onvif-device"]
+
+export const useCameraTimeSync = () =>
+  useCentralMutation(
+    (api, cameraId: number) =>
+      unwrap<OnvifClock>(api.POST("/api/v1/onvif/cameras/{camera_id}/time-sync", { params: { path: { camera_id: cameraId } } })),
+    { success: "Camera clock set to the node's time", invalidate: DEVICE_KEYS, errorText: onvifErrorText },
+  )
+
+export const useCameraNtp = () =>
+  useCentralMutation(
+    (api, { cameraId, body }: { cameraId: number; body: OnvifNtpIn }) =>
+      unwrap(api.POST("/api/v1/onvif/cameras/{camera_id}/ntp", { params: { path: { camera_id: cameraId } }, body })),
+    { success: "NTP settings saved on the camera", invalidate: DEVICE_KEYS, errorText: onvifErrorText },
+  )
+
+export const useCameraReboot = () =>
+  useCentralMutation(
+    (api, cameraId: number) =>
+      unwrap<{ message: string }>(api.POST("/api/v1/onvif/cameras/{camera_id}/reboot", { params: { path: { camera_id: cameraId } } })),
+    { success: (r) => `Camera: ${r.message}`, invalidate: DEVICE_KEYS, errorText: onvifErrorText },
+  )
