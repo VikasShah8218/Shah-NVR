@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     UPLOAD_INTERVAL_SECONDS: int = 3
     STATUS_INTERVAL_SECONDS: int = 10
     DELETION_INTERVAL_SECONDS: int = 60
+    ONVIF_CHECK_INTERVAL_SECONDS: float = 300  # camera reachable + clock offset (no login, see app/onvif/health.py)
 
     # Disk protection: above MAX, delete oldest recordings until below TARGET.
     STORAGE_CHECK_INTERVAL_SECONDS: float = 10
