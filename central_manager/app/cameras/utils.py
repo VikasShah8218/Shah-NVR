@@ -4,6 +4,10 @@ from app.cameras.models import Camera, CameraStream
 from app.cameras.schemas import AssignmentInfo, CameraOut, StreamOut
 
 
+DEVICE_FIELDS = ("onvif_host", "onvif_port", "manufacturer", "model", "firmware", "serial", "mac", "onvif_services",
+                 "onvif_reachable", "clock_offset_seconds", "onvif_checked_at")
+
+
 def build_source_url(stream: CameraStream, camera: Camera) -> str:
     """Inject camera credentials into the stream URL (unless the URL already has them)."""
     parts = urlsplit(stream.source_url)
@@ -40,6 +44,7 @@ async def camera_to_out(camera: Camera) -> CameraOut:
         has_password=bool(camera.password),
         enabled=camera.enabled,
         retention_days=camera.retention_days,
+        **{f: getattr(camera, f) for f in DEVICE_FIELDS},
         created_at=camera.created_at,
         updated_at=camera.updated_at,
         streams=[
@@ -54,6 +59,7 @@ async def camera_to_out(camera: Camera) -> CameraOut:
                 bytes_received=s.bytes_received,
                 last_status_at=s.last_status_at,
                 last_segment_at=s.last_segment_at,
+                onvif_profile_token=s.onvif_profile_token,
             )
             for s in camera.streams
         ],
