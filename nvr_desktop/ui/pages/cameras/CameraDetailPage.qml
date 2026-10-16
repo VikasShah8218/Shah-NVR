@@ -7,24 +7,31 @@ import "../../video"
 import "../assignments"
 
 // Port of nvr_client/src/features/cameras/CameraDetailPage.tsx:
-// tabs Overview (live preview, details, live URLs, streams) / Recordings (last 24 h) / Assignment.
+// tabs Overview / Device (ONVIF) / Recordings / Assignment.
 PageScroll {
     id: root
     objectName: "cameraDetail"
 
     readonly property var c: CameraDetail.camera
     readonly property bool ready: c.id !== undefined
-    property string tab: "overview"
+    property string tab: Router.params && Router.params.tab ? Router.params.tab : "overview"
     property string previewProfile: ""
     property double now: Date.now()
 
     function showTab(name) { tab = name }
 
-    Component.onCompleted: CameraDetail.cameraId = Router.id
+    Component.onCompleted: {
+        CameraDetail.cameraId = Router.id
+    }
     Component.onDestruction: CameraDetail.cameraId = 0
     Connections {
         target: Router
-        function onChanged() { if (Router.page === "camera") CameraDetail.cameraId = Router.id }
+        function onChanged() {
+            if (Router.page === "camera") {
+                CameraDetail.cameraId = Router.id
+                root.tab = Router.params && Router.params.tab ? Router.params.tab : "overview"
+            }
+        }
     }
     Connections {
         target: CameraDetail
@@ -62,9 +69,11 @@ PageScroll {
 
     AppTabs {
         visible: root.ready
-        options: [{ value: "overview", label: "Overview" }, { value: "recordings", label: "Recordings" }, { value: "assignment", label: "Assignment" }]
+        options: [{ value: "overview", label: "Overview" }, { value: "device", label: "Device" }, { value: "recordings", label: "Recordings" }, { value: "assignment", label: "Assignment" }]
         current: root.tab
-        onPicked: v => root.tab = v
+        onPicked: v => {
+            root.tab = v
+        }
     }
 
     // ================================================================= Overview
@@ -222,6 +231,14 @@ PageScroll {
                 }
             }
         }
+    }
+
+    // ================================================================= ONVIF device
+    DeviceTab {
+        visible: root.ready && root.tab === "device"
+        Layout.fillWidth: true
+        camera: root.c
+        active: visible
     }
 
     // ================================================================= Recordings

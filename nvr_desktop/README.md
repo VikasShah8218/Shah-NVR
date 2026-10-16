@@ -9,7 +9,8 @@ decoded on the GPU and drawn by libmpv; **video frames never pass through Python
 | Dashboard | KPIs, alerts, streams by status, node cards |
 | Live View | 1 / 2×2 / 3×3 / 4×4 grid, click or drag cameras onto tiles, RTSP or LL-HLS, snapshot, fullscreen (F11) |
 | Playback | Day timeline (24h / 6h / 1h / 10m, drag to pan, click to play), wall-clock player, ±10 s / ±1 min, 0.5–8×, chunk list, MP4 download |
-| Cameras | Add / edit (streams, brand URL examples), enable / disable, delete; detail tabs Overview / Recordings / Assignment |
+| Cameras | Add / edit (streams, brand URL examples), enable / disable, delete; detail tabs Overview / Device / Recordings / Assignment |
+| Discover | ONVIF network discovery or manual address, multi-camera credential checks, snapshot preview, main/sub selection and onboarding |
 | Media Nodes | CPU / GPU / RAM / storage / quota per node, limits, drain / cordon / activate / delete; detail charts, MediaMTX paths, chunks, logs |
 | Assignments | Which node records each camera, lease countdown, move, history, run scheduler |
 | Settings | Central URL (test / save), refresh interval, live protocol, substreams in grids, hardware decoding |
@@ -56,9 +57,20 @@ cd nvr_desktop
 python -m pytest
 ```
 
-The tests cover all logic outside QML: formatting, status tones, dashboard alerts, node
-resource maths, timeline maths, camera form validation and stream diff, live URL selection, and the
-API clients (against mocked HTTP with `respx`).
+The tests cover formatting, status tones, dashboard alerts, node resource maths, timelines,
+camera forms, live URL selection, API contracts and ONVIF workflows (mocked HTTP, no camera writes).
+With libmpv installed, a separate offscreen desktop process also loads the real QML pages with
+ONVIF and manual cameras, checks names/enabled state and live metadata updates, opens the Device
+tab and onboarding sheet, and fails on QML warnings. It uses isolated preferences.
+
+ONVIF H1 operations go through central to a media node, never directly from the desktop to a
+camera. Device details are read on opening the Device tab or explicit refresh, not polled.
+Wrong credentials are not retried automatically. Time sync and NTP are explicit actions;
+reboot requires confirmation and interrupts recording temporarily.
+
+Camera list roles must never be named `model`, `modelData` or `index`: these shadow Qt's
+delegate context. The API's hardware `model` stays in camera dictionaries and is exposed
+as `deviceModel` in the list model.
 
 ## Code map
 

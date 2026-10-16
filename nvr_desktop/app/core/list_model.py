@@ -16,6 +16,8 @@ class DictListModel(QAbstractListModel):
 
     def __init__(self, roles: list[str], key: str = "id", parent=None):
         super().__init__(parent)
+        if "model" in roles or "modelData" in roles or "index" in roles:
+            raise ValueError("List roles must not shadow QML model, modelData or index")
         self._roles = list(roles)
         self._key = key
         self._items: list[dict] = []

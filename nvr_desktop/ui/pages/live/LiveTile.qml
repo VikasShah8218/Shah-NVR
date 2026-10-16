@@ -16,7 +16,10 @@ Rectangle {
     property string gridProtocol: "auto"
     signal expand(int cameraId)
 
-    readonly property var camera: cameraId ? Cameras.byId(cameraId) : null
+    readonly property var camera: {
+        Cameras.all // subscribe to camera updates, not just changes of the tile ID
+        return cameraId ? Cameras.byId(cameraId) : null
+    }
     readonly property bool selected: Live.selected === index
     property string protocolOverride: "" // "" = same as the grid
     readonly property string protocol: protocolOverride || gridProtocol
