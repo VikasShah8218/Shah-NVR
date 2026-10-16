@@ -20,6 +20,7 @@ from app.cluster.router import router as cluster_router
 from app.nodes.router import internal_router as nodes_internal_router
 from app.nodes.router import router as nodes_router
 from app.nodes.services import node_health_tick
+from app.onvif.router import router as onvif_router
 from app.playback.router import router as playback_router
 from app.recordings.router import internal_router as recordings_internal_router
 from app.recordings.router import router as recordings_router
@@ -67,6 +68,7 @@ for r in (
     nodes_router,
     assignments_router,
     cluster_router,
+    onvif_router,
     nodes_internal_router,
     recordings_internal_router,
 ):
