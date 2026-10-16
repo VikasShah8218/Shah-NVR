@@ -15,6 +15,8 @@ from app.features.cameras import forms
 CAMERA_ROLES = [
     "id", "name", "description", "username", "has_password", "enabled", "retention_days",
     "created_at", "updated_at", "streams", "assignment", "lastSegment", "recordStatus",
+    "onvif_host", "onvif_port", "manufacturer", "model", "firmware", "serial", "mac",
+    "onvif_services", "onvif_reachable", "clock_offset_seconds", "onvif_checked_at",
 ]
 
 

@@ -33,6 +33,7 @@ class Stream(ApiModel):
     bytes_received: int = 0
     last_status_at: datetime | None = None
     last_segment_at: datetime | None = None
+    onvif_profile_token: str | None = None
 
 
 class AssignmentInfo(ApiModel):
@@ -54,6 +55,17 @@ class Camera(ApiModel):
     updated_at: datetime
     streams: list[Stream] = []
     assignment: AssignmentInfo | None = None
+    onvif_host: str | None = None
+    onvif_port: int | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    firmware: str | None = None
+    serial: str | None = None
+    mac: str | None = None
+    onvif_services: list[str] | None = None
+    onvif_reachable: bool | None = None
+    clock_offset_seconds: float | None = None
+    onvif_checked_at: datetime | None = None
 
 
 class LiveUrls(ApiModel):
@@ -69,6 +81,97 @@ class LiveInfo(ApiModel):
     node_name: str
     generation: int
     streams: list[LiveUrls]
+
+
+# ---------------------------------------------------------------- ONVIF H1
+class OnvifDiscovered(ApiModel):
+    endpoint: str
+    host: str
+    port: int
+    xaddr: str
+    name: str | None = None
+    hardware: str | None = None
+    location: str | None = None
+    mac: str | None = None
+    profiles: list[str] = []
+    node_id: int
+    node_name: str
+    camera_id: int | None = None
+    camera_name: str | None = None
+
+
+class OnvifClock(ApiModel):
+    offset_seconds: float | None = None
+    source: str | None = None
+    timezone: str | None = None
+    camera_utc: str | None = None
+
+
+class OnvifProfile(ApiModel):
+    token: str
+    name: str | None = None
+    api: str
+    encoding: str | None = None
+    width: int | None = None
+    height: int | None = None
+    fps: int | None = None
+    bitrate_kbps: int | None = None
+    has_audio: bool = False
+    has_ptz: bool = False
+    rtsp: str | None = None
+    snapshot: str | None = None
+
+
+class OnvifSuggestion(ApiModel):
+    main: str | None = None
+    sub: str | None = None
+
+
+class OnvifDeviceInfo(ApiModel):
+    manufacturer: str | None = None
+    model: str | None = None
+    firmwareversion: str | None = None
+    serialnumber: str | None = None
+    hardwareid: str | None = None
+
+
+class OnvifProbe(ApiModel):
+    node_id: int
+    host: str
+    port: int
+    device_url: str
+    clock: OnvifClock
+    info: OnvifDeviceInfo
+    services: list[str] = []
+    profiles: list[OnvifProfile] = []
+    suggested: OnvifSuggestion
+    camera_id: int | None = None
+
+
+class OnvifNtp(ApiModel):
+    from_dhcp: bool = False
+    servers: list[str] = []
+
+
+class OnvifNetwork(ApiModel):
+    mac: str | None = None
+    dhcp: bool = False
+    ip: str | None = None
+    prefix_length: int | None = None
+
+
+class OnvifDeviceState(ApiModel):
+    camera_id: int
+    node_id: int
+    host: str
+    port: int
+    clock: OnvifClock
+    info: OnvifDeviceInfo
+    services: list[str] = []
+    ntp: OnvifNtp | None = None
+    hostname: str | None = None
+    network: OnvifNetwork | None = None
+    checked_at: datetime
 
 
 # ---------------------------------------------------------------- recordings

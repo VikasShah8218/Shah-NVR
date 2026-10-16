@@ -19,6 +19,10 @@ from app.core.api.models import (
     ClusterHealth,
     LiveInfo,
     MediaNode,
+    OnvifClock,
+    OnvifDeviceState,
+    OnvifDiscovered,
+    OnvifProbe,
     StorageVolume,
     Timeline,
 )
@@ -34,12 +38,14 @@ class CentralApi:
         self._http.close()
 
     # ------------------------------------------------------------------ plumbing
-    def _request(self, method: str, path: str, **kwargs):
+    def _request(self, method: str, path: str, *, raw: bool = False, **kwargs):
         try:
             response = self._http.request(method, path, **kwargs)
         except httpx.HTTPError as exc:
             raise ApiError(0, f"Central manager unreachable ({self.base_url})") from exc
         raise_for_response(response)
+        if raw:
+            return response
         return response.json() if response.content else None
 
     # ------------------------------------------------------------------ system
@@ -84,6 +90,45 @@ class CentralApi:
     def playlist_url(self, camera_id: int, profile: str, start: datetime, end: datetime) -> str:
         query = urlencode({"profile": profile, "start": start.isoformat(), "end": end.isoformat()})
         return f"{self.base_url}/api/v1/playback/{camera_id}/index.m3u8?{query}"
+
+    # ------------------------------------------------------------------ ONVIF H1
+    def onvif_discover(self, node_id: int | None = None, seconds: float = 3.0) -> list[OnvifDiscovered]:
+        body = {"node_id": node_id, "seconds": seconds}
+        rows = self._request("POST", "/api/v1/onvif/discover", json=body, timeout=seconds + 15)
+        return [OnvifDiscovered.model_validate(row) for row in rows]
+
+    def onvif_probe(self, body: dict) -> OnvifProbe:
+        return OnvifProbe.model_validate(
+            self._request("POST", "/api/v1/onvif/probe", json=body, timeout=60)
+        )
+
+    def onvif_snapshot(self, body: dict) -> bytes:
+        response = self._request("POST", "/api/v1/onvif/snapshot", json=body, timeout=30, raw=True)
+        return response.content
+
+    def create_onvif_camera(self, body: dict) -> Camera:
+        return Camera.model_validate(
+            self._request("POST", "/api/v1/onvif/cameras", json=body, timeout=60)
+        )
+
+    def onvif_device(self, camera_id: int) -> OnvifDeviceState:
+        return OnvifDeviceState.model_validate(
+            self._request("GET", f"/api/v1/onvif/cameras/{camera_id}/device", timeout=60)
+        )
+
+    def onvif_time_sync(self, camera_id: int) -> OnvifClock:
+        return OnvifClock.model_validate(
+            self._request("POST", f"/api/v1/onvif/cameras/{camera_id}/time-sync", timeout=60)
+        )
+
+    def onvif_set_ntp(self, camera_id: int, from_dhcp: bool, servers: list[str]) -> dict:
+        return self._request(
+            "POST", f"/api/v1/onvif/cameras/{camera_id}/ntp",
+            json={"from_dhcp": from_dhcp, "servers": servers}, timeout=60,
+        )
+
+    def onvif_reboot(self, camera_id: int) -> dict:
+        return self._request("POST", f"/api/v1/onvif/cameras/{camera_id}/reboot", timeout=60)
 
     # ------------------------------------------------------------------ nodes
     def nodes(self) -> list[MediaNode]:
