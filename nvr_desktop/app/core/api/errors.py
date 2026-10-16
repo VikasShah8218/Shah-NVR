@@ -4,12 +4,10 @@ import httpx
 
 
 class ApiError(Exception):
-    def __init__(self, status: int, message: str, code: str | None = None, detail=None):
+    def __init__(self, status: int, message: str):
         super().__init__(message)
         self.status = status
         self.message = message
-        self.code = code
-        self.detail = detail
 
     def __str__(self) -> str:
         return self.message
@@ -23,8 +21,6 @@ def error_message(response: httpx.Response) -> str:
         detail = None
     if isinstance(detail, str):
         return detail
-    if isinstance(detail, dict):
-        return str(detail.get("message") or detail.get("detail") or f"Request failed (HTTP {response.status_code})")
     if isinstance(detail, list):
         parts = []
         for item in detail:
@@ -36,9 +32,4 @@ def error_message(response: httpx.Response) -> str:
 
 def raise_for_response(response: httpx.Response) -> None:
     if response.status_code >= 400:
-        try:
-            detail = response.json().get("detail")
-        except ValueError:
-            detail = None
-        code = detail.get("code") if isinstance(detail, dict) else None
-        raise ApiError(response.status_code, error_message(response), code=code, detail=detail)
+        raise ApiError(response.status_code, error_message(response))

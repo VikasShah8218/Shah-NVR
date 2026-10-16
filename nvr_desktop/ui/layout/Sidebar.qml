@@ -14,7 +14,6 @@ Rectangle {
         { page: "live", label: "Live View", icon: "monitor-play" },
         { page: "playback", label: "Playback", icon: "history" },
         { page: "cameras", label: "Cameras", icon: "camera" },
-        { page: "discover", label: "Discover", icon: "search" },
         { page: "nodes", label: "Media Nodes", icon: "server" },
         { page: "assignments", label: "Assignments", icon: "arrow-left-right" },
         { page: "settings", label: "Settings", icon: "settings" }

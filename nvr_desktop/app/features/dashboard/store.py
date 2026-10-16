@@ -11,7 +11,7 @@ from app.features.dashboard.alerts import build_alerts
 from app.features.dashboard.cluster_store import ClusterStore
 from app.features.nodes.store import NodesStore
 
-ALERT_ROLES = ["key", "level", "title", "detail", "page", "id", "tab"]
+ALERT_ROLES = ["key", "level", "title", "detail", "page", "id"]
 
 
 class DashboardStore(QObject):

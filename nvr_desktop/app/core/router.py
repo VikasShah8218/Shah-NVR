@@ -1,6 +1,6 @@
 """Router: which page is shown (QML singleton `Router`). The desktop equivalent of React Router.
 
-Pages: dashboard, live, playback, cameras, camera (id), discover, nodes, node (id), assignments, settings.
+Pages: dashboard, live, playback, cameras, camera (id), nodes, node (id), assignments, settings.
 `go(page, id)` navigates; `back()` returns to the previous page; `params` holds extra values
 (e.g. Playback opened from a camera at a given time).
 """
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
-PAGES = ("dashboard", "live", "playback", "cameras", "camera", "discover", "nodes", "node", "assignments", "settings")
+PAGES = ("dashboard", "live", "playback", "cameras", "camera", "nodes", "node", "assignments", "settings")
 
 
 class Router(QObject):

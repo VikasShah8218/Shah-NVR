@@ -31,7 +31,6 @@ PageScroll {
             placeholderText: "Search cameras"
             onTextChanged: root.search = text
         }
-        AppButton { text: "Discover"; iconName: "search"; variant: "outline"; onClicked: Router.go("discover") }
         AppButton { text: "Add camera"; iconName: "plus"; onClicked: form.openFor(null) }
     }
 
@@ -41,7 +40,7 @@ PageScroll {
         visible: !Cameras.loading && Cameras.error === "" && Cameras.listModel.count === 0
         iconName: "camera"
         title: "No cameras yet"
-        text: "Use Discover for ONVIF cameras, or Add camera to enter an RTSP URL manually."
+        text: "Click Add camera and enter the camera's RTSP URL."
     }
 
     Rectangle {
