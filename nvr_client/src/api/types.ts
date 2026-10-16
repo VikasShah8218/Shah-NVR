@@ -26,6 +26,15 @@ export type VolumeState = StorageVolume["state"]
 export type VolumeCreate = C["schemas"]["VolumeCreate"]
 export type VolumeUpdate = C["schemas"]["VolumeUpdate"]
 export type DriveInfo = C["schemas"]["DriveInfo"]
+// ONVIF (H1)
+export type OnvifDiscovered = C["schemas"]["DiscoveredOut"]
+export type OnvifDeviceIn = C["schemas"]["DeviceIn"]
+export type OnvifProbe = C["schemas"]["ProbeOut"]
+export type OnvifProfile = C["schemas"]["ProfileOut"]
+export type OnvifCameraCreate = C["schemas"]["OnvifCameraCreate"]
+export type OnvifDeviceState = C["schemas"]["DeviceStateOut"]
+export type OnvifClock = C["schemas"]["ClockOut"]
+export type OnvifNtpIn = C["schemas"]["NtpIn"]
 
 /** Shape of MediaNode.metrics (the node's last heartbeat; stored as free JSON by central). */
 export interface NodeMetrics {
