@@ -1,4 +1,4 @@
-import { Camera as CameraIcon, History, MonitorPlay, MoreHorizontal, Pencil, Plus, Search, Trash2 } from "lucide-react"
+import { Camera as CameraIcon, History, MonitorPlay, MoreHorizontal, Pencil, Plus, Radar, Search, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { Link, useNavigate } from "react-router"
 import { useCameras, useDeleteCamera, useUpdateCamera } from "@/api/queries"
@@ -40,6 +40,11 @@ export function CamerasPage() {
               <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
               <Input className="pl-8" placeholder="Search cameras" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
+            <Button variant="outline" asChild>
+              <Link to="/discover">
+                <Radar className="size-4" /> Discover
+              </Link>
+            </Button>
             <Button onClick={() => setEditing("new")}>
               <Plus className="size-4" /> Add camera
             </Button>
@@ -50,7 +55,7 @@ export function CamerasPage() {
       {cameras.error && <ErrorState error={cameras.error} />}
       {cameras.data && cameras.data.length === 0 && (
         <EmptyState icon={CameraIcon} title="No cameras yet">
-          Click <b>Add camera</b> and enter the camera's RTSP URL.
+          Use <b>Discover</b> to find ONVIF cameras on the network, or click <b>Add camera</b> and enter an RTSP URL.
         </EmptyState>
       )}
       {list.length > 0 && (
