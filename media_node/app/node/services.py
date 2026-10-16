@@ -72,6 +72,7 @@ def disk_info() -> dict:
 
 
 async def heartbeat_tick() -> None:
+    from app.onvif.health import ack_reports, take_reports
     from app.recordings.models import LocalSegment
     from app.recordings.services import recordings_used_bytes
     from app.storage.services import local_drives, storage
@@ -93,10 +94,12 @@ async def heartbeat_tick() -> None:
         "default_recordings_dir": str(settings.RECORDINGS_DIR),
         "drives": await asyncio.to_thread(local_drives),
         "volumes": storage.reports(),
+        "onvif": (onvif_reports := take_reports()),
     }
     try:
         data = await central.heartbeat(runtime.node_id, payload)
         runtime.last_central_contact = utcnow()
+        ack_reports(onvif_reports)
         await storage.apply_config(data.get("volumes"), data.get("storage_quota_bytes"))
     except CentralError as exc:
         if exc.status_code == 404:  # central lost us (e.g. DB reset): register again
