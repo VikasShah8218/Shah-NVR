@@ -2131,6 +2131,118 @@
         }
       }
     },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/ptz": {
+      "post": {
+        "tags": [
+          "PTZ"
+        ],
+        "summary": "Open Ptz",
+        "operationId": "open_ptz_api_v1_cameras__camera_id__streams__profile__ptz_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PtzState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/ptz/command": {
+      "post": {
+        "tags": [
+          "PTZ"
+        ],
+        "summary": "Ptz Command",
+        "operationId": "ptz_command_api_v1_cameras__camera_id__streams__profile__ptz_command_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PtzCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PtzResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/nodes/register": {
       "post": {
         "tags": [
@@ -5291,6 +5403,301 @@
           "snapshot"
         ],
         "title": "ProfileOut"
+      },
+      "PtzCapabilities": {
+        "properties": {
+          "pan_tilt": {
+            "type": "boolean",
+            "title": "Pan Tilt",
+            "default": false
+          },
+          "zoom": {
+            "type": "boolean",
+            "title": "Zoom",
+            "default": false
+          },
+          "presets": {
+            "type": "boolean",
+            "title": "Presets",
+            "default": false
+          },
+          "home": {
+            "type": "boolean",
+            "title": "Home",
+            "default": false
+          },
+          "home_set": {
+            "type": "boolean",
+            "title": "Home Set",
+            "default": false
+          },
+          "camera_timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera Timeout Seconds"
+          }
+        },
+        "type": "object",
+        "title": "PtzCapabilities"
+      },
+      "PtzCommand": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 16,
+            "title": "Session Id"
+          },
+          "sequence": {
+            "type": "integer",
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Sequence"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "move",
+              "stop",
+              "refresh",
+              "preset_save",
+              "preset_goto",
+              "preset_remove",
+              "home_goto",
+              "home_set"
+            ],
+            "title": "Action"
+          },
+          "pan": {
+            "type": "number",
+            "maximum": 0.5,
+            "minimum": -0.5,
+            "title": "Pan",
+            "default": 0
+          },
+          "tilt": {
+            "type": "number",
+            "maximum": 0.5,
+            "minimum": -0.5,
+            "title": "Tilt",
+            "default": 0
+          },
+          "zoom": {
+            "type": "number",
+            "maximum": 0.5,
+            "minimum": -0.5,
+            "title": "Zoom",
+            "default": 0
+          },
+          "preset_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset Token"
+          },
+          "preset_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset Name"
+          },
+          "confirm": {
+            "type": "boolean",
+            "title": "Confirm",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session_id",
+          "sequence",
+          "action"
+        ],
+        "title": "PtzCommand"
+      },
+      "PtzPreset": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "name"
+        ],
+        "title": "PtzPreset"
+      },
+      "PtzResult": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PtzStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "presets": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PtzPreset"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "PtzResult"
+      },
+      "PtzState": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "title": "Expires In Seconds",
+            "default": 120
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/PtzCapabilities"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PtzStatus"
+          },
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/PtzPreset"
+            },
+            "type": "array",
+            "title": "Presets",
+            "default": []
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "capabilities",
+          "status"
+        ],
+        "title": "PtzState"
+      },
+      "PtzStatus": {
+        "properties": {
+          "pan": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pan"
+          },
+          "tilt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tilt"
+          },
+          "zoom": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zoom"
+          },
+          "pan_tilt_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pan Tilt State"
+          },
+          "zoom_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zoom State"
+          },
+          "position_valid": {
+            "type": "boolean",
+            "title": "Position Valid",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PtzStatus"
       },
       "RecoveryOut": {
         "properties": {

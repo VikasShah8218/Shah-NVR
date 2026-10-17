@@ -23,6 +23,7 @@ from app.node.services import check_public_host, heartbeat_tick, load_local_stat
 from app.node.utils import central
 from app.onvif.health import onvif_tick
 from app.onvif.router import router as onvif_router
+from app.onvif.ptz_router import router as ptz_router
 from app.recordings.router import router as recordings_router
 from app.recordings.services import deletion_tick, scan_tick, upload_tick
 from app.storage.services import storage, storage_tick
@@ -83,6 +84,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], a
 app.include_router(node_router)
 app.include_router(recordings_router)
 app.include_router(onvif_router)
+app.include_router(ptz_router)
 
 
 @app.get("/", tags=["System"])

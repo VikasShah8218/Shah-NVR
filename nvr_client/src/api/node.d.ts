@@ -327,6 +327,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/onvif/ptz/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open Ptz */
+        post: operations["open_ptz_api_v1_onvif_ptz_open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/ptz/command": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ptz Command */
+        post: operations["ptz_command_api_v1_onvif_ptz_command_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -788,6 +822,176 @@ export interface components {
             rtsp: string | null;
             /** Snapshot */
             snapshot: string | null;
+        };
+        /** PtzCapabilities */
+        PtzCapabilities: {
+            /**
+             * Pan Tilt
+             * @default false
+             */
+            pan_tilt: boolean;
+            /**
+             * Zoom
+             * @default false
+             */
+            zoom: boolean;
+            /**
+             * Presets
+             * @default false
+             */
+            presets: boolean;
+            /**
+             * Home
+             * @default false
+             */
+            home: boolean;
+            /**
+             * Home Set
+             * @default false
+             */
+            home_set: boolean;
+            /** Camera Timeout Seconds */
+            camera_timeout_seconds?: number | null;
+        };
+        /** PtzCommand */
+        PtzCommand: {
+            /** Session Id */
+            session_id: string;
+            /** Sequence */
+            sequence: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "move" | "stop" | "refresh" | "preset_save" | "preset_goto" | "preset_remove" | "home_goto" | "home_set";
+            /**
+             * Pan
+             * @default 0
+             */
+            pan: number;
+            /**
+             * Tilt
+             * @default 0
+             */
+            tilt: number;
+            /**
+             * Zoom
+             * @default 0
+             */
+            zoom: number;
+            /** Preset Token */
+            preset_token?: string | null;
+            /** Preset Name */
+            preset_name?: string | null;
+            /**
+             * Confirm
+             * @default false
+             */
+            confirm: boolean;
+        };
+        /** PtzCommandIn */
+        PtzCommandIn: {
+            /** Host */
+            host: string;
+            /**
+             * Port
+             * @default 80
+             */
+            port: number;
+            /**
+             * Username
+             * @default
+             */
+            username: string;
+            /**
+             * Password
+             * @default
+             */
+            password: string;
+            /** Xaddr */
+            xaddr?: string | null;
+            /** Profile Token */
+            profile_token: string;
+            command: components["schemas"]["PtzCommand"];
+        };
+        /** PtzOpenIn */
+        PtzOpenIn: {
+            /** Host */
+            host: string;
+            /**
+             * Port
+             * @default 80
+             */
+            port: number;
+            /**
+             * Username
+             * @default
+             */
+            username: string;
+            /**
+             * Password
+             * @default
+             */
+            password: string;
+            /** Xaddr */
+            xaddr?: string | null;
+            /** Profile Token */
+            profile_token: string;
+        };
+        /** PtzPreset */
+        PtzPreset: {
+            /** Token */
+            token: string;
+            /** Name */
+            name: string;
+        };
+        /** PtzResult */
+        PtzResult: {
+            /** Message */
+            message: string;
+            status?: components["schemas"]["PtzStatus"] | null;
+            /** Presets */
+            presets?: components["schemas"]["PtzPreset"][] | null;
+        };
+        /** PtzState */
+        PtzState: {
+            /** Session Id */
+            session_id: string;
+            /**
+             * Expires In Seconds
+             * @default 120
+             */
+            expires_in_seconds: number;
+            capabilities: components["schemas"]["PtzCapabilities"];
+            status: components["schemas"]["PtzStatus"];
+            /**
+             * Presets
+             * @default []
+             */
+            presets: components["schemas"]["PtzPreset"][];
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
+        /** PtzStatus */
+        PtzStatus: {
+            /** Pan */
+            pan?: number | null;
+            /** Tilt */
+            tilt?: number | null;
+            /** Zoom */
+            zoom?: number | null;
+            /** Pan Tilt State */
+            pan_tilt_state?: string | null;
+            /** Zoom State */
+            zoom_state?: string | null;
+            /**
+             * Position Valid
+             * @default false
+             */
+            position_valid: boolean;
         };
         /** RebootOut */
         RebootOut: {
@@ -1415,6 +1619,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EncoderResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_ptz_api_v1_onvif_ptz_open_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PtzOpenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PtzState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ptz_command_api_v1_onvif_ptz_command_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PtzCommandIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PtzResult"];
                 };
             };
             /** @description Validation Error */
