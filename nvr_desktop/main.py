@@ -90,6 +90,7 @@ def build_app():
     from app.features.nodes.detail_store import NodeDetailStore
     from app.features.nodes.store import NodesStore
     from app.features.onvif.store import DiscoverStore
+    from app.features.encoder.store import EncoderStore
     from app.features.playback.store import PlaybackStore
     from app.features.settings.store import SettingsStore
     from app.video import register_video_types
@@ -116,6 +117,7 @@ def build_app():
         "Discover": DiscoverStore(ctx, cameras, nodes),
         "Dashboard": DashboardStore(ctx, cluster, cameras, nodes),
         "CameraDetail": CameraDetailStore(ctx),
+        "Encoder": EncoderStore(ctx, cameras),
         "NodeDetail": NodeDetailStore(ctx),
         "Assignments": AssignmentsStore(ctx),
         "Live": LiveStore(ctx),

@@ -9,7 +9,7 @@ decoded on the GPU and drawn by libmpv; **video frames never pass through Python
 | Dashboard | KPIs, alerts, streams by status, node cards |
 | Live View | 1 / 2×2 / 3×3 / 4×4 grid, click or drag cameras onto tiles, RTSP or LL-HLS, snapshot, fullscreen (F11) |
 | Playback | Day timeline (24h / 6h / 1h / 10m, drag to pan, click to play), wall-clock player, ±10 s / ±1 min, 0.5–8×, chunk list, MP4 download |
-| Cameras | Add / edit (streams, brand URL examples), enable / disable, delete; detail tabs Overview / Device / Recordings / Assignment |
+| Cameras | Add / edit (streams, brand URL examples), enable / disable, delete; detail tabs Overview / Device / Video / Recordings / Assignment |
 | Discover | ONVIF network discovery or manual address, multi-camera credential checks, snapshot preview, main/sub selection and onboarding |
 | Media Nodes | CPU / GPU / RAM / storage / quota per node, limits, drain / cordon / activate / delete; detail charts, MediaMTX paths, chunks, logs |
 | Assignments | Which node records each camera, lease countdown, move, history, run scheduler |
@@ -61,7 +61,32 @@ The tests cover formatting, status tones, dashboard alerts, node resource maths,
 camera forms, live URL selection, API contracts and ONVIF workflows (mocked HTTP, no camera writes).
 With libmpv installed, a separate offscreen desktop process also loads the real QML pages with
 ONVIF and manual cameras, checks names/enabled state and live metadata updates, opens the Device
-tab and onboarding sheet, and fails on QML warnings. It uses isolated preferences.
+tab, H2 Video editor and onboarding sheet, and fails on QML warnings. It uses isolated preferences.
+
+### ONVIF H2 video settings
+
+Open **Cameras → camera → Video**, then choose the NVR stream (main/sub). This requires
+the H2-enabled central manager and media node. No new desktop dependencies or migrations are needed.
+
+- Map the stream to its ONVIF profile explicitly; saving a mapping does not change its RTSP URL.
+- Edit codec, resolution, frame rate, bitrate, GOP, quality and exposed rate-control/profile fields.
+  Multiple advertised option blocks remain separate; a proposal must fit one complete block.
+- Storage saver / Best quality / Low-bandwidth substream are editable proposals. Storage estimates
+  are decimal GB/day for continuous video at the configured bitrate, not guaranteed VBR usage.
+- Review runs a read-only server preflight. Only the subsequent confirmation writes to the camera.
+  Shared encoders require acknowledgment. All device streams may briefly stop and recordings may gap.
+- History supports restoring saved before-values through another preflight and confirmation.
+  Recovery reports fresh stream status and recording evidence, not proof of decoder compatibility.
+- Bulk applies only edited fields to the same stream name on up to 20 selected cameras. Each target
+  is checked; unsupported/shared targets are skipped. Confirmed writes run sequentially and stop
+  after an unverified result. Navigation/server changes cancel unsent work, not a write already sent.
+- Writes are never automatically retried. For a pending/unknown outcome, wait at least two minutes
+  and use **Resolve / fresh readback** on the affected camera before another write.
+
+Only central history/recovery is polled while this tab is open; camera settings are read on entry,
+explicit reload, preflight or readback. The isolated encoder store does not modify camera-list roles
+or the live/playback video engine. Automated tests use mocked APIs; physical-camera acceptance
+should verify apply/readback and live/recording recovery against the deployed H2 server.
 
 ONVIF H1 operations go through central to a media node, never directly from the desktop to a
 camera. Device details are read on opening the Device tab or explicit refresh, not polled.

@@ -23,6 +23,7 @@ from app.core.store import BaseStore
 from app.features.cameras.store import _decorate
 from tests.test_api import CAMERA
 from tests.test_onvif import DISCOVERED, PROBE
+from tests.test_encoder import immediate, mock_api
 
 
 def walk(obj):
@@ -138,6 +139,41 @@ Item {
                 page.setProperty("tab", tab)
                 settle()
 
+            # Real Video tab, fake API: exercise field bindings, alternative H265
+            # options, review dialog and stream navigation without touching a camera.
+            encoder = stores["Encoder"]
+            encoder._ctx.central = mock_api()
+            with patch("app.features.encoder.store.run_task", immediate):
+                page.setProperty("tab", "video")
+                settle()
+                assert "Video encoder" in " ".join(texts())
+                assert "Gate" in texts()
+                field = next(o for o in walk(window) if o.objectName() == "encoderInput-bitrate_kbps")
+                field.forceActiveFocus()
+                field.setProperty("text", "4096")
+                QMetaObject.invokeMethod(field, "textEdited")
+                encoder.refreshStatus()
+                settle()
+                assert field.property("activeFocus") and field.property("text") == "4096"
+                assert next(o for o in walk(window) if o.objectName() == "encoderInput-bitrate_kbps") == field
+                settle()
+                assert encoder.view["canApply"] and not encoder.view["errors"]
+                assert "44.2 GB/day" in " ".join(texts())
+                button = next(o for o in walk(window) if o.objectName() == "encoderReview")
+                QMetaObject.invokeMethod(button, "clicked")
+                settle()
+                dialog = next(o for o in walk(window) if o.objectName() == "encoderConfirmation")
+                assert dialog.property("visible")
+                encoder._ctx.central.encoder_apply.assert_not_called()
+                dialog.close()
+                encoder.confirm()
+                settle()
+                encoder._ctx.central.encoder_apply.assert_called_once()
+                assert window.grabWindow().save(str(output / "video.png"))
+                page.setProperty("tab", "overview")
+                settle()
+                assert encoder.view["state"] == {}
+
             router.go("discover")
             discover = stores["Discover"]
             discover._rows = [OnvifDiscovered.model_validate(DISCOVERED).to_qml()]
@@ -178,7 +214,7 @@ Item {
             engine.deleteLater()
             QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
             app.processEvents()
-            print("QML smoke passed: camera roles, populated pages, live metadata updates, Device and onboarding")
+            print("QML smoke passed: camera roles, populated pages, live metadata updates, Device, H2 Video and onboarding")
     finally:
         qInstallMessageHandler(previous)
 

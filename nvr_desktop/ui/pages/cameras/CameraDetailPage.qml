@@ -7,7 +7,7 @@ import "../../video"
 import "../assignments"
 
 // Port of nvr_client/src/features/cameras/CameraDetailPage.tsx:
-// tabs Overview / Device (ONVIF) / Recordings / Assignment.
+// tabs Overview / Device (ONVIF) / Video / Recordings / Assignment.
 PageScroll {
     id: root
     objectName: "cameraDetail"
@@ -69,7 +69,7 @@ PageScroll {
 
     AppTabs {
         visible: root.ready
-        options: [{ value: "overview", label: "Overview" }, { value: "device", label: "Device" }, { value: "recordings", label: "Recordings" }, { value: "assignment", label: "Assignment" }]
+        options: [{ value: "overview", label: "Overview" }, { value: "device", label: "Device" }, { value: "video", label: "Video" }, { value: "recordings", label: "Recordings" }, { value: "assignment", label: "Assignment" }]
         current: root.tab
         onPicked: v => {
             root.tab = v
@@ -236,6 +236,14 @@ PageScroll {
     // ================================================================= ONVIF device
     DeviceTab {
         visible: root.ready && root.tab === "device"
+        Layout.fillWidth: true
+        camera: root.c
+        active: visible
+    }
+
+    // ================================================================= H2 video settings
+    VideoTab {
+        visible: root.ready && root.tab === "video"
         Layout.fillWidth: true
         camera: root.c
         active: visible

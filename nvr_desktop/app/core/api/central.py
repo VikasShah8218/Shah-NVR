@@ -7,11 +7,12 @@ on a worker thread, so the UI thread never waits on the network.
 from __future__ import annotations
 
 from datetime import datetime
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import httpx
 
 from app.core.api.errors import ApiError, raise_for_response
+from app.core.api.encoder_models import EncoderChange, EncoderHistory, EncoderState
 from app.core.api.models import (
     Assignment,
     AssignmentHistory,
@@ -36,6 +37,36 @@ class CentralApi:
 
     def close(self) -> None:
         self._http.close()
+
+    # H2: no automatic retries, especially after an uncertain camera write.
+    @staticmethod
+    def _encoder_path(camera_id: int, profile: str) -> str:
+        return f"/api/v1/cameras/{camera_id}/streams/{quote(profile, safe='')}/encoder"
+
+    def encoder(self, camera_id: int, profile: str) -> EncoderState:
+        return EncoderState.model_validate(self._request("GET", self._encoder_path(camera_id, profile), timeout=75))
+
+    def encoder_mapping(self, camera_id: int, profile: str, token: str) -> EncoderState:
+        return EncoderState.model_validate(self._request("PUT", self._encoder_path(camera_id, profile) + "/mapping",
+                                                       json={"profile_token": token}, timeout=75))
+
+    def encoder_check(self, camera_id: int, profile: str, body: dict) -> EncoderState:
+        return EncoderState.model_validate(self._request("POST", self._encoder_path(camera_id, profile) + "/check",
+                                                       json=body, timeout=75))
+
+    def encoder_apply(self, camera_id: int, profile: str, body: dict) -> EncoderChange:
+        # Central performs a 60s preflight followed by a bounded 100s apply/readback.
+        return EncoderChange.model_validate(self._request("PUT", self._encoder_path(camera_id, profile),
+                                                        json=body, timeout=190))
+
+    def encoder_history(self, camera_id: int, profile: str) -> EncoderHistory:
+        return EncoderHistory.model_validate(self._request("GET", self._encoder_path(camera_id, profile) + "/history"))
+
+    def encoder_recovery(self, camera_id: int, profile: str) -> dict:
+        return self._request("GET", self._encoder_path(camera_id, profile) + "/recovery")
+
+    def encoder_resolve(self, camera_id: int, profile: str) -> dict:
+        return self._request("POST", self._encoder_path(camera_id, profile) + "/resolve", timeout=75)
 
     # ------------------------------------------------------------------ plumbing
     def _request(self, method: str, path: str, *, raw: bool = False, **kwargs):
