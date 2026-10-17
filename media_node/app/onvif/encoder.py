@@ -54,7 +54,27 @@ async def call(dev, url, el):
     return await dev.soap.call(url, etree.tostring(el, encoding="unicode"))
 
 
-def values(conf, ns):
+def current_number(text, field, warnings, *, integer=False, positive=False):
+    """Normalize device-reported values, not user input or the original XML.
+
+    Some devices (e.g. Illustra PTZ Media1) report BitrateLimit=0 and no
+    bitrate options. This is not a usable limit, nor evidence of unlimited
+    bitrate. Expose it as unknown instead of failing response validation.
+    Keep write schemas strict and preserve the camera's XML for other edits.
+    """
+    value = number(text)
+    if value is not None and (not positive or value > 0) and (not integer or value.is_integer()):
+        return int(value) if integer else value
+    if text is not None:
+        warning = f"Camera reports an invalid {field}; this field is unavailable and read-only."
+        if field == "bitrate limit":
+            warning += " Storage estimate is unavailable."
+        warnings.append(warning)
+    return None
+
+
+def values(conf, ns, warnings=None):
+    warnings = warnings if warnings is not None else []
     rate = conf.find("tt:RateControl", NS)
     mode = rate.get("ConstantBitRate", "false") if rate is not None and ns == "tr2" else None
     # AverageBitRate overrides ConstantBitRate; do not mislabel it as CBR.
@@ -62,12 +82,13 @@ def values(conf, ns):
         mode = None
     return {
         "encoding": codec(_t(conf, "tt:Encoding")),
-        "width": number(_t(conf, "tt:Resolution/tt:Width")),
-        "height": number(_t(conf, "tt:Resolution/tt:Height")),
-        "fps": number(_t(rate, "tt:FrameRateLimit")),
-        "bitrate_kbps": number(_t(rate, "tt:BitrateLimit")),
-        "gop": number(conf.get("GovLength") if ns == "tr2" else _t(conf, "tt:H264/tt:GovLength")),
-        "quality": number(_t(conf, "tt:Quality")),
+        "width": current_number(_t(conf, "tt:Resolution/tt:Width"), "width", warnings, integer=True, positive=True),
+        "height": current_number(_t(conf, "tt:Resolution/tt:Height"), "height", warnings, integer=True, positive=True),
+        "fps": current_number(_t(rate, "tt:FrameRateLimit"), "frame rate", warnings, positive=True),
+        "bitrate_kbps": current_number(_t(rate, "tt:BitrateLimit"), "bitrate limit", warnings, integer=True, positive=True),
+        "gop": current_number(conf.get("GovLength") if ns == "tr2" else _t(conf, "tt:H264/tt:GovLength"),
+                              "GOP", warnings, integer=True, positive=True),
+        "quality": current_number(_t(conf, "tt:Quality"), "quality", warnings),
         "codec_profile": conf.get("Profile") if ns == "tr2" else _t(conf, "tt:H264/tt:H264Profile"),
         "rate_control": ("CBR" if mode in ("true", "1") else "VBR") if mode is not None else None,
     }
@@ -148,7 +169,7 @@ async def read(dev: OnvifDevice, profile_token: str | None, api: str | None = No
                          if e.get("token") == token), None)
             if conf is None:
                 raise NotSupported("The camera did not return the requested encoder configuration")
-            current = values(conf, ns)
+            current = values(conf, ns, state["warnings"])
             if current["encoding"] not in ("H264", "H265"):
                 raise NotSupported("Only H264/H265 encoder configurations are editable")
             try:

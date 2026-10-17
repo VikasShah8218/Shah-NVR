@@ -72,6 +72,23 @@ def test_multiple_options_accept_the_reported_h265_proposal():
     assert len(alternatives([OPTION, deepcopy(OPTION)], "H265")) == 1
 
 
+def test_ptz_unavailable_bitrate_displays_other_fields_and_cannot_be_edited(setup):
+    _, _, _, store = setup
+    state = deepcopy(STATE)
+    state["current"]["bitrate_kbps"] = None
+    state["options"][0]["bitrate_range"] = None
+    store._accept_state(state)
+    field = next(f for f in store.view["fields"] if f["key"] == "bitrate_kbps")
+    assert not field["enabled"] and field["value"] == ""
+    assert "current unknown" in store.view["storage"]
+    store.edit("fps", "15")
+    assert store.view["canApply"]
+    store.preset("Storage saver")
+    assert store.view["draft"]["bitrate_kbps"] is None
+    store.edit("bitrate_kbps", "4096")
+    assert not store.view["canApply"]
+
+
 def test_never_union_incompatible_alternatives():
     draft = {**STATE["current"], "width": 640, "height": 360, "bitrate_kbps": 4096}
     assert validation(STATE, draft)

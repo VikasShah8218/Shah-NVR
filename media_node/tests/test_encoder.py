@@ -183,9 +183,79 @@ def test_unmapped_returns_choices_without_guessing():
 
 
 def test_nonfinite_and_extra_fields_rejected():
-    for value in ({"fps": float("nan")}, {"fps": float("inf")}, {"bitrate_kbps": -1}, {"unknown": 1}):
+    for value in ({"fps": float("nan")}, {"fps": float("inf")}, {"bitrate_kbps": -1}, {"bitrate_kbps": 0}, {"unknown": 1}):
         with pytest.raises(ValidationError):
             EncoderValues(**value)
+
+
+@pytest.mark.parametrize("ns", ["tr2", "trt"])
+@pytest.mark.parametrize("reported", ["0", "-1", "NaN", "INF", "broken", "4096.5"])
+def test_invalid_reported_bitrate_is_unknown_not_a_response_failure(ns, reported):
+    conf = config(ns)
+    conf.find("tt:RateControl/tt:BitrateLimit", NS).text = reported
+    warnings = []
+    current = encoder.values(conf, ns, warnings)
+    EncoderValues.model_validate(current)
+    assert current["bitrate_kbps"] is None
+    assert current["fps"] == 25 and current["width"] == 1920
+    assert len(warnings) == 1 and "Storage estimate is unavailable" in warnings[0]
+    assert conf.find("tt:RateControl/tt:BitrateLimit", NS).text == reported
+
+
+@pytest.mark.parametrize("key,path,reported", [
+    ("width", "tt:Resolution/tt:Width", "0"),
+    ("height", "tt:Resolution/tt:Height", "1080.5"),
+    ("fps", "tt:RateControl/tt:FrameRateLimit", "-1"),
+    ("gop", "tt:H264/tt:GovLength", "0"),
+    ("quality", "tt:Quality", "NaN"),
+])
+def test_other_malformed_numeric_read_fields_are_unavailable(key, path, reported):
+    conf = config("trt")
+    conf.find(path, NS).text = reported
+    warnings = []
+    current = encoder.values(conf, "trt", warnings)
+    EncoderValues.model_validate(current)
+    assert current[key] is None and len(warnings) == 1
+
+
+def test_valid_zero_quality_fractional_fps_and_unlimited_sentinel_are_preserved():
+    conf = config()
+    conf.find("tt:Quality", NS).text = "0"
+    conf.find("tt:RateControl/tt:FrameRateLimit", NS).text = "12.5"
+    conf.find("tt:RateControl/tt:BitrateLimit", NS).text = "2147483647"
+    warnings = []
+    current = encoder.values(conf, "tr2", warnings)
+    assert current["quality"] == 0 and current["fps"] == 12.5 and current["bitrate_kbps"] == 2147483647
+    assert not warnings
+
+
+@pytest.mark.parametrize("ns", ["tr2", "trt"])
+def test_ptz_zero_bitrate_other_edits_preserve_xml_and_readback(ns):
+    async def go():
+        sim = CameraSimulator(ns, shared=True)
+        sim.conf.find("tt:RateControl/tt:BitrateLimit", NS).text = "0"
+        async with await sim.device() as dev:
+            state, original, _ = await encoder.read(dev, "profile&one")
+            EncoderState.model_validate(state)
+            assert state["current"]["bitrate_kbps"] is None
+            assert any("bitrate limit" in w for w in state["warnings"])
+            # Unknown fields cannot be written, even if options advertise a range.
+            with pytest.raises(HTTPException) as exc:
+                await encoder.apply(dev, "profile&one", state["revision"], {"bitrate_kbps": 2048}, True)
+            assert exc.value.detail["code"] == "unsupported" and sim.sets == 0
+            with pytest.raises(HTTPException) as exc:
+                await encoder.apply(dev, "profile&one", state["revision"], {"fps": 5}, False)
+            assert exc.value.detail["code"] == "shared_encoder" and sim.sets == 0
+            result = await encoder.apply(dev, "profile&one", state["revision"], {"fps": 5}, True)
+            assert result["outcome"] == "verified" and sim.sets == 1
+            EncoderState.model_validate(result["after"])
+            assert sim.conf.find("tt:RateControl/tt:BitrateLimit", NS).text == "0"
+            # Revisions continue to cover raw XML, not the normalized public values.
+            sim.conf.find("tt:RateControl/tt:BitrateLimit", NS).text = "-1"
+            next_state, _, _ = await encoder.read(dev, "profile&one")
+            assert next_state["current"]["bitrate_kbps"] is None
+            assert next_state["revision"] != result["after"]["revision"]
+    asyncio.run(go())
 
 
 def test_use_count_requires_ack_even_when_other_profiles_are_hidden():
@@ -333,11 +403,14 @@ def test_media2_multiple_h265_entries_end_to_end(monkeypatch, duplicate):
     asyncio.run(go())
 
 
-def test_node_http_contract_preflight_apply_and_invalid_body(monkeypatch):
+@pytest.mark.parametrize("zero_bitrate", [False, True])
+def test_node_http_contract_preflight_apply_and_invalid_body(monkeypatch, zero_bitrate):
     from fastapi import FastAPI
     from app.onvif import router
     from app.mediamtx import services
     sim = CameraSimulator()
+    if zero_bitrate:
+        sim.conf.find("tt:RateControl/tt:BitrateLimit", NS).text = "0"
     class SimDevice(OnvifDevice):
         def __init__(self, *args, **kwargs):
             self.host = "camera"
@@ -356,12 +429,20 @@ def test_node_http_contract_preflight_apply_and_invalid_body(monkeypatch):
     async def go():
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://node") as client:
             body = {"host": "camera", "profile_token": "profile&one"}
-            state = (await client.post("/api/v1/onvif/encoder/read", json=body)).json()
-            write = {**body, "revision": state["revision"], "values": {"bitrate_kbps": 2048}, "camera_ids": [1]}
+            response = await client.post("/api/v1/onvif/encoder/read", json=body)
+            assert response.status_code == 200, response.text
+            state = response.json()
+            if zero_bitrate:
+                assert state["current"]["bitrate_kbps"] is None
+                assert any("bitrate limit" in w for w in state["warnings"])
+            write = {**body, "revision": state["revision"], "values": {"fps": 5} if zero_bitrate else {"bitrate_kbps": 2048}, "camera_ids": [1]}
             assert (await client.post("/api/v1/onvif/encoder/check", json=write)).status_code == 200
             assert sim.sets == 0
             invalid = {**write, "values": {"password": "not-an-encoder-field"}}
             assert (await client.post("/api/v1/onvif/encoder/apply", json=invalid)).status_code == 422
+            invalid_bitrate = {**write, "values": {"bitrate_kbps": 0}}
+            assert (await client.post("/api/v1/onvif/encoder/check", json=invalid_bitrate)).status_code == 422
+            assert (await client.post("/api/v1/onvif/encoder/apply", json=invalid_bitrate)).status_code == 422
             result = await client.post("/api/v1/onvif/encoder/apply", json=write)
             assert result.status_code == 200, result.text
             assert result.json()["outcome"] == "verified"

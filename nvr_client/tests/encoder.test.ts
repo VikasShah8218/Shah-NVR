@@ -68,3 +68,13 @@ test("missing capabilities never invent editable limits", () => {
   const current = { encoding: "H265" as const, bitrate_kbps: 4096, fps: 25 }
   assert.deepEqual(presetValues(current, { encoding: "H265", resolutions: [], frame_rates: [], codec_profiles: [], rate_controls: [] }, "Storage saver"), current)
 })
+
+test("PTZ unknown bitrate remains unknown while other settings can change", () => {
+  const reported = { ...current, bitrate_kbps: null }
+  const option = { ...full, bitrate_range: null, frame_rates: [18, 15] }
+  assert.deepEqual(encoderOptionErrors(option, reported, { ...reported, fps: 15 }), [])
+  const draft = presetValues(reported, option, "Storage saver")
+  assert.equal(draft.bitrate_kbps, null)
+  assert.equal(videoGBPerDay(draft.bitrate_kbps), null)
+  assert.deepEqual(changedValues(reported, draft), { fps: 15 })
+})
