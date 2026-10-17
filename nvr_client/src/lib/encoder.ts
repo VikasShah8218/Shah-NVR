@@ -9,6 +9,61 @@ export function changedValues(current: EncoderValues, draft: EncoderValues): Enc
   return Object.fromEntries(Object.entries(draft).filter(([k, v]) => v != null && v !== current[k as keyof EncoderValues]))
 }
 
+/** Match the node's whole-alternative check; unadvertised unchanged values may be preserved. */
+export function encoderOptionErrors(option: EncoderOption, current: EncoderValues, target: EncoderValues): string[] {
+  const changes = changedValues(current, target)
+  const switched = "encoding" in changes
+  const errors: string[] = []
+  if ((option.resolutions?.length || switched || "width" in changes || "height" in changes)
+    && !option.resolutions?.some(([w, h]) => w === target.width && h === target.height)) {
+    errors.push("Resolution is not supported by this option")
+  }
+  const bounds = { fps: "fps_range", bitrate_kbps: "bitrate_range", gop: "gop_range", quality: "quality_range" } as const
+  for (const key of Object.keys(bounds) as (keyof typeof bounds)[]) {
+    const value = target[key]
+    if (value == null) continue
+    const range = option[bounds[key]]
+    const rates = key === "fps" ? option.frame_rates : []
+    const valid = rates?.length ? rates.includes(value)
+      : range ? value >= range[0] && value <= range[1] : !(key in changes) && !switched
+    if (!valid) errors.push(`${key}=${value} is outside this option's advertised limits (or limits are unavailable)`)
+  }
+  for (const [key, choices] of [["codec_profile", "codec_profiles"], ["rate_control", "rate_controls"]] as const) {
+    const value = target[key]
+    const allowed = option[choices] ?? []
+    if (value != null && (allowed.length || key in changes || switched) && !allowed.includes(value)) {
+      errors.push(`${key}=${value} is not supported by this option`)
+    }
+  }
+  return errors
+}
+
+/** Keep alternatives separate. Identical entries need only one selection in the UI. */
+export function encoderAlternatives(options: EncoderOption[], encoding: EncoderValues["encoding"]): EncoderOption[] {
+  const seen = new Set<string>()
+  return options.filter(option => {
+    if (option.encoding !== encoding) return false
+    const key = JSON.stringify(option)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+export function preferredEncoderOption(options: EncoderOption[], current: EncoderValues, target: EncoderValues): number {
+  let best = 0
+  let count = Infinity
+  let resolutionMatches = false
+  options.forEach((option, index) => {
+    const errors = encoderOptionErrors(option, current, target).length
+    const matches = option.resolutions?.some(([w, h]) => w === target.width && h === target.height) ?? false
+    if (errors < count || (errors === count && matches && !resolutionMatches)) {
+      best = index; count = errors; resolutionMatches = matches
+    }
+  })
+  return best
+}
+
 export type Preset = "Storage saver" | "Best quality" | "Low-bandwidth substream"
 
 /** Presets are editable proposals, keep the codec, and use only advertised values. */

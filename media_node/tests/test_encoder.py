@@ -1,6 +1,7 @@
 """H2 simulated devices: no physical cameras are contacted."""
 import asyncio
 import copy
+import sys
 
 import httpx
 import pytest
@@ -231,6 +232,105 @@ def test_auth_failure_stops_readback(monkeypatch):
 def test_lock_serializes_device_alias_case_and_cleans_up():
     lock = encoder.device_lock("CAMERA.", 80)
     assert lock is encoder.device_lock("camera", 80)
+
+
+def alternative_state():
+    full = encoder.parse_options(options(), "tr2")[0]
+    full.update(frame_rates=[25], resolutions=[[1920, 1080]])
+    low = {**copy.deepcopy(full), "frame_rates": [5], "resolutions": [[640, 360]], "bitrate_range": [128, 2048]}
+    return {"api": "tr2", "current": encoder.values(config(), "tr2"), "options": [low, full],
+            "shared_profiles": ["main"], "use_count": 1}
+
+
+def test_multiple_options_match_second_complete_entry():
+    state = alternative_state()
+    changes, target = encoder.validate(state, {"bitrate_kbps": 6000})
+    assert changes == {"bitrate_kbps": 6000} and target["width"] == 1920
+
+
+def test_multiple_options_allow_switching_to_another_complete_combination():
+    state = alternative_state()
+    patch = {"width": 640, "height": 360, "fps": 5, "bitrate_kbps": 1024}
+    assert encoder.validate(state, patch)[0] == patch
+
+
+@pytest.mark.parametrize("patch,field", [
+    ({"fps": 5, "bitrate_kbps": 1024}, "fps"),
+    ({"width": 640, "height": 360, "fps": 5, "bitrate_kbps": 6000}, "bitrate_kbps"),
+    ({"quality": 99}, "quality"),
+])
+def test_mixed_alternative_limits_are_rejected(patch, field):
+    state = alternative_state()
+    with pytest.raises(HTTPException) as exc:
+        encoder.validate(state, patch)
+    assert exc.value.detail["code"] == "unsupported"
+    assert field in exc.value.detail["message"]
+    assert "complete settings combination" in exc.value.detail["message"]
+
+
+def test_missing_options_has_distinct_actionable_error():
+    state = alternative_state()
+    state["options"] = []
+    with pytest.raises(HTTPException) as exc:
+        encoder.validate(state, {"bitrate_kbps": 2048})
+    assert "did not advertise encoder options for H264" in exc.value.detail["message"]
+
+
+def test_unknown_limits_preserved_only_for_unchanged_same_codec_fields():
+    state = alternative_state()
+    state["options"] = [state["options"][1]]
+    state["options"][0]["bitrate_range"] = None
+    assert encoder.validate(state, {"quality": 4})[0] == {"quality": 4}
+    with pytest.raises(HTTPException):
+        encoder.validate(state, {"bitrate_kbps": 2048})
+
+
+@pytest.mark.parametrize("key,choices,bad", [
+    ("codec_profile", "codec_profiles", "High"), ("rate_control", "rate_controls", "CBR"),
+])
+def test_unchanged_profile_or_mode_cannot_borrow_another_options_limits(key, choices, bad):
+    state = alternative_state()
+    state["current"][key] = bad
+    for option in state["options"]:
+        option[choices] = ["Main"] if key == "codec_profile" else ["VBR"]
+    with pytest.raises(HTTPException) as exc:
+        encoder.validate(state, {"bitrate_kbps": 2048})
+    assert key in exc.value.detail["message"]
+
+
+@pytest.mark.parametrize("duplicate", [True, False])
+def test_media2_multiple_h265_entries_end_to_end(monkeypatch, duplicate):
+    original = options
+    def multi_options(ns="tr2"):
+        result = original(ns)
+        if ns == "tr2":
+            result[1].set("FrameRatesSupported", "18")
+            result[1].set("GovLengthRange", "2 255")
+            result[1].find("tt:BitrateRange/tt:Min", NS).text = "1024"
+            result[1].find("tt:BitrateRange/tt:Max", NS).text = "8000"
+            result[1].find("tt:QualityRange/tt:Min", NS).text = "0"
+            result[1].find("tt:QualityRange/tt:Max", NS).text = "5"
+            alternative = copy.deepcopy(result[1])
+            if not duplicate:
+                # First H265 entry deliberately cannot support the current resolution/rate.
+                result[1].find("tt:ResolutionsAvailable/tt:Width", NS).text = "1280"
+                result[1].set("FrameRatesSupported", "5")
+            result.append(alternative)
+        return result
+    monkeypatch.setattr(sys.modules[__name__], "options", multi_options)
+    async def go():
+        sim = CameraSimulator()
+        sim.conf.find("tt:Encoding", NS).text = "H265"
+        sim.conf.find("tt:RateControl/tt:FrameRateLimit", NS).text = "18"
+        sim.conf.find("tt:RateControl/tt:BitrateLimit", NS).text = "1024"
+        sim.conf.set("GovLength", "20")
+        sim.conf.attrib.pop("Profile")
+        async with await sim.device() as dev:
+            state, _, _ = await encoder.read(dev, "profile&one")
+            assert len([o for o in state["options"] if o["encoding"] == "H265"]) == 2
+            result = await encoder.apply(dev, "profile&one", state["revision"], {"bitrate_kbps": 4096}, False)
+            assert result["outcome"] == "verified" and sim.sets == 1
+    asyncio.run(go())
 
 
 def test_node_http_contract_preflight_apply_and_invalid_body(monkeypatch):

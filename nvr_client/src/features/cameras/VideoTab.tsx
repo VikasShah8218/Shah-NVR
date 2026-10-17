@@ -9,7 +9,7 @@ import { ConfirmDialog, ErrorState, Loading } from "@/components/common"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { changedValues, presetValues, videoGBPerDay } from "@/lib/encoder"
+import { changedValues, encoderAlternatives, encoderOptionErrors, preferredEncoderOption, presetValues, videoGBPerDay } from "@/lib/encoder"
 import type { Preset } from "@/lib/encoder"
 
 const selectClass = "h-9 rounded-md border bg-background px-3 text-sm"
@@ -41,6 +41,7 @@ function EncoderEditor({ camera, profile, active }: { camera: Camera; profile: s
   const query = useEncoder(camera.id, profile, active)
   const [loaded, setLoaded] = useState<EncoderState | null>(null)
   const [draft, setDraft] = useState<EncoderValues | null>(null)
+  const [selectedOption, setSelectedOption] = useState<string | null>(null)
   const [token, setToken] = useState("")
   const [shared, setShared] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -49,7 +50,11 @@ function EncoderEditor({ camera, profile, active }: { camera: Camera; profile: s
   const state = loaded ?? query.data
   const current = state?.current
   const values = draft ?? current
-  const option = state?.options?.find(o => o.encoding === values?.encoding)
+  const alternatives = encoderAlternatives(state?.options ?? [], values?.encoding)
+  const selectedIndex = alternatives.findIndex(o => JSON.stringify(o) === selectedOption)
+  const optionIndex = selectedIndex >= 0 ? selectedIndex : preferredEncoderOption(alternatives, current ?? {}, values ?? {})
+  const option = alternatives[optionIndex]
+  const optionIssues = option && current && values ? encoderOptionErrors(option, current, values) : []
   const history = useQuery({ queryKey: [api.url, "encoder-history", camera.id, profile],
     queryFn: () => api.history(camera.id, profile), enabled: active, retry: false, refetchInterval: busy ? false : 5000 })
   const recovery = useQuery({ queryKey: [api.url, "encoder-recovery", camera.id, profile],
@@ -59,7 +64,7 @@ function EncoderEditor({ camera, profile, active }: { camera: Camera; profile: s
   const patch = (v: Partial<EncoderValues>) => setDraft({ ...values, ...v })
   const refresh = async () => {
     const next = await api.read(camera.id, profile)
-    setLoaded(next); setDraft(null); setShared(false)
+    setLoaded(next); setDraft(null); setShared(false); setSelectedOption(null)
     cache.setQueryData([api.url, "encoder", camera.id, profile], next)
   }
   const run = async (fn: () => Promise<void>) => {
@@ -78,7 +83,7 @@ function EncoderEditor({ camera, profile, active }: { camera: Camera; profile: s
   const apply = async (body: EncoderWrite) => {
     setConfirm(null)
     const change = await api.apply(camera.id, profile, body)
-    if (change.result?.after) { setLoaded(change.result.after); setDraft(null) }
+    if (change.result?.after) { setLoaded(change.result.after); setDraft(null); setSelectedOption(null) }
     if (change.status === "verified") toast.success("Encoder readback verified. Check stream recovery below.")
     else setError(change.result?.message ?? `Operation status: ${change.status}. Check history before another write.`)
     void cache.invalidateQueries({ queryKey: [api.url, "cameras"] })
@@ -106,7 +111,7 @@ function EncoderEditor({ camera, profile, active }: { camera: Camera; profile: s
               {state.profiles?.filter(p => p.encoder_token).map(p => <option key={p.token} value={p.token}>{p.name || p.token} ({p.token})</option>)}
             </select>
             <Button variant="outline" disabled={!token} onClick={() => void run(async () => {
-              const next = await api.map(camera.id, profile, token); setLoaded(next); setDraft(null); setToken(""); setShared(false)
+              const next = await api.map(camera.id, profile, token); setLoaded(next); setDraft(null); setToken(""); setShared(false); setSelectedOption(null)
               void cache.invalidateQueries({ queryKey: [api.url, "cameras"] })
             })}>Save mapping</Button>
             <Button variant="outline" onClick={() => void run(refresh)}>Reload / discard draft</Button>
@@ -118,9 +123,26 @@ function EncoderEditor({ camera, profile, active }: { camera: Camera; profile: s
             I understand this changes shared profiles: {sharedProfiles.join(", ")} (camera use count: {state.use_count ?? "unknown"})
           </label>}
           {values && current && <>
+            {alternatives.length > 1 && <label className="grid gap-1 text-sm">Supported configuration
+              <select className={`${selectClass} min-w-0 w-full`} value={optionIndex}
+                onChange={e => setSelectedOption(JSON.stringify(alternatives[Number(e.target.value)]))}>
+                {alternatives.map((o, i) => <option key={i} value={i}>
+                  Option {i + 1}: {o.resolutions.map(r => r.join("×")).join(", ")} · {
+                    o.frame_rates.length ? o.frame_rates.join(", ") : o.fps_range?.join("–") ?? "unspecified"
+                  } fps · {o.bitrate_range?.join("–") ?? "unspecified"} kbps
+                </option>)}
+              </select>
+              <span className="text-xs text-muted-foreground">Limits below belong to this single camera-advertised option. Selecting another option does not change your draft; adjust any incompatible values before applying.</span>
+            </label>}
+            {!option && <p className="text-sm text-warning">The camera did not advertise options for {values.encoding}. Reload the encoder before applying.</p>}
+            {optionIssues.length > 0 && <div role="status" className="text-sm text-warning">
+              Adjust the draft to fit one complete supported configuration: {optionIssues.join("; ")}.
+            </div>}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <label className="grid gap-1 text-sm">Codec
-                <select className={selectClass} value={values.encoding ?? ""} onChange={e => patch({ encoding: e.target.value as "H264" | "H265" })}>
+                <select className={selectClass} value={values.encoding ?? ""} onChange={e => {
+                  setSelectedOption(null); patch({ encoding: e.target.value as "H264" | "H265" })
+                }}>
                   {[...new Set([values.encoding, ...(state.options ?? []).map(o => o.encoding)])].filter(Boolean).map(v => <option key={v!}>{v}</option>)}
                 </select>
               </label>
@@ -169,7 +191,7 @@ function EncoderEditor({ camera, profile, active }: { camera: Camera; profile: s
             {(values.encoding === "H265" || current.encoding === "H265") && <p className="text-sm text-warning">
               H.265 browser support varies. An H.264 substream can help live viewing; it does not make H.265 main-stream recordings browser-compatible. No transcoding is performed.
             </p>}
-            <Button disabled={!option || !Object.keys(changedValues(current, values)).length || (sharedEncoder && !shared) || !!history.error}
+            <Button disabled={!option || optionIssues.length > 0 || !Object.keys(changedValues(current, values)).length || (sharedEncoder && !shared) || !!history.error}
               onClick={() => void run(() => prepare())}>Review and apply</Button>
           </>}
         </fieldset>

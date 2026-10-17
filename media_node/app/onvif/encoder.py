@@ -179,6 +179,40 @@ async def read(dev: OnvifDevice, profile_token: str | None, api: str | None = No
     raise NotSupported("No compatible media service/profile")
 
 
+def option_errors(option, target, changes, switched):
+    """Check one whole alternative, including advertised limits on unchanged fields.
+
+    Unknown limits can only be preserved on unchanged fields of the same codec.
+    Never combine a resolution from one alternative with rates from another.
+    """
+    errors = []
+    resolutions = option.get("resolutions") or []
+    if resolutions or switched or {"width", "height"} & changes.keys():
+        if [target.get("width"), target.get("height")] not in resolutions:
+            errors.append("resolution is not supported")
+    for key, bounds in (("fps", "fps_range"), ("bitrate_kbps", "bitrate_range"),
+                        ("gop", "gop_range"), ("quality", "quality_range")):
+        value = target.get(key)
+        if value is None:
+            continue
+        span = option.get(bounds)
+        rates = (option.get("frame_rates") or []) if key == "fps" else []
+        if rates:
+            valid = value in rates
+        elif span:
+            valid = span[0] <= value <= span[1]
+        else:
+            valid = key not in changes and not switched
+        if not valid:
+            errors.append(f"{key}={value:g} is outside advertised limits (or limits are unavailable)")
+    for key, choices in (("codec_profile", "codec_profiles"), ("rate_control", "rate_controls")):
+        value = target.get(key)
+        allowed = option.get(choices) or []
+        if value is not None and (allowed or key in changes or switched) and value not in allowed:
+            errors.append(f"{key}={value} is not supported")
+    return errors
+
+
 def validate(state, proposed, acknowledge_shared=False):
     current = state.get("current")
     if not current:
@@ -188,31 +222,22 @@ def validate(state, proposed, acknowledge_shared=False):
         fail("unsupported", "Cannot safely edit a field absent from the current encoder configuration.")
     target = {**current, **changes}
     options = [o for o in state["options"] if o["encoding"] == target["encoding"]]
-    if len(options) != 1:
-        fail("unsupported", "The camera does not advertise unambiguous options for this codec.")
-    option = options[0]
+    if not options:
+        fail("unsupported", f"The camera did not advertise encoder options for {target['encoding']}. Reload the encoder.")
     if (len(state["shared_profiles"]) > 1 or state.get("use_count", 0) > 1) and not acknowledge_shared:
         fail("shared_encoder", "Acknowledge the shared encoder before applying.", 409)
     switched = "encoding" in changes
-    if (switched or {"width", "height"} & changes.keys()) and [target["width"], target["height"]] not in option["resolutions"]:
-        fail("unsupported", "Resolution is not supported for this codec.")
-    for key, bounds in (("fps", "fps_range"), ("bitrate_kbps", "bitrate_range"),
-                        ("gop", "gop_range"), ("quality", "quality_range")):
-        if key not in changes and not switched:
-            continue
-        value = target[key]
-        if value is None:
-            continue
-        span = option[bounds]
-        if key == "fps" and option["frame_rates"]:
-            valid = value in option["frame_rates"]
-        else:
-            valid = span is not None and span[0] <= value <= span[1]
-        if not valid:
-            fail("unsupported", f"{key} is outside advertised options (or the camera did not advertise a range).")
-    for key, choices in (("codec_profile", "codec_profiles"), ("rate_control", "rate_controls")):
-        if (key in changes or switched) and target[key] is not None and target[key] not in option[choices]:
-            fail("unsupported", f"{key} is not supported for this codec.")
+    failures = [option_errors(option, target, changes, switched) for option in options]
+    if all(failures):
+        # Break ties in favour of the selected resolution, so the message points at
+        # e.g. the unsupported frame rate rather than suggesting a resolution change.
+        closest_index = min(range(len(options)), key=lambda i: (
+            len(failures[i]),
+            [target.get("width"), target.get("height")] not in (options[i].get("resolutions") or []),
+        ))
+        closest = failures[closest_index]
+        fail("unsupported", f"No advertised {target['encoding']} option supports the complete settings combination. "
+             "Closest option: " + "; ".join(closest) + ".")
     if state["api"] == "trt" and target["fps"] is not None and target["fps"] != int(target["fps"]):
         fail("unsupported", "Media1 requires an integer frame rate.")
     return changes, target
