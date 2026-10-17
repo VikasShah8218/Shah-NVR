@@ -6,6 +6,7 @@ import copy
 import hashlib
 import json
 import math
+import re
 import weakref
 
 from fastapi import HTTPException
@@ -132,6 +133,21 @@ def semantic(el):
     return [el.tag, sorted(el.attrib.items()), (el.text or "").strip(), [semantic(c) for c in el]]
 
 
+def media_failure_reason(exc):
+    """Public diagnostic without echoing arbitrary camera fault text or credentials."""
+    status = re.fullmatch(r"HTTP ([45]\d\d)(?:: not a SOAP reply)?", str(exc))
+    if status:
+        return f"HTTP {status[1]}"
+    return "operation not supported" if isinstance(exc, NotSupported) else "camera SOAP fault"
+
+
+def fallback_warning(stage, reason):
+    return (f"Camera advertises Media2, but {stage} failed ({reason}). Using Media1 fallback; "
+            "H265 and other encoder settings may be unavailable or differ from the camera's own UI. "
+            "These are Media1-reported settings, not an independent measurement of the live stream. "
+            "Check the camera's Media2 service and reload before changing settings if they disagree.")
+
+
 async def read(dev: OnvifDevice, profile_token: str | None, api: str | None = None):
     services = await dev.services()
     candidates = [("tr2", services[NS["tr2"]])] if NS["tr2"] in services else []
@@ -141,7 +157,9 @@ async def read(dev: OnvifDevice, profile_token: str | None, api: str | None = No
         candidates = [("trt", dev.device_url)]
     if api:
         candidates = [(ns, url) for ns, url in candidates if ns == api]
+    fallback_warnings = []
     for index, (ns, url) in enumerate(candidates):
+        stage = "GetProfiles"
         try:
             profiles_body = await call(dev, url, request(ns, "GetProfiles", **({"Type": "All"} if ns == "tr2" else {})))
             profiles, configs = [], {}
@@ -153,17 +171,19 @@ async def read(dev: OnvifDevice, profile_token: str | None, api: str | None = No
                 if conf is not None:
                     configs[token] = conf
             state = {"api": ns, "profile_token": profile_token, "profiles": profiles, "options": [],
-                     "shared_profiles": [], "warnings": []}
+                     "shared_profiles": [], "warnings": list(fallback_warnings)}
             if not profile_token:
                 return state, None, url
             if profile_token not in configs:
                 if index + 1 < len(candidates):
+                    fallback_warnings.append(fallback_warning("profile lookup", "mapped profile has no Media2 encoder"))
                     continue
                 fail("profile_mapping_required", "Select an ONVIF profile that has a video encoder.")
             token = configs[profile_token].get("token")
             if not token:
                 raise NotSupported("The profile has no encoder configuration token")
             action = "GetVideoEncoderConfigurations" if ns == "tr2" else "GetVideoEncoderConfiguration"
+            stage = action
             reply = await call(dev, url, request(ns, action, ConfigurationToken=token))
             conf = next((e for e in reply.findall(".//" + ns + (":Configurations" if ns == "tr2" else ":Configuration"), NS)
                          if e.get("token") == token), None)
@@ -176,11 +196,14 @@ async def read(dev: OnvifDevice, profile_token: str | None, api: str | None = No
                 options = await call(dev, url, request(ns, "GetVideoEncoderConfigurationOptions",
                                                       ConfigurationToken=token, ProfileToken=profile_token))
                 state["options"] = parse_options(options, ns)
-            except (NotSupported, Fault):
-                # Try Media1 before returning a read-only Media2 result.
-                if index + 1 < len(candidates):
-                    continue
-                state["warnings"].append("Encoder options unavailable; settings are read-only.")
+            except (NotSupported, Fault) as exc:
+                # A valid Media2 configuration is more authoritative than a legacy
+                # Media1 fallback. Missing edit limits must not replace e.g. H265
+                # current values with the legacy service's H264 representation.
+                label = "Media2" if ns == "tr2" else "Media1"
+                state["warnings"].append(
+                    f"{label} GetVideoEncoderConfigurationOptions failed ({media_failure_reason(exc)}). "
+                    f"Keeping {label}-reported settings; encoder options unavailable and settings are read-only.")
             shared = sorted(p["token"] for p in profiles if p["encoder_token"] == token)
             revision = hashlib.sha256(json.dumps([ns, semantic(conf), shared], sort_keys=True).encode()).hexdigest()
             state.update(encoder_token=token, current=current, revision=revision, shared_profiles=shared,
@@ -194,9 +217,10 @@ async def read(dev: OnvifDevice, profile_token: str | None, api: str | None = No
                     option["rate_controls"] = []
                 state["warnings"].append("Average bitrate overrides CBR/VBR on this camera; rate mode is read-only.")
             return state, conf, url
-        except (NotSupported, Fault):
+        except (NotSupported, Fault) as exc:
             if index + 1 == len(candidates):
                 raise
+            fallback_warnings.append(fallback_warning(stage, media_failure_reason(exc)))
     raise NotSupported("No compatible media service/profile")
 
 

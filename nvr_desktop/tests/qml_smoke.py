@@ -170,6 +170,13 @@ Item {
                 settle()
                 encoder._ctx.central.encoder_apply.assert_called_once()
                 assert window.grabWindow().save(str(output / "video.png"))
+                fallback = "Camera advertises Media2, but GetProfiles failed (HTTP 503). Using Media1 fallback."
+                state = dict(encoder.view["state"])
+                state["warnings"] = [fallback]
+                encoder._accept_state(state)
+                encoder.changed.emit()
+                settle()
+                assert fallback in texts()
                 page.setProperty("tab", "overview")
                 settle()
                 assert encoder.view["state"] == {}

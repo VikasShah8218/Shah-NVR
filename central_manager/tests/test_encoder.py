@@ -242,3 +242,21 @@ def test_public_contract_is_identical_on_central_and_node():
     root = Path(__file__).resolve().parents[2]
     assert (root / "central_manager/app/onvif/encoder_schemas.py").read_text() == (
         root / "media_node/app/onvif/encoder_schemas.py").read_text()
+
+
+def test_media2_failure_warning_survives_central_response(monkeypatch):
+    import httpx
+    from fastapi import FastAPI
+    warning = "Camera advertises Media2, but GetProfiles failed (HTTP 503). Using Media1 fallback."
+    async def call(*args, **kwargs):
+        return {**STATE, "api": "trt", "warnings": [warning]}
+    monkeypatch.setattr(api, "call_node", call)
+    app = FastAPI()
+    app.include_router(api.router)
+    async def go(cam):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://central") as http:
+            response = await http.get(f"/api/v1/cameras/{cam.id}/streams/main/encoder")
+            assert response.status_code == 200
+            assert response.json()["warnings"] == [warning]
+            assert response.json()["api"] == "trt"
+    run(go)

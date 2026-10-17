@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from app.onvif import encoder
 from app.onvif.encoder_schemas import EncoderState, EncoderValues
 from app.onvif.services import OnvifDevice
-from app.onvif.soap import NS, NotAuthorized, SoapClient
+from app.onvif.soap import NS, Fault, NotAuthorized, NotSupported, SoapClient, Unreachable
 
 
 def xml(text):
@@ -117,6 +117,106 @@ def test_read_validate_apply_preserves_config(ns):
             result = await encoder.apply(dev, "profile&one", state["revision"], {"bitrate_kbps": 2048}, False)
             assert result["outcome"] == "verified" and sim.sets == 1
             assert result["after"]["current"]["bitrate_kbps"] == 2048
+    asyncio.run(go())
+
+
+@pytest.mark.parametrize("mapped", [True, False])
+def test_media2_503_fallback_is_visible_and_does_not_invent_h265(monkeypatch, mapped):
+    original = encoder.call
+    async def call(dev, url, el):
+        if etree.QName(el).namespace == NS["tr2"]:
+            raise Fault("HTTP 503")
+        return await original(dev, url, el)
+    monkeypatch.setattr(encoder, "call", call)
+    async def go():
+        sim = CameraSimulator("trt")
+        async with await sim.device() as dev:
+            state, _, _ = await encoder.read(dev, "profile&one" if mapped else None)
+            EncoderState.model_validate(state)
+            assert state["api"] == "trt" and sim.sets == 0
+            assert "GetProfiles failed (HTTP 503)" in state["warnings"][0]
+            assert "Media1 fallback" in state["warnings"][0]
+            assert "H265" in state["warnings"][0]
+            if mapped:
+                assert state["current"]["encoding"] == "H264"
+                assert [o["encoding"] for o in state["options"]] == ["H264"]
+    asyncio.run(go())
+
+
+@pytest.mark.parametrize("stage", ["GetVideoEncoderConfigurations", "profile lookup"])
+def test_fallback_includes_configuration_or_mapping_failure(monkeypatch, stage):
+    original = encoder.call
+    async def call(dev, url, el):
+        if etree.QName(el).namespace == NS["tr2"]:
+            if etree.QName(el).localname == "GetProfiles":
+                if stage == "profile lookup":
+                    return xml('<tr2:GetProfilesResponse><tr2:Profiles token="profile&amp;one"/></tr2:GetProfilesResponse>')
+                return xml('<tr2:GetProfilesResponse><tr2:Profiles token="profile&amp;one"><tr2:Configurations>'
+                           '<tr2:VideoEncoder token="enc&amp;1"/></tr2:Configurations></tr2:Profiles></tr2:GetProfilesResponse>')
+            raise Fault("HTTP 503")
+        return await original(dev, url, el)
+    monkeypatch.setattr(encoder, "call", call)
+    async def go():
+        sim = CameraSimulator("trt")
+        async with await sim.device() as dev:
+            state, _, _ = await encoder.read(dev, "profile&one")
+            assert state["api"] == "trt" and stage in state["warnings"][0]
+    asyncio.run(go())
+
+
+def test_media2_valid_h265_read_is_not_replaced_when_options_fail(monkeypatch):
+    original = encoder.call
+    async def call(dev, url, el):
+        assert etree.QName(el).namespace == NS["tr2"], "Must not fall back to legacy settings"
+        if etree.QName(el).localname == "GetVideoEncoderConfigurationOptions":
+            raise Fault("HTTP 503")
+        return await original(dev, url, el)
+    monkeypatch.setattr(encoder, "call", call)
+    async def go():
+        sim = CameraSimulator()
+        sim.conf.find("tt:Encoding", NS).text = "H265"
+        async with await sim.device() as dev:
+            state, _, _ = await encoder.read(dev, "profile&one")
+            EncoderState.model_validate(state)
+            assert state["api"] == "tr2" and state["current"]["encoding"] == "H265"
+            assert state["options"] == []
+            assert "Keeping Media2-reported settings" in state["warnings"][0]
+            with pytest.raises(HTTPException):
+                await encoder.apply(dev, "profile&one", state["revision"], {"fps": 5}, False)
+            assert sim.sets == 0
+    asyncio.run(go())
+
+
+@pytest.mark.parametrize("exc", [NotAuthorized("denied"), Unreachable("timed out")])
+def test_auth_and_transport_errors_do_not_trigger_new_fallbacks(monkeypatch, exc):
+    calls = []
+    async def call(dev, url, el):
+        calls.append(url)
+        raise exc
+    monkeypatch.setattr(encoder, "call", call)
+    async def go():
+        sim = CameraSimulator()
+        async with await sim.device() as dev:
+            with pytest.raises(type(exc)):
+                await encoder.read(dev, "profile&one")
+            assert len(calls) == 1 and sim.sets == 0
+    asyncio.run(go())
+
+
+def test_warning_never_exposes_vendor_fault_details():
+    assert encoder.media_failure_reason(Fault("HTTP 503")) == "HTTP 503"
+    assert encoder.media_failure_reason(Fault("HTTP 503: not a SOAP reply")) == "HTTP 503"
+    assert encoder.media_failure_reason(Fault("http://user:secret@camera/private")) == "camera SOAP fault"
+    assert encoder.media_failure_reason(NotSupported("private details")) == "operation not supported"
+
+
+def test_media1_only_camera_has_no_false_media2_warning():
+    async def go():
+        sim = CameraSimulator("trt")
+        async with await sim.device() as dev:
+            dev._services = {NS["trt"]: "http://camera/media1"}
+            state, _, _ = await encoder.read(dev, "profile&one")
+            assert state["warnings"] == []
     asyncio.run(go())
 
 
