@@ -14,6 +14,7 @@ from fastapi import HTTPException
 from lxml import etree
 
 from app.onvif.soap import NS, Fault, NotSupported, NotAuthorized, OnvifError
+from app.onvif import illustra_ptz
 
 PTZ = "http://www.onvif.org/ver20/ptz/wsdl"
 N = {**NS, "p": PTZ}
@@ -42,6 +43,7 @@ class Session:
     digest: bool
     caps: dict
     spaces: dict
+    backend: str = "onvif"
     touched: float = field(default_factory=time.monotonic)
     sequence: int = 0
     failed: bool = False
@@ -137,7 +139,21 @@ async def open_session(dev, profile):
     if config is None or not config.get("token"):
         raise NotSupported("Mapped ONVIF profile has no PTZ configuration; check stream mapping in Video")
     token = config.get("token")
-    configs = await call(dev, url, request("GetConfigurations"))
+    try:
+        configs = await call(dev, url, request("GetConfigurations"))
+    except Fault as exc:
+        # This Pro4 firmware advertises ONVIF PTZ but its PTZ endpoint returns
+        # HTTP 503 while its own iAPI remains healthy. Never route an arbitrary
+        # camera or a SOAP/auth fault to a vendor-specific control protocol.
+        if not str(exc).startswith("HTTP 503") or not illustra_ptz.supported_device(await dev.info()):
+            raise
+        caps = await illustra_ptz.capabilities(dev)
+        status = await illustra_ptz.status(dev)
+        if not (caps["pan_tilt"] or caps["zoom"]):
+            raise NotSupported("Illustra iAPI does not advertise relative PTZ movement")
+        sid = create_session(dev, profile, url, caps, {}, "illustra_iapi")
+        return {"session_id": sid, "capabilities": caps, "status": status, "presets": [],
+                "warnings": ["Camera ONVIF PTZ returned HTTP 503. Using Illustra's native PTZ API with finite relative steps; presets and home are unavailable."]}
     conf = next((c for c in configs.findall(".//p:PTZConfiguration", N) if c.get("token") == token), None)
     if conf is None:
         raise NotSupported("Mapped PTZ configuration is unavailable")
@@ -170,6 +186,11 @@ async def open_session(dev, profile):
     presets = []
     if caps["presets"]:
         presets = parse_presets(await call(dev, url, request("GetPresets", profile)))
+    sid = create_session(dev, profile, url, caps, spaces)
+    return {"session_id": sid, "capabilities": caps, "status": status, "presets": presets, "warnings": warnings}
+
+
+def create_session(dev, profile, url, caps, spaces, backend="onvif"):
     now = time.monotonic()
     for sid, old in list(sessions.items()):
         actor = actors[old.key[:2]]
@@ -184,8 +205,8 @@ async def open_session(dev, profile):
     sid = secrets.token_urlsafe(24)
     k = key(dev, profile)
     actors.setdefault(k[:2], Actor())
-    sessions[sid] = Session(k, url, profile, dev.soap.offset, dev.soap.http_digest, caps, spaces)
-    return {"session_id": sid, "capabilities": caps, "status": status, "presets": presets, "warnings": warnings}
+    sessions[sid] = Session(k, url, profile, dev.soap.offset, dev.soap.http_digest, caps, spaces, backend)
+    return sid
 
 
 async def command(dev, profile, cmd):
@@ -218,6 +239,30 @@ async def command(dev, profile, cmd):
         async with actor.lock:
             if cmd.action != "stop" and (epoch != actor.epoch or cmd.sequence != session.sequence):
                 fail("ptz_stale_command", "Command superseded by Stop.")
+            if session.backend == "illustra_iapi":
+                if cmd.action == "stop":
+                    await illustra_ptz.stop(dev)
+                    return {"message": "Stop acknowledged by camera."}
+                if cmd.action == "refresh":
+                    return {"message": "PTZ refreshed.", "status": await illustra_ptz.status(dev), "presets": []}
+                if cmd.action != "move":
+                    raise NotSupported("This camera's native PTZ fallback supports movement only")
+                if ((cmd.pan or cmd.tilt) and not session.caps["pan_tilt"]) or (cmd.zoom and not session.caps["zoom"]):
+                    raise NotSupported("Requested PTZ axis is unavailable")
+                initial = await illustra_ptz.status(dev)
+                if initial["pan_tilt_state"] != "IDLE" or initial["zoom_state"] != "IDLE":
+                    fail("ptz_not_idle", "Camera must report IDLE before a new movement. Stop and refresh.")
+                if epoch != actor.epoch or cmd.sequence != session.sequence:
+                    fail("ptz_stale_command", "Command superseded by Stop.")
+                try:
+                    await illustra_ptz.move(dev, cmd.pan, cmd.tilt, cmd.zoom)
+                    await asyncio.sleep(PULSE_SECONDS)
+                finally:
+                    await illustra_ptz.stop(dev)
+                state = await illustra_ptz.status(dev)
+                if state["pan_tilt_state"] != "IDLE" or state["zoom_state"] != "IDLE":
+                    fail("ptz_stop_unconfirmed", "Stop sent, but camera did not confirm IDLE. Check the camera before further control.", 502)
+                return {"message": "Finite step acknowledged; camera IDLE.", "status": state}
             if cmd.action == "stop":
                 await stop()
                 return {"message": "Stop acknowledged by camera."}

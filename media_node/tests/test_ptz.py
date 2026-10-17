@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from lxml import etree
 from pydantic import ValidationError
-from app.onvif import ptz, ptz_router
+from app.onvif import ptz, ptz_router, illustra_ptz
 from app.onvif.ptz_schemas import PtzCommand, PtzState
 from app.onvif.soap import Fault, NotAuthorized, Unreachable
 
@@ -63,6 +63,57 @@ def camera(monkeypatch):
 
 def command(sid, action="move", sequence=1, **kw):
     return PtzCommand(session_id=sid, action=action, sequence=sequence, **kw)
+
+
+def test_illustra_status_and_device_gate():
+    status = illustra_ptz.parse_status("pan=253.95\r\ntilt=-62.65\r\nzoom=1.00\r\npansp=0\r\ntiltsp=0\r\nzoomsp=0\r\n")
+    assert status["pan_tilt_state"] == status["zoom_state"] == "IDLE"
+    assert status["pan"] == 253.95 and not status["position_valid"]
+    with pytest.raises(Fault):
+        illustra_ptz.parse_status("pan=1\ntilt=2\nzoom=3")
+    assert illustra_ptz.supported_device({"manufacturer": "Tyco Security Products", "model": "Illustra Pro4 4k IRPTZ Out"})
+    assert not illustra_ptz.supported_device({"manufacturer": "Other", "model": "Illustra Pro4"})
+
+
+def test_illustra_fallback_only_on_confirmed_http503(camera, monkeypatch):
+    async def run():
+        dev, _, old_call = camera
+        async def broken(dev, url, req):
+            if etree.QName(req).localname == "GetConfigurations":
+                raise Fault("HTTP 503: not a SOAP reply")
+            return await old_call(dev, url, req)
+        async def info():
+            return {"manufacturer": "Tyco Security Products", "model": "Illustra Pro4 4k IRPTZ Out"}
+        async def caps(dev):
+            return dict(pan_tilt=True, zoom=True, presets=False, home=False, home_set=False, camera_timeout_seconds=None)
+        async def state(dev):
+            return dict(pan=100, tilt=0, zoom=1, position_valid=False, pan_tilt_state="IDLE", zoom_state="IDLE")
+        log = []
+        async def move(dev, pan, tilt, zoom):
+            log.append(("move", pan, tilt, zoom))
+        async def stop(dev):
+            log.append(("stop",))
+        dev.info = info
+        monkeypatch.setattr(ptz, "call", broken)
+        monkeypatch.setattr(illustra_ptz, "capabilities", caps)
+        monkeypatch.setattr(illustra_ptz, "status", state)
+        monkeypatch.setattr(illustra_ptz, "move", move)
+        monkeypatch.setattr(illustra_ptz, "stop", stop)
+        opened = await ptz.open_session(dev, "profile_1")
+        sid = opened["session_id"]
+        assert opened["capabilities"]["pan_tilt"] and not opened["capabilities"]["presets"]
+        assert ptz.sessions[sid].backend == "illustra_iapi"
+        await ptz.command(dev, "profile_1", command(sid, pan=.1))
+        assert log == [("move", .1, 0, 0), ("stop",)]
+        log.clear()
+        await ptz.command(dev, "profile_1", command(sid, "stop", 2))
+        assert log == [("stop",)]
+        async def other_info():
+            return {"manufacturer": "Other", "model": "Camera"}
+        dev.info = other_info
+        with pytest.raises(Fault):
+            await ptz.open_session(dev, "profile_1")
+    asyncio.run(run())
 
 
 def test_capabilities_preserve_raw_tyco_position_without_enabling_absolute(camera):
