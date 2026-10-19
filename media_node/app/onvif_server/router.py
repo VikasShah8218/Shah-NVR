@@ -6,6 +6,7 @@ from fastapi import APIRouter, Request, Response, status
 
 from app.node.utils import runtime
 from app.onvif_server.auth import digest_challenge, verify_digest, verify_username_token
+from app.onvif_server.recording import dispatch_recording
 from app.onvif_server.soap import SoapFault, action, dispatch, fault, parse
 
 logger = logging.getLogger("node.onvif-server")
@@ -42,7 +43,8 @@ async def _handle(request: Request, service: str) -> Response:
                 headers={"WWW-Authenticate": digest_challenge()},
             )
     try:
-        return Response(dispatch(service, root), media_type=SOAP_TYPE)
+        content = (await dispatch_recording(service, root)) if service in ("recording", "search", "replay") else dispatch(service, root)
+        return Response(content, media_type=SOAP_TYPE)
     except SoapFault as exc:
         return _soap_error(exc.subcode, exc.reason)
     except Exception:
@@ -58,3 +60,18 @@ async def device_service(request: Request):
 @router.post("/onvif/media_service")
 async def media_service(request: Request):
     return await _handle(request, "media")
+
+
+@router.post("/onvif/recording_service")
+async def recording_service(request: Request):
+    return await _handle(request, "recording")
+
+
+@router.post("/onvif/search_service")
+async def search_service(request: Request):
+    return await _handle(request, "search")
+
+
+@router.post("/onvif/replay_service")
+async def replay_service(request: Request):
+    return await _handle(request, "replay")

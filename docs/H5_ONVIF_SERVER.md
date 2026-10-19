@@ -1,6 +1,6 @@
 # H5 Implementation Plan: Shah-NVR as an ONVIF Device
 
-Status: implementation started; Device/Media live slice implemented locally  
+Status: implementation in progress; Device/Media live slice and read-only recording search implemented locally
 Scope: `central_manager`, `media_node`, and `nvr_client`  
 Excluded: `nvr_desktop`, H4 events, official ONVIF certification, TLS and the
 final external identity-provider integration
@@ -8,8 +8,9 @@ final external identity-provider integration
 Current implementation includes Central configuration and camera exposure,
 node-local credentials, HTTP/RTSP Digest and WS-UsernameToken authentication,
 WS-Discovery, initial Device/Media SOAP operations, an authenticated no-transcode
-live RTSP proxy, node status reporting, and the web management tab. Recording
-Search and Profile G replay remain pending and H5 is not yet complete.
+live RTSP proxy, node status reporting, the web management tab, recording
+enumeration, recording summary, and bounded paginated recording searches.
+Profile G RTSP replay remains pending and H5 is not yet complete.
 
 ## 1. Goal
 

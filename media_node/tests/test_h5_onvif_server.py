@@ -1,8 +1,8 @@
 import base64
 import asyncio
 import hashlib
-from datetime import datetime, timezone
-from uuid import UUID
+from datetime import datetime, timedelta, timezone
+from uuid import UUID, uuid4
 
 from lxml import etree
 from fastapi import FastAPI
@@ -14,8 +14,12 @@ from app.node.utils import runtime
 from app.onvif_server.auth import REALM, make_nonce, verify_digest, verify_username_token
 from app.onvif_server.rtsp_proxy import _allowed, _rewrite_request
 from app.onvif_server.router import router
+from app.onvif_server.recording import TRC, TSE, _searches, dispatch_recording
 from app.onvif_server.service import KV_UUID, persistent_device_uuid
 from app.onvif_server.soap import dispatch, parse
+from app.recordings.models import LocalSegment
+from app.storage.services import storage
+from app.storage.utils import OK
 from settings.settings import settings
 
 
@@ -104,6 +108,73 @@ def test_onvif_device_uuid_uses_json_safe_persistent_shape(tmp_path):
             second = await persistent_device_uuid()
             assert second == first
         finally:
+            await Tortoise.close_connections()
+
+    asyncio.run(run())
+
+
+def test_recording_enumeration_and_paginated_search(tmp_path):
+    def request(namespace, operation, inner=""):
+        return parse(f'''<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+          xmlns:x="{namespace}"><s:Body><x:{operation}>{inner}</x:{operation}></s:Body></s:Envelope>'''.encode())
+
+    async def run():
+        await Tortoise.init(
+            db_url=f"sqlite://{(tmp_path / 'recordings.sqlite3').as_posix()}",
+            modules={"models": ["app.node.models", "app.recordings.models"]},
+        )
+        await Tortoise.generate_schemas()
+        try:
+            storage.get(None).state = OK
+            runtime.assignments = {
+                17: {"camera_id": 17, "camera_name": "Gate", "expose_via_onvif": True, "streams": []}
+            }
+            start = datetime.now(timezone.utc) - timedelta(minutes=3)
+            for index in range(2):
+                item_start = start + timedelta(minutes=index)
+                await LocalSegment.create(
+                    id=uuid4(), camera_id=17, profile="main", rel_path=f"cam-17/main/x{index}.mp4",
+                    start_time=item_start, end_time=item_start + timedelta(seconds=59), duration_ms=59000,
+                    size_bytes=1000, init_size=100, codec="H264", parts=[], tracks={},
+                )
+
+            listing = await dispatch_recording("recording", request(TRC, "GetRecordings"))
+            assert b"recording_cam_17_main" in listing and b"Gate - main" in listing
+
+            summary = await dispatch_recording("search", request(TSE, "GetRecordingSummary"))
+            assert b"<tt:NumberRecordings>1</tt:NumberRecordings>" in summary
+
+            information = await dispatch_recording(
+                "search",
+                request(TSE, "GetRecordingInformation", "<x:RecordingToken>recording_cam_17_main</x:RecordingToken>"),
+            )
+            assert b"RecordingInformation" in information and b"track_cam_17_main_video" in information
+
+            attributes = await dispatch_recording(
+                "search",
+                request(
+                    TSE, "GetMediaAttributes",
+                    f"<x:RecordingTokens>recording_cam_17_main</x:RecordingTokens><x:Time>{start.isoformat()}</x:Time>",
+                ),
+            )
+            assert b"MediaAttributes" in attributes and b"TrackInformation" in attributes
+
+            found = await dispatch_recording(
+                "search",
+                request(TSE, "FindRecordings", "<x:Scope/><x:KeepAliveTime>PT10S</x:KeepAliveTime>"),
+            )
+            token = etree.fromstring(found).xpath("string(.//*[local-name()='SearchToken'])")
+            assert token
+            results = await dispatch_recording(
+                "search",
+                request(TSE, "GetRecordingSearchResults", f"<x:SearchToken>{token}</x:SearchToken><x:MaxResults>1</x:MaxResults>"),
+            )
+            assert b"recording_cam_17_main" in results and b"Completed" in results
+            await dispatch_recording("search", request(TSE, "KeepAliveSearch", f"<x:SearchToken>{token}</x:SearchToken>"))
+            await dispatch_recording("search", request(TSE, "EndSearch", f"<x:SearchToken>{token}</x:SearchToken>"))
+            assert token not in _searches
+        finally:
+            _searches.clear()
             await Tortoise.close_connections()
 
     asyncio.run(run())

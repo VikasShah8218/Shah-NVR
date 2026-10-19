@@ -43,3 +43,22 @@ class SkippedFile(Model):
 
     class Meta:
         table = "skipped_files"
+
+
+class OnvifRecordingExport(Model):
+    """Stable public metadata for recordings exported by the virtual ONVIF NVR.
+
+    LocalSegment remains the authority for media availability.  This table only
+    preserves a friendly camera/profile name after a camera is moved or removed.
+    """
+
+    token = fields.CharField(max_length=160, primary_key=True)
+    camera_id = fields.IntField()
+    profile = fields.CharField(max_length=64)
+    display_name = fields.CharField(max_length=256)
+    codec = fields.CharField(max_length=32, null=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "onvif_recording_exports"
+        unique_together = (("camera_id", "profile"),)

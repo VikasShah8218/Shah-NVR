@@ -6,10 +6,11 @@ Edit only the configuration block below, then run:
 
 The script accepts no command-line arguments.  It behaves like an external VMS:
 WS-Discovery, SOAP bootstrap/authentication, Device/Media calls, profile/URI
-enumeration, and authenticated RTSP DESCRIBE.  It does not import Shah-NVR code.
+enumeration, recording search, and authenticated RTSP DESCRIBE.  It does not
+import Shah-NVR code.
 
-Recording Search and Profile G replay are intentionally not tested because they
-are not implemented in the current H5 slice.
+Profile G RTSP replay is intentionally not tested because it is not implemented
+in the current H5 slice.
 """
 
 from __future__ import annotations
@@ -52,6 +53,8 @@ WSA = "http://schemas.xmlsoap.org/ws/2004/08/addressing"
 WSD = "http://schemas.xmlsoap.org/ws/2005/04/discovery"
 TDS = "http://www.onvif.org/ver10/device/wsdl"
 TRT = "http://www.onvif.org/ver10/media/wsdl"
+TRC = "http://www.onvif.org/ver10/recording/wsdl"
+TSE = "http://www.onvif.org/ver10/search/wsdl"
 WSSE = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
 WSU = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"
 PASSWORD_DIGEST = (
@@ -242,7 +245,10 @@ def soap_checks() -> list[tuple[str, str]]:
         )
 
         results.step("3. Authenticated Device service operations")
-        for operation in ("GetDeviceInformation", "GetServices", "GetCapabilities", "GetScopes", "GetHostname"):
+        for operation in (
+            "GetDeviceInformation", "GetServices", "GetCapabilities", "GetServiceCapabilities",
+            "GetScopes", "GetHostname", "GetNetworkInterfaces",
+        ):
             response = post_soap(digest, device_url, TDS, operation)
             results.check(response.status_code == 200, f"Device/{operation} succeeds")
             if operation == "GetDeviceInformation" and response.status_code == 200:
@@ -299,6 +305,68 @@ def soap_checks() -> list[tuple[str, str]]:
             bad.status_code == 400 and "InvalidToken" in bad.text,
             "A guessed/unexposed profile token is rejected",
         )
+
+        results.step("5. Read-only Profile G recording discovery and search")
+        recording_url, search_url = f"{base}/recording_service", f"{base}/search_service"
+        capabilities = post_soap(digest, recording_url, TRC, "GetServiceCapabilities")
+        results.check(capabilities.status_code == 200, "Recording/GetServiceCapabilities succeeds")
+        listing = post_soap(digest, recording_url, TRC, "GetRecordings")
+        results.check(listing.status_code == 200, "Recording/GetRecordings succeeds")
+        recording_tokens = values(xml_root(listing.content), "RecordingToken") if listing.status_code == 200 else []
+        print(f"  Locally available recordings: {len(recording_tokens)}")
+        for token in recording_tokens:
+            print(f"    {token}")
+
+        summary = post_soap(digest, search_url, TSE, "GetRecordingSummary")
+        results.check(summary.status_code == 200, "Search/GetRecordingSummary succeeds")
+        if summary.status_code == 200:
+            root = xml_root(summary.content)
+            print("  Recording summary:", ", ".join(
+                f"{key}={next(iter(values(root, key)), 'missing')}"
+                for key in ("DataFrom", "DataUntil", "NumberRecordings")
+            ))
+
+        if recording_tokens:
+            info = post_soap(
+                digest, search_url, TSE, "GetRecordingInformation",
+                f"<op:RecordingToken>{recording_tokens[0]}</op:RecordingToken>",
+            )
+            results.check(info.status_code == 200, "Search/GetRecordingInformation succeeds")
+            when = next(iter(values(xml_root(info.content), "EarliestRecording")), datetime.now(timezone.utc).isoformat())
+            attributes = post_soap(
+                digest, search_url, TSE, "GetMediaAttributes",
+                f"<op:RecordingTokens>{recording_tokens[0]}</op:RecordingTokens><op:Time>{when}</op:Time>",
+            )
+            results.check(attributes.status_code == 200, "Search/GetMediaAttributes succeeds")
+
+        found = post_soap(
+            digest, search_url, TSE, "FindRecordings",
+            "<op:Scope/><op:KeepAliveTime>PT10S</op:KeepAliveTime>",
+        )
+        search_tokens = values(xml_root(found.content), "SearchToken") if found.status_code == 200 else []
+        results.check(bool(search_tokens), "Search/FindRecordings returns a search token")
+        if search_tokens:
+            search_token = search_tokens[0]
+            inner = f"<op:SearchToken>{search_token}</op:SearchToken><op:MaxResults>200</op:MaxResults>"
+            page = post_soap(digest, search_url, TSE, "GetRecordingSearchResults", inner)
+            results.check(page.status_code == 200, "Search/GetRecordingSearchResults succeeds")
+            if page.status_code == 200:
+                returned = values(xml_root(page.content), "RecordingToken")
+                results.check(
+                    set(returned) == set(recording_tokens),
+                    "Search results match recording enumeration",
+                    f"enumerated={len(recording_tokens)}, search={len(returned)}",
+                )
+            keep = post_soap(
+                digest, search_url, TSE, "KeepAliveSearch",
+                f"<op:SearchToken>{search_token}</op:SearchToken>",
+            )
+            results.check(keep.status_code == 200, "Search/KeepAliveSearch succeeds")
+            end = post_soap(
+                digest, search_url, TSE, "EndSearch",
+                f"<op:SearchToken>{search_token}</op:SearchToken>",
+            )
+            results.check(end.status_code == 200, "Search/EndSearch succeeds")
         return profiles
     except (httpx.HTTPError, OSError, ET.ParseError) as exc:
         results.fail("SOAP verification completed", repr(exc))
@@ -387,7 +455,7 @@ def rtsp_describe(uri: str) -> tuple[bool, str]:
 
 
 def rtsp_checks(profiles: list[tuple[str, str]]) -> None:
-    results.step("5. Authenticated RTSP live gateway")
+    results.step("6. Authenticated RTSP live gateway")
     selected = profiles if TEST_EVERY_RTSP_PROFILE else profiles[:1]
     for token, uri in selected:
         print(f"  DESCRIBE {token}: {uri}")
@@ -402,8 +470,8 @@ def main() -> int:
     print("Shah-NVR H5 external-service verification")
     print(f"Target SOAP: http://{NODE_HOST}:{NODE_HTTP_PORT}/onvif/device_service")
     print(f"User: {ONVIF_USERNAME}; password: <hidden>")
-    print("Scope: currently implemented discovery + Device/Media + live RTSP slice")
-    print("Not in current slice: Recording Search and Profile G recorded RTSP replay")
+    print("Scope: discovery + Device/Media + Recording/Search + live RTSP")
+    print("Not in current slice: Profile G recorded RTSP replay")
     if not NODE_HOST or ONVIF_USERNAME == "CHANGE_ME" or ONVIF_PASSWORD == "CHANGE_ME":
         print("\n[CONFIG ERROR] Edit NODE_HOST, ONVIF_USERNAME and ONVIF_PASSWORD at the top of this file.")
         return 2

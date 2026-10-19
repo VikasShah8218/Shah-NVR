@@ -13,9 +13,11 @@ from settings.settings import settings
 SOAP = "http://www.w3.org/2003/05/soap-envelope"
 TDS = "http://www.onvif.org/ver10/device/wsdl"
 TRT = "http://www.onvif.org/ver10/media/wsdl"
+TRC = "http://www.onvif.org/ver10/recording/wsdl"
+TSE = "http://www.onvif.org/ver10/search/wsdl"
 TT = "http://www.onvif.org/ver10/schema"
 TER = "http://www.onvif.org/ver10/error"
-NS = {"s": SOAP, "tds": TDS, "trt": TRT, "tt": TT, "ter": TER}
+NS = {"s": SOAP, "tds": TDS, "trt": TRT, "trc": TRC, "tse": TSE, "tt": TT, "ter": TER}
 PARSER = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False)
 
 
@@ -45,7 +47,7 @@ def action(root: etree._Element) -> tuple[str, etree._Element]:
     return etree.QName(operation).localname, operation
 
 
-def _envelope(child: etree._Element) -> bytes:
+def envelope(child: etree._Element) -> bytes:
     envelope = etree.Element(etree.QName(SOAP, "Envelope"), nsmap=NS)
     etree.SubElement(envelope, etree.QName(SOAP, "Header"))
     etree.SubElement(envelope, etree.QName(SOAP, "Body")).append(child)
@@ -61,7 +63,7 @@ def fault(subcode: str, reason: str) -> bytes:
     text = etree.SubElement(reason_node, etree.QName(SOAP, "Text"))
     text.set("{http://www.w3.org/XML/1998/namespace}lang", "en")
     text.text = reason
-    return _envelope(node)
+    return envelope(node)
 
 
 def _text(parent: etree._Element, namespace: str, name: str, value: object) -> etree._Element:
@@ -122,7 +124,12 @@ def _device(operation: str) -> etree._Element:
         return out
     if operation == "GetServices":
         out = etree.Element(etree.QName(TDS, "GetServicesResponse"))
-        for namespace, xaddr in ((TDS, _xaddr("device_service")), (TRT, _xaddr("media_service"))):
+        for namespace, xaddr in (
+            (TDS, _xaddr("device_service")),
+            (TRT, _xaddr("media_service")),
+            (TRC, _xaddr("recording_service")),
+            (TSE, _xaddr("search_service")),
+        ):
             service = etree.SubElement(out, etree.QName(TDS, "Service"))
             _text(service, TDS, "Namespace", namespace)
             _text(service, TDS, "XAddr", xaddr)
@@ -134,6 +141,19 @@ def _device(operation: str) -> etree._Element:
         caps = etree.SubElement(out, etree.QName(TDS, "Capabilities"))
         device = etree.SubElement(caps, etree.QName(TT, "Device")); _text(device, TT, "XAddr", _xaddr("device_service"))
         media = etree.SubElement(caps, etree.QName(TT, "Media")); _text(media, TT, "XAddr", _xaddr("media_service"))
+        extension = etree.SubElement(caps, etree.QName(TT, "Extension"))
+        recording = etree.SubElement(extension, etree.QName(TT, "Recording"))
+        _text(recording, TT, "XAddr", _xaddr("recording_service"))
+        search = etree.SubElement(extension, etree.QName(TT, "Search"))
+        _text(search, TT, "XAddr", _xaddr("search_service"))
+        return out
+    if operation == "GetServiceCapabilities":
+        out = etree.Element(etree.QName(TDS, "GetServiceCapabilitiesResponse"))
+        caps = etree.SubElement(out, etree.QName(TDS, "Capabilities"))
+        network = etree.SubElement(caps, etree.QName(TDS, "Network"))
+        network.set("IPFilter", "false"); network.set("ZeroConfiguration", "false")
+        system = etree.SubElement(caps, etree.QName(TDS, "System"))
+        system.set("DiscoveryResolve", "true"); system.set("DiscoveryBye", "false")
         return out
     if operation == "GetScopes":
         out = etree.Element(etree.QName(TDS, "GetScopesResponse"))
@@ -149,6 +169,17 @@ def _device(operation: str) -> etree._Element:
         out = etree.Element(etree.QName(TDS, "GetHostnameResponse"))
         info = etree.SubElement(out, etree.QName(TDS, "HostnameInformation"))
         _text(info, TT, "FromDHCP", False); _text(info, TT, "Name", settings.NODE_NAME)
+        return out
+    if operation == "GetNetworkInterfaces":
+        out = etree.Element(etree.QName(TDS, "GetNetworkInterfacesResponse"))
+        interface = etree.SubElement(out, etree.QName(TDS, "NetworkInterfaces"))
+        interface.set("token", "primary"); _text(interface, TT, "Enabled", True)
+        info = etree.SubElement(interface, etree.QName(TT, "Info")); _text(info, TT, "Name", "primary")
+        ipv4 = etree.SubElement(interface, etree.QName(TT, "IPv4")); _text(ipv4, TT, "Enabled", True)
+        config = etree.SubElement(ipv4, etree.QName(TT, "Config"))
+        manual = etree.SubElement(config, etree.QName(TT, "Manual"))
+        _text(manual, TT, "Address", settings.public_host); _text(manual, TT, "PrefixLength", 24)
+        _text(config, TT, "DHCP", False)
         return out
     raise SoapFault("ter:ActionNotSupported", f"Device action {operation} is not supported")
 
@@ -193,4 +224,4 @@ def _media(operation: str, request: etree._Element) -> etree._Element:
 def dispatch(service: str, root: etree._Element) -> bytes:
     name, request = action(root)
     response = _device(name) if service == "device" else _media(name, request)
-    return _envelope(response)
+    return envelope(response)
