@@ -35,8 +35,8 @@ import httpx
 # ---------------------------------------------------------------------------
 NODE_HOST = "192.168.1.115"
 NODE_HTTP_PORT = 7100
-ONVIF_USERNAME = "CHANGE_ME"
-ONVIF_PASSWORD = "CHANGE_ME"
+ONVIF_USERNAME = "shah"
+ONVIF_PASSWORD = "shah"
 
 HTTP_TIMEOUT_SECONDS = 10.0
 RTSP_TIMEOUT_SECONDS = 12.0
