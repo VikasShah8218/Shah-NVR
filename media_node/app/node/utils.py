@@ -27,6 +27,10 @@ class NodeRuntime:
     last_segment_end: dict[tuple[int, str], datetime] = field(default_factory=dict)
     # path name -> time we first saw it "ready" in MediaMTX
     ready_since: dict[str, datetime] = field(default_factory=dict)
+    # Desired H5 state supplied by central. Credentials are intentionally absent.
+    onvif_server_config: dict = field(default_factory=lambda: {
+        "enabled": False, "discovery_name": "Shah-NVR", "location": None,
+    })
 
     def generation_for(self, camera_id: int) -> int:
         a = self.assignments.get(camera_id)

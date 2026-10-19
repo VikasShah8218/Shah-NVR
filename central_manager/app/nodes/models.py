@@ -33,6 +33,10 @@ class MediaNode(Model):
     storage_quota_bytes = fields.BigIntField(null=True)
     version = fields.CharField(max_length=64, null=True)
     mediamtx_version = fields.CharField(max_length=64, null=True)
+    # H5 desired state. Credentials remain node-local and are never stored in central.
+    onvif_server_enabled = fields.BooleanField(default=False)
+    onvif_server_name = fields.CharField(max_length=128, default="Shah-NVR")
+    onvif_server_location = fields.CharField(max_length=256, null=True)
     state = fields.CharEnumField(NodeState, max_length=16, default=NodeState.READY)
     last_heartbeat_at = fields.DatetimeField(null=True)
     metrics = fields.JSONField(null=True)

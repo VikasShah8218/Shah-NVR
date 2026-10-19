@@ -93,6 +93,7 @@ class HeartbeatIn(BaseModel):
     drives: list[DriveInfo] = []
     volumes: list[VolumeReport] = []
     onvif: list[OnvifHealthIn] = []  # fresh ONVIF checks of this node's cameras
+    onvif_server: dict[str, Any] | None = None
     extra: dict[str, Any] | None = None
 
 
@@ -114,6 +115,7 @@ class HeartbeatOut(BaseModel):
     assignments: int
     storage_quota_bytes: int | None = None  # deprecated: for nodes older than storage volumes
     volumes: list[VolumeConfig] = []
+    onvif_server: dict[str, Any] = {}
 
 
 class StreamAssignment(BaseModel):
@@ -131,6 +133,7 @@ class CameraAssignmentOut(BaseModel):
     streams: list[StreamAssignment]
     onvif_host: str | None = None  # the node checks reachability + clock (no login) when set
     onvif_port: int | None = None
+    expose_via_onvif: bool = True
 
 
 class AssignmentsOut(BaseModel):
@@ -218,3 +221,23 @@ class NodeUpdate(BaseModel):
     capacity_cameras: int | None = Field(default=None, ge=1)
     # Deprecated (use the volumes API): sets the cap of the node's default volume. null = whole disk.
     storage_quota_gb: float | None = Field(default=None, gt=0)
+
+
+class OnvifServerUpdate(BaseModel):
+    enabled: bool | None = None
+    discovery_name: str | None = Field(default=None, min_length=1, max_length=128)
+    location: str | None = Field(default=None, max_length=256)
+
+
+class OnvifServerOut(BaseModel):
+    node_id: int
+    enabled: bool
+    discovery_name: str
+    location: str | None
+    status: str
+    credentials_configured: bool
+    xaddr: str | None = None
+    rtsp_address: str | None = None
+    exposed_cameras: int = 0
+    exposed_profiles: int = 0
+    last_error: str | None = None

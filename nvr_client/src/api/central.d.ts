@@ -171,6 +171,24 @@ export interface paths {
         patch: operations["update_node_api_v1_nodes__node_id__patch"];
         trace?: never;
     };
+    "/api/v1/nodes/{node_id}/onvif-server": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Onvif Server */
+        get: operations["get_onvif_server_api_v1_nodes__node_id__onvif_server_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Onvif Server */
+        patch: operations["update_onvif_server_api_v1_nodes__node_id__onvif_server_patch"];
+        trace?: never;
+    };
     "/api/v1/nodes/{node_id}/volumes": {
         parameters: {
             query?: never;
@@ -867,6 +885,11 @@ export interface components {
             onvif_host?: string | null;
             /** Onvif Port */
             onvif_port?: number | null;
+            /**
+             * Expose Via Onvif
+             * @default true
+             */
+            expose_via_onvif: boolean;
         };
         /** CameraCreate */
         CameraCreate: {
@@ -902,6 +925,8 @@ export interface components {
             has_password: boolean;
             /** Enabled */
             enabled: boolean;
+            /** Expose Via Onvif */
+            expose_via_onvif: boolean;
             /** Retention Days */
             retention_days: number | null;
             /** Onvif Host */
@@ -952,6 +977,8 @@ export interface components {
             password?: string | null;
             /** Enabled */
             enabled?: boolean | null;
+            /** Expose Via Onvif */
+            expose_via_onvif?: boolean | null;
             /** Retention Days */
             retention_days?: number | null;
         };
@@ -1370,6 +1397,10 @@ export interface components {
              * @default []
              */
             onvif: components["schemas"]["OnvifHealthIn"][];
+            /** Onvif Server */
+            onvif_server?: {
+                [key: string]: unknown;
+            } | null;
             /** Extra */
             extra?: {
                 [key: string]: unknown;
@@ -1394,6 +1425,13 @@ export interface components {
              * @default []
              */
             volumes: components["schemas"]["VolumeConfig"][];
+            /**
+             * Onvif Server
+             * @default {}
+             */
+            onvif_server: {
+                [key: string]: unknown;
+            };
         };
         /** HistoryOut */
         HistoryOut: {
@@ -1626,6 +1664,46 @@ export interface components {
              * Format: date-time
              */
             checked_at: string;
+        };
+        /** OnvifServerOut */
+        OnvifServerOut: {
+            /** Node Id */
+            node_id: number;
+            /** Enabled */
+            enabled: boolean;
+            /** Discovery Name */
+            discovery_name: string;
+            /** Location */
+            location: string | null;
+            /** Status */
+            status: string;
+            /** Credentials Configured */
+            credentials_configured: boolean;
+            /** Xaddr */
+            xaddr?: string | null;
+            /** Rtsp Address */
+            rtsp_address?: string | null;
+            /**
+             * Exposed Cameras
+             * @default 0
+             */
+            exposed_cameras: number;
+            /**
+             * Exposed Profiles
+             * @default 0
+             */
+            exposed_profiles: number;
+            /** Last Error */
+            last_error?: string | null;
+        };
+        /** OnvifServerUpdate */
+        OnvifServerUpdate: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Discovery Name */
+            discovery_name?: string | null;
+            /** Location */
+            location?: string | null;
         };
         /** ProbeOut */
         ProbeOut: {
@@ -2679,6 +2757,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NodeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_onvif_server_api_v1_nodes__node_id__onvif_server_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnvifServerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_onvif_server_api_v1_nodes__node_id__onvif_server_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnvifServerUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnvifServerOut"];
                 };
             };
             /** @description Validation Error */

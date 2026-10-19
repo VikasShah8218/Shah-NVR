@@ -24,6 +24,8 @@ from app.node.utils import central
 from app.onvif.health import onvif_tick
 from app.onvif.router import router as onvif_router
 from app.onvif.ptz_router import router as ptz_router
+from app.onvif_server.router import router as onvif_server_router
+from app.onvif_server.service import onvif_server
 from app.recordings.router import router as recordings_router
 from app.recordings.services import deletion_tick, scan_tick, upload_tick
 from app.storage.services import storage, storage_tick
@@ -52,6 +54,7 @@ async def lifespan(app: FastAPI):
         await storage.refresh()  # pick the recording target before MediaMTX gets its first paths
         await supervisor.start()
         await register()
+        await onvif_server.apply()
 
         tasks = [
             asyncio.create_task(run_periodic(name, interval, func))
@@ -74,6 +77,7 @@ async def lifespan(app: FastAPI):
             for t in tasks:
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            await onvif_server.stop()
             await supervisor.stop()
             await mtx.close()
             await central.close()
@@ -85,6 +89,7 @@ app.include_router(node_router)
 app.include_router(recordings_router)
 app.include_router(onvif_router)
 app.include_router(ptz_router)
+app.include_router(onvif_server_router)
 
 
 @app.get("/", tags=["System"])

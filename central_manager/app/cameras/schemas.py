@@ -65,6 +65,7 @@ class CameraUpdate(BaseModel):
     username: str | None = None
     password: str | None = None
     enabled: bool | None = None
+    expose_via_onvif: bool | None = None
     # Days to keep, counted back from the camera's latest recording. Leave out for the default (create) /
     # unchanged (update); send null to keep recordings until storage is full.
     retention_days: int | None = Field(default=None, ge=1, le=3650)
@@ -84,6 +85,7 @@ class CameraOut(BaseModel):
     username: str | None
     has_password: bool
     enabled: bool
+    expose_via_onvif: bool
     retention_days: int | None  # None = keep until storage is full
     # ONVIF device (null for cameras never seen over ONVIF)
     onvif_host: str | None = None

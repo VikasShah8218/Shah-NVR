@@ -23,6 +23,8 @@ class Camera(Model):
     username = fields.CharField(max_length=128, null=True)
     password = fields.CharField(max_length=256, null=True)
     enabled = fields.BooleanField(default=True)
+    # Whether the owning media node may expose this camera through its H5 virtual ONVIF NVR.
+    expose_via_onvif = fields.BooleanField(default=True)
     # Max days of recordings, counted back from the camera's latest recording (app/recordings/services.py).
     # None = keep until storage is full (only space-based cleanup on the node removes recordings).
     retention_days = fields.IntField(default=7, null=True)

@@ -80,6 +80,8 @@ async def heartbeat_tick() -> None:
 
     if runtime.node_id is None and not await register():
         return
+    from app.onvif_server.service import onvif_server
+
     payload = {
         **metrics.cpu_memory(),
         **metrics.network_rates(),
@@ -95,12 +97,17 @@ async def heartbeat_tick() -> None:
         "drives": await asyncio.to_thread(local_drives),
         "volumes": storage.reports(),
         "onvif": (onvif_reports := take_reports()),
+        "onvif_server": onvif_server.status(),
     }
     try:
         data = await central.heartbeat(runtime.node_id, payload)
         runtime.last_central_contact = utcnow()
         ack_reports(onvif_reports)
         await storage.apply_config(data.get("volumes"), data.get("storage_quota_bytes"))
+        config = data.get("onvif_server") or {}
+        if config != runtime.onvif_server_config:
+            runtime.onvif_server_config = config
+            await onvif_server.apply()
     except CentralError as exc:
         if exc.status_code == 404:  # central lost us (e.g. DB reset): register again
             logger.warning("Central does not know node_id=%s; re-registering", runtime.node_id)

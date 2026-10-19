@@ -31,7 +31,8 @@ cd central_manager
 aerich upgrade
 ```
 
-This applies migrations 5 (encoder journal) and 6 (recording decoder fingerprint); do not run
+This applies migrations 5 (encoder journal), 6 (recording decoder fingerprint), and 7
+(virtual ONVIF-server configuration and camera exposure); do not run
 `init-db` or generate new migrations on an existing installation. Restart central and the media node,
 then rebuild/restart `nvr_client`. These migrations target PostgreSQL, the supported central database.
 New in-memory SQLite databases are used only by tests.

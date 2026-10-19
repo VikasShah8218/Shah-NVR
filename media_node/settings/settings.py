@@ -45,6 +45,13 @@ class Settings(BaseSettings):
     WEBRTC_PORT: int = 8889
     WEBRTC_UDP_PORT: int = 8189
 
+    # H5 virtual ONVIF NVR. Desired enable/name come from central; the secret stays on this node.
+    ONVIF_AUTH_MODE: str = "local"
+    ONVIF_SERVER_USERNAME: str = ""
+    ONVIF_SERVER_PASSWORD: str = ""
+    ONVIF_RTSP_PORT: int = 8555
+    ONVIF_AUTH_NONCE_SECONDS: int = 300
+
     # Recording
     SEGMENT_SECONDS: int = 60  # length of one recorded chunk
     PART_SECONDS: float = 1.0  # MediaMTX fMP4 fragment length (= max data lost on power cut)
@@ -89,6 +96,10 @@ class Settings(BaseSettings):
     @property
     def db_path(self) -> Path:
         return self.DATA_DIR / "node_state.sqlite3"
+
+    @property
+    def onvif_credentials_configured(self) -> bool:
+        return bool(self.ONVIF_SERVER_USERNAME and self.ONVIF_SERVER_PASSWORD)
 
 
 @lru_cache

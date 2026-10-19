@@ -25,6 +25,8 @@ import type {
   OnvifDiscovered,
   OnvifNtpIn,
   OnvifProbe,
+  OnvifServer,
+  OnvifServerUpdate,
   StreamIn,
   StorageVolume,
   StreamUpdate,
@@ -66,6 +68,15 @@ export function useNode(nodeId: number, refetchMs?: number) {
     queryKey: [url, "nodes", nodeId],
     queryFn: () => unwrap<MediaNode>(api.GET("/api/v1/nodes/{node_id}", { params: { path: { node_id: nodeId } } })),
     refetchInterval: refetchMs ?? poll,
+  })
+}
+
+export function useOnvifServer(nodeId: number, refetchMs = 5000) {
+  const { url, api } = useCentral()
+  return useQuery({
+    queryKey: [url, "onvif-server", nodeId],
+    queryFn: () => unwrap<OnvifServer>(api.GET("/api/v1/nodes/{node_id}/onvif-server", { params: { path: { node_id: nodeId } } })),
+    refetchInterval: refetchMs,
   })
 }
 
@@ -257,6 +268,13 @@ export const useUpdateNode = () =>
     (api, { id, body }: { id: number; body: NodeUpdate }) =>
       unwrap<MediaNode>(api.PATCH("/api/v1/nodes/{node_id}", { params: { path: { node_id: id } }, body })),
     { success: (n) => `Limits saved for ${n.name}` },
+  )
+
+export const useUpdateOnvifServer = () =>
+  useCentralMutation(
+    (api, { id, body }: { id: number; body: OnvifServerUpdate }) =>
+      unwrap<OnvifServer>(api.PATCH("/api/v1/nodes/{node_id}/onvif-server", { params: { path: { node_id: id } }, body })),
+    { success: "ONVIF server configuration saved", invalidate: ["nodes", "onvif-server"] },
   )
 
 export type NodeAction = "drain" | "cordon" | "activate"

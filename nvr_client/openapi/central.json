@@ -819,6 +819,98 @@
         }
       }
     },
+    "/api/v1/nodes/{node_id}/onvif-server": {
+      "get": {
+        "tags": [
+          "Media Nodes"
+        ],
+        "summary": "Get Onvif Server",
+        "operationId": "get_onvif_server_api_v1_nodes__node_id__onvif_server_get",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnvifServerOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Media Nodes"
+        ],
+        "summary": "Update Onvif Server",
+        "operationId": "update_onvif_server_api_v1_nodes__node_id__onvif_server_patch",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnvifServerUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnvifServerOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/nodes/{node_id}/volumes": {
       "get": {
         "tags": [
@@ -2841,6 +2933,11 @@
               }
             ],
             "title": "Onvif Port"
+          },
+          "expose_via_onvif": {
+            "type": "boolean",
+            "title": "Expose Via Onvif",
+            "default": true
           }
         },
         "type": "object",
@@ -2966,6 +3063,10 @@
           "enabled": {
             "type": "boolean",
             "title": "Enabled"
+          },
+          "expose_via_onvif": {
+            "type": "boolean",
+            "title": "Expose Via Onvif"
           },
           "retention_days": {
             "anyOf": [
@@ -3139,6 +3240,7 @@
           "username",
           "has_password",
           "enabled",
+          "expose_via_onvif",
           "retention_days",
           "created_at",
           "updated_at",
@@ -3205,6 +3307,17 @@
               }
             ],
             "title": "Enabled"
+          },
+          "expose_via_onvif": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expose Via Onvif"
           },
           "retention_days": {
             "anyOf": [
@@ -4514,6 +4627,18 @@
             "title": "Onvif",
             "default": []
           },
+          "onvif_server": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Server"
+          },
           "extra": {
             "anyOf": [
               {
@@ -4566,6 +4691,12 @@
             "type": "array",
             "title": "Volumes",
             "default": []
+          },
+          "onvif_server": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Onvif Server",
+            "default": {}
           }
         },
         "type": "object",
@@ -5211,6 +5342,136 @@
           "checked_at"
         ],
         "title": "OnvifHealthIn"
+      },
+      "OnvifServerOut": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "discovery_name": {
+            "type": "string",
+            "title": "Discovery Name"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "credentials_configured": {
+            "type": "boolean",
+            "title": "Credentials Configured"
+          },
+          "xaddr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xaddr"
+          },
+          "rtsp_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rtsp Address"
+          },
+          "exposed_cameras": {
+            "type": "integer",
+            "title": "Exposed Cameras",
+            "default": 0
+          },
+          "exposed_profiles": {
+            "type": "integer",
+            "title": "Exposed Profiles",
+            "default": 0
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "enabled",
+          "discovery_name",
+          "location",
+          "status",
+          "credentials_configured"
+        ],
+        "title": "OnvifServerOut"
+      },
+      "OnvifServerUpdate": {
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "discovery_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discovery Name"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          }
+        },
+        "type": "object",
+        "title": "OnvifServerUpdate"
       },
       "ProbeOut": {
         "properties": {

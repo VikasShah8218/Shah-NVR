@@ -18,6 +18,7 @@ import { NodeActions } from "./NodeActions"
 import { nodeResources } from "./nodeUtils"
 import { ResourceCharts, useNodeHistory } from "./ResourceCharts"
 import { StorageTab } from "./StorageTab"
+import { OnvifServerTab } from "./OnvifServerTab"
 
 export function NodeDetailPage() {
   const nodeId = Number(useParams().id)
@@ -53,6 +54,7 @@ export function NodeDetailPage() {
           <TabsTrigger value="paths">MediaMTX paths</TabsTrigger>
           <TabsTrigger value="chunks">Recorded chunks</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
+          <TabsTrigger value="onvif">ONVIF server</TabsTrigger>
         </TabsList>
         <TabsContent value="cameras">
           <NodeCameras apiUrl={n.api_url} />
@@ -72,6 +74,9 @@ export function NodeDetailPage() {
               <LogViewer apiUrl={n.api_url} />
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="onvif">
+          <OnvifServerTab node={n} />
         </TabsContent>
       </Tabs>
     </div>
