@@ -17,6 +17,28 @@ logger = logging.getLogger("node.onvif-server")
 KV_UUID = "onvif_server_uuid"
 
 
+def _valid_uuid(value: object) -> str | None:
+    """Read both the current JSON object and any early string-format value."""
+    candidate = value.get("uuid") if isinstance(value, dict) else value
+    if not isinstance(candidate, str):
+        return None
+    try:
+        return str(uuid.UUID(candidate))
+    except ValueError:
+        return None
+
+
+async def persistent_device_uuid() -> str:
+    device_uuid = _valid_uuid(await KeyValue.get_value(KV_UUID))
+    if device_uuid:
+        return device_uuid
+    device_uuid = str(uuid.uuid4())
+    # KeyValue.value is a JSONField. Store an object rather than a bare
+    # string, which Tortoise otherwise attempts to JSON-decode.
+    await KeyValue.set_value(KV_UUID, {"uuid": device_uuid})
+    return device_uuid
+
+
 class OnvifServer:
     def __init__(self):
         self.discovery_transport = None
@@ -35,10 +57,7 @@ class OnvifServer:
         if self.discovery_transport and rtsp_proxy.server:
             self.state = "online"; self.last_error = None; return
         try:
-            self.device_uuid = await KeyValue.get_value(KV_UUID)
-            if not self.device_uuid:
-                self.device_uuid = str(uuid.uuid4())
-                await KeyValue.set_value(KV_UUID, self.device_uuid)
+            self.device_uuid = await persistent_device_uuid()
             await rtsp_proxy.start()
             loop = asyncio.get_running_loop()
             self.discovery_transport, _ = await loop.create_datagram_endpoint(

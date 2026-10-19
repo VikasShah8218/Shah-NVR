@@ -1,15 +1,20 @@
 import base64
+import asyncio
 import hashlib
 from datetime import datetime, timezone
+from uuid import UUID
 
 from lxml import etree
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from tortoise import Tortoise
 
+from app.node.models import KeyValue
 from app.node.utils import runtime
 from app.onvif_server.auth import REALM, make_nonce, verify_digest, verify_username_token
 from app.onvif_server.rtsp_proxy import _allowed, _rewrite_request
 from app.onvif_server.router import router
+from app.onvif_server.service import KV_UUID, persistent_device_uuid
 from app.onvif_server.soap import dispatch, parse
 from settings.settings import settings
 
@@ -81,3 +86,24 @@ def test_device_endpoint_challenges_then_accepts_digest(monkeypatch):
                 f'response="{answer}", qop=auth, nc={nc}, cnonce="{cnonce}"')
         response = client.post(uri, content=request_xml, headers={"Authorization": auth})
         assert response.status_code == 200 and b"GetDeviceInformationResponse" in response.content
+
+
+def test_onvif_device_uuid_uses_json_safe_persistent_shape(tmp_path):
+    async def run():
+        await Tortoise.init(
+            db_url=f"sqlite://{(tmp_path / 'node.sqlite3').as_posix()}",
+            modules={"models": ["app.node.models"]},
+        )
+        await Tortoise.generate_schemas()
+        try:
+            first = await persistent_device_uuid()
+            stored = await KeyValue.get_value(KV_UUID)
+            assert stored == {"uuid": first}
+            assert str(UUID(first)) == first
+
+            second = await persistent_device_uuid()
+            assert second == first
+        finally:
+            await Tortoise.close_connections()
+
+    asyncio.run(run())
