@@ -1462,6 +1462,11 @@ export interface components {
             onvif_server: {
                 [key: string]: unknown;
             };
+            /**
+             * Webrtc Additional Hosts
+             * @default []
+             */
+            webrtc_additional_hosts: string[];
         };
         /** HistoryOut */
         HistoryOut: {
@@ -1551,6 +1556,32 @@ export interface components {
             hls_port: number;
             /** Webrtc Port */
             webrtc_port: number;
+            /** Public Enabled */
+            public_enabled: boolean;
+            /** Public Api Url */
+            public_api_url: string | null;
+            /** Public Media Host */
+            public_media_host: string | null;
+            /** Public Rtsp Port */
+            public_rtsp_port: number | null;
+            /** Public Hls Port */
+            public_hls_port: number | null;
+            /** Public Webrtc Port */
+            public_webrtc_port: number | null;
+            /** Public Media Tls */
+            public_media_tls: boolean;
+            /** Client Api Url */
+            client_api_url: string;
+            /** Client Media Host */
+            client_media_host: string;
+            /** Client Rtsp Port */
+            client_rtsp_port: number;
+            /** Client Hls Port */
+            client_hls_port: number;
+            /** Client Webrtc Port */
+            client_webrtc_port: number;
+            /** Client Media Scheme */
+            client_media_scheme: string;
             /** Capacity Cameras */
             capacity_cameras: number;
             /** Storage Quota Bytes */
@@ -1629,6 +1660,20 @@ export interface components {
             capacity_cameras?: number | null;
             /** Storage Quota Gb */
             storage_quota_gb?: number | null;
+            /** Public Enabled */
+            public_enabled?: boolean | null;
+            /** Public Api Url */
+            public_api_url?: string | null;
+            /** Public Media Host */
+            public_media_host?: string | null;
+            /** Public Rtsp Port */
+            public_rtsp_port?: number | null;
+            /** Public Hls Port */
+            public_hls_port?: number | null;
+            /** Public Webrtc Port */
+            public_webrtc_port?: number | null;
+            /** Public Media Tls */
+            public_media_tls?: boolean | null;
         };
         /** NtpIn */
         NtpIn: {

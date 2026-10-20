@@ -5,8 +5,9 @@ Compared: `nvr_client` and `nvr_desktop` at commit `0d15b46`
 
 ## Summary
 
-There are currently **two feature packages implemented in the web client but
-not in the desktop client: H3 ONVIF PTZ controls and H6 one-way audio**.
+There are currently **three feature packages implemented in the web client but
+not in the desktop client: H3 ONVIF PTZ controls, H6 one-way audio, and per-node
+public client endpoints**.
 
 | Feature | Web client | Desktop client | Status |
 |---|---|---|---|
@@ -14,6 +15,7 @@ not in the desktop client: H3 ONVIF PTZ controls and H6 one-way audio**.
 | H2 ONVIF video encoder control | Implemented | Implemented | In parity |
 | H3 ONVIF PTZ control, initial slice | Implemented | Not implemented | **Desktop pending** |
 | H6 audio detection, live listening and recorded listening | Implemented | Not implemented | **Desktop pending** |
+| Per-node public client endpoints | Implemented | Not implemented | **Desktop pending** |
 
 H4 events, H5 Shah-NVR as an ONVIF device, H6 two-way talk and the lower
 priority ONVIF roadmap items are not counted here. They have not yet been
@@ -42,6 +44,18 @@ Desktop parity requires:
   H1/H2/live-view metadata regressions.
 
 Two-way talk remains separate product work and is not part of this parity item.
+
+## Pending feature: per-node public client endpoints
+
+Central Manager retains each node's private registration address while storing an
+optional public API URL, media hostname, RTSP/HLS/WebRTC ports and HTTPS preference.
+The web node-detail Connectivity tab controls whether browser-facing live, playback,
+download and node-administration links use that public mapping.
+
+Desktop parity requires the same node connectivity form and resolved endpoint fields.
+Native RTSP playback must use the resolved public RTSP host/port when enabled, while
+all desktop node API and recording-download calls must use `client_api_url`. The desktop
+must continue using its normal LAN paths when public mode is disabled.
 
 ## Pending feature: H3 ONVIF PTZ controls
 

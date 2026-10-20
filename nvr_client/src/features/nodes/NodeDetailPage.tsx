@@ -19,6 +19,7 @@ import { nodeResources } from "./nodeUtils"
 import { ResourceCharts, useNodeHistory } from "./ResourceCharts"
 import { StorageTab } from "./StorageTab"
 import { OnvifServerTab } from "./OnvifServerTab"
+import { ConnectivityTab } from "./ConnectivityTab"
 
 export function NodeDetailPage() {
   const nodeId = Number(useParams().id)
@@ -36,7 +37,7 @@ export function NodeDetailPage() {
       </Link>
       <PageHeader
         title={n.name}
-        description={`${n.api_url} · heartbeat ${timeAgo(n.last_heartbeat_at)}`}
+        description={`${n.client_api_url} · heartbeat ${timeAgo(n.last_heartbeat_at)}`}
         actions={
           <>
             <StatusBadge status={n.state} />
@@ -54,26 +55,30 @@ export function NodeDetailPage() {
           <TabsTrigger value="paths">MediaMTX paths</TabsTrigger>
           <TabsTrigger value="chunks">Recorded chunks</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
+          <TabsTrigger value="connectivity">Connectivity</TabsTrigger>
           <TabsTrigger value="onvif">ONVIF server</TabsTrigger>
         </TabsList>
         <TabsContent value="cameras">
-          <NodeCameras apiUrl={n.api_url} />
+          <NodeCameras apiUrl={n.client_api_url} />
         </TabsContent>
         <TabsContent value="storage">
           <StorageTab node={n} />
         </TabsContent>
         <TabsContent value="paths">
-          <NodePaths apiUrl={n.api_url} />
+          <NodePaths apiUrl={n.client_api_url} />
         </TabsContent>
         <TabsContent value="chunks">
-          <NodeChunks apiUrl={n.api_url} />
+          <NodeChunks apiUrl={n.client_api_url} />
         </TabsContent>
         <TabsContent value="logs">
           <Card>
             <CardContent>
-              <LogViewer apiUrl={n.api_url} />
+              <LogViewer apiUrl={n.client_api_url} />
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="connectivity">
+          <ConnectivityTab node={n} />
         </TabsContent>
         <TabsContent value="onvif">
           <OnvifServerTab node={n} />
@@ -85,7 +90,7 @@ export function NodeDetailPage() {
 
 function ResourceSummary({ node }: { node: MediaNode }) {
   const r = nodeResources(node)
-  const status = useNodeStatus(node.api_url)
+  const status = useNodeStatus(node.client_api_url)
   const s = status.data
   const gpu = r.gpus[0]
   return (
@@ -318,8 +323,9 @@ function ClientAddress({ node }: { node: MediaNode }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border bg-card px-4 py-2.5 text-sm">
       <span>
-        Clients connect to <b className="font-mono">{node.media_host}</b>
+        Clients connect to <b className="font-mono">{node.client_media_host}</b>
         <span className="text-muted-foreground"> (live, playback, downloads and VLC links)</span>
+        {node.public_enabled && <span className="ml-2 text-success">Public mode</span>}
       </span>
       {others.length > 0 && (
         <span className="text-xs text-muted-foreground">

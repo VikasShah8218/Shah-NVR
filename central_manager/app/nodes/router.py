@@ -77,6 +77,14 @@ async def update_node(node_id: int, body: NodeUpdate):
         quota = gb_to_bytes(data.pop("storage_quota_gb"))
         node.storage_quota_bytes = quota
         await StorageVolume.filter(node_id=node.id, is_default=True).update(quota_bytes=quota)
+    enabled = data.get("public_enabled", node.public_enabled)
+    public_api_url = data.get("public_api_url", node.public_api_url)
+    public_media_host = data.get("public_media_host", node.public_media_host)
+    if enabled and (not public_api_url or not public_media_host):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "Public Node API URL and public media host are required before public access can be enabled",
+        )
     if data:
         node.update_from_dict(data)
     await node.save()
@@ -293,6 +301,9 @@ async def heartbeat(node_id: int, body: HeartbeatIn):
             "discovery_name": node.onvif_server_name,
             "location": node.onvif_server_location,
         },
+        webrtc_additional_hosts=list(dict.fromkeys(
+            [node.media_host] + ([node.public_media_host] if node.public_enabled and node.public_media_host else [])
+        )),
     )
 
 

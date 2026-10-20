@@ -4863,6 +4863,14 @@
             "type": "object",
             "title": "Onvif Server",
             "default": {}
+          },
+          "webrtc_additional_hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Webrtc Additional Hosts",
+            "default": []
           }
         },
         "type": "object",
@@ -5128,6 +5136,93 @@
             "type": "integer",
             "title": "Webrtc Port"
           },
+          "public_enabled": {
+            "type": "boolean",
+            "title": "Public Enabled"
+          },
+          "public_api_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Api Url"
+          },
+          "public_media_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Media Host"
+          },
+          "public_rtsp_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Rtsp Port"
+          },
+          "public_hls_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Hls Port"
+          },
+          "public_webrtc_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Webrtc Port"
+          },
+          "public_media_tls": {
+            "type": "boolean",
+            "title": "Public Media Tls"
+          },
+          "client_api_url": {
+            "type": "string",
+            "title": "Client Api Url"
+          },
+          "client_media_host": {
+            "type": "string",
+            "title": "Client Media Host"
+          },
+          "client_rtsp_port": {
+            "type": "integer",
+            "title": "Client Rtsp Port"
+          },
+          "client_hls_port": {
+            "type": "integer",
+            "title": "Client Hls Port"
+          },
+          "client_webrtc_port": {
+            "type": "integer",
+            "title": "Client Webrtc Port"
+          },
+          "client_media_scheme": {
+            "type": "string",
+            "title": "Client Media Scheme"
+          },
           "capacity_cameras": {
             "type": "integer",
             "title": "Capacity Cameras"
@@ -5215,6 +5310,19 @@
           "rtsp_port",
           "hls_port",
           "webrtc_port",
+          "public_enabled",
+          "public_api_url",
+          "public_media_host",
+          "public_rtsp_port",
+          "public_hls_port",
+          "public_webrtc_port",
+          "public_media_tls",
+          "client_api_url",
+          "client_media_host",
+          "client_rtsp_port",
+          "client_hls_port",
+          "client_webrtc_port",
+          "client_media_scheme",
           "capacity_cameras",
           "storage_quota_bytes",
           "version",
@@ -5353,6 +5461,91 @@
               }
             ],
             "title": "Storage Quota Gb"
+          },
+          "public_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Enabled"
+          },
+          "public_api_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Api Url"
+          },
+          "public_media_host": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Media Host"
+          },
+          "public_rtsp_port": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 65535.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Rtsp Port"
+          },
+          "public_hls_port": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 65535.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Hls Port"
+          },
+          "public_webrtc_port": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 65535.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Webrtc Port"
+          },
+          "public_media_tls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Media Tls"
           }
         },
         "type": "object",

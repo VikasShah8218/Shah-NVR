@@ -61,7 +61,7 @@ export function PlaybackPage() {
   const isToday = startOfLocalDay(new Date()).getTime() === dayStart
   const timeline = useTimeline(cameraId, profile, new Date(dayStart), new Date(dayEnd), isToday ? 20_000 : 0)
   const segments: Segment[] = timeline.data?.segments ?? []
-  const nodeUrl = useMemo(() => new Map((nodes.data ?? []).map((n) => [n.id, n.api_url])), [nodes.data])
+  const nodeUrl = useMemo(() => new Map((nodes.data ?? []).map((n) => [n.id, n.client_api_url])), [nodes.data])
 
   const viewEnd = viewStart + zoom
   const src = useMemo(

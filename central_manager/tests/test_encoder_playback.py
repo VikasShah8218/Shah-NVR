@@ -54,3 +54,16 @@ def test_audio_playlist_skips_video_only_segments():
     )
     node = SimpleNamespace(api_url="http://node", state=NodeState.ACTIVE)
     assert build_audio_playlist([segment], {1: node}, start, start + timedelta(seconds=60)) is None
+
+
+def test_playback_playlist_uses_browser_facing_node_url():
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    segment = SimpleNamespace(
+        id="abc", node_id=1, codec="h264", config_signature=None,
+        start_time=start, end_time=start + timedelta(seconds=10), parts=[10000],
+    )
+    node = SimpleNamespace(api_url="http://192.168.1.115:7100", client_api_url="https://nvr.example.com:17100",
+                           state=NodeState.ACTIVE)
+    playlist = build_vod_playlist([segment], {1: node}, start, start + timedelta(seconds=10))
+    assert "https://nvr.example.com:17100/api/v1/media/abc" in playlist
+    assert "192.168.1.115" not in playlist

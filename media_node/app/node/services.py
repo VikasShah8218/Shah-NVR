@@ -16,6 +16,12 @@ KV_ASSIGNMENTS = "assignments"
 VERSION = "0.1.0"
 
 
+def desired_webrtc_hosts(data: dict) -> list[str]:
+    """Sanitize central's browser-facing ICE hosts and always retain this node's LAN address."""
+    supplied = [str(h).strip() for h in data.get("webrtc_additional_hosts", []) if str(h).strip()]
+    return list(dict.fromkeys([settings.public_host, *supplied]))
+
+
 async def load_local_state() -> None:
     """Restore node id and last known assignments, so recording continues if central is down."""
     runtime.node_id = await KeyValue.get_value(KV_NODE_ID)
@@ -104,6 +110,13 @@ async def heartbeat_tick() -> None:
         runtime.last_central_contact = utcnow()
         ack_reports(onvif_reports)
         await storage.apply_config(data.get("volumes"), data.get("storage_quota_bytes"))
+        hosts = desired_webrtc_hosts(data)
+        if hosts != runtime.webrtc_additional_hosts:
+            from app.mediamtx.utils import mtx
+
+            await mtx.patch_global({"webrtcAdditionalHosts": hosts})
+            runtime.webrtc_additional_hosts = hosts
+            logger.info("MediaMTX WebRTC advertised hosts updated: %s", ", ".join(hosts))
         config = data.get("onvif_server") or {}
         if config != runtime.onvif_server_config:
             runtime.onvif_server_config = config

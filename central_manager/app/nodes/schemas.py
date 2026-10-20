@@ -116,6 +116,7 @@ class HeartbeatOut(BaseModel):
     storage_quota_bytes: int | None = None  # deprecated: for nodes older than storage volumes
     volumes: list[VolumeConfig] = []
     onvif_server: dict[str, Any] = {}
+    webrtc_additional_hosts: list[str] = []
 
 
 class StreamAssignment(BaseModel):
@@ -215,6 +216,19 @@ class NodeOut(BaseModel):
     rtsp_port: int
     hls_port: int
     webrtc_port: int
+    public_enabled: bool
+    public_api_url: str | None
+    public_media_host: str | None
+    public_rtsp_port: int | None
+    public_hls_port: int | None
+    public_webrtc_port: int | None
+    public_media_tls: bool
+    client_api_url: str
+    client_media_host: str
+    client_rtsp_port: int
+    client_hls_port: int
+    client_webrtc_port: int
+    client_media_scheme: str
     capacity_cameras: int
     storage_quota_bytes: int | None  # total cap of all volumes (None if any volume is uncapped)
     volumes: list[VolumeOut] = []
@@ -230,6 +244,29 @@ class NodeUpdate(BaseModel):
     capacity_cameras: int | None = Field(default=None, ge=1)
     # Deprecated (use the volumes API): sets the cap of the node's default volume. null = whole disk.
     storage_quota_gb: float | None = Field(default=None, gt=0)
+    public_enabled: bool | None = None
+    public_api_url: str | None = Field(default=None, max_length=256)
+    public_media_host: str | None = Field(default=None, max_length=256)
+    public_rtsp_port: int | None = Field(default=None, ge=1, le=65535)
+    public_hls_port: int | None = Field(default=None, ge=1, le=65535)
+    public_webrtc_port: int | None = Field(default=None, ge=1, le=65535)
+    public_media_tls: bool | None = None
+
+    @field_validator("public_api_url")
+    @classmethod
+    def _public_api_url(cls, value: str | None) -> str | None:
+        value = value.strip().rstrip("/") if value else None
+        if value and not (value.startswith("http://") or value.startswith("https://")):
+            raise ValueError("Public Node API URL must start with http:// or https://")
+        return value
+
+    @field_validator("public_media_host")
+    @classmethod
+    def _public_media_host(cls, value: str | None) -> str | None:
+        value = value.strip() if value else None
+        if value and ("://" in value or "/" in value):
+            raise ValueError("Public media host must be a hostname or IP address without a scheme or path")
+        return value
 
 
 class OnvifServerUpdate(BaseModel):

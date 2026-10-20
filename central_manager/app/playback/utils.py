@@ -50,7 +50,8 @@ def build_vod_playlist(
 
         # Nodes serve parts on one absolute timeline, so consecutive chunks join seamlessly.
         # A decoder configuration change (including resolution/SPS/PPS) needs a fresh boundary.
-        base = f"{node.api_url.rstrip('/')}/api/v1/media/{seg.id}"
+        client_api_url = getattr(node, "client_api_url", node.api_url)
+        base = f"{client_api_url.rstrip('/')}/api/v1/media/{seg.id}"
         config = seg.config_signature
         if body and (seg.codec != prev_codec or config != prev_config or chosen[0][2] - prev_end > GAP_TOLERANCE):
             body.append("#EXT-X-DISCONTINUITY")
@@ -110,7 +111,8 @@ def build_audio_playlist(
         duration_ms = max(1, round((clip_end - clip_start).total_seconds() * 1000))
         seconds = duration_ms / 1000
         max_duration = max(max_duration, seconds)
-        base = f"{node.api_url.rstrip('/')}/api/v1/media/{seg.id}/audio.aac"
+        client_api_url = getattr(node, "client_api_url", node.api_url)
+        base = f"{client_api_url.rstrip('/')}/api/v1/media/{seg.id}/audio.aac"
         body.extend([
             f"#EXT-X-PROGRAM-DATE-TIME:{_iso(clip_start)}",
             f"#EXTINF:{seconds:.3f},",

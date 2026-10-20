@@ -31,6 +31,8 @@ class NodeRuntime:
     onvif_server_config: dict = field(default_factory=lambda: {
         "enabled": False, "discovery_name": "Shah-NVR", "location": None,
     })
+    # Supplied by central so MediaMTX offers both LAN and configured public ICE hosts.
+    webrtc_additional_hosts: list[str] = field(default_factory=list)
 
     def generation_for(self, camera_id: int) -> int:
         a = self.assignments.get(camera_id)

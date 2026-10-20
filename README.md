@@ -32,7 +32,8 @@ aerich upgrade
 ```
 
 This applies migrations 5 (encoder journal), 6 (recording decoder fingerprint), 7
-(virtual ONVIF-server configuration and camera exposure), and 8 (H6 audio metadata); do not run
+(virtual ONVIF-server configuration and camera exposure), 8 (H6 audio metadata), and 9
+(per-node public client endpoints); do not run
 `init-db` or generate new migrations on an existing installation. Restart central and the media node,
 then rebuild/restart `nvr_client`. These migrations target PostgreSQL, the supported central database.
 New in-memory SQLite databases are used only by tests.
@@ -104,6 +105,14 @@ Each service reads the `.env` next to its `main.py` (`.env.example` lists every 
 
 - `central_manager/.env`: set `DB_USER` / `DB_PASSWORD`.
 - `media_node/.env`: set `PUBLIC_HOST` to this machine's LAN IP if VLC runs on another PC. `127.0.0.1` works for same-PC testing. Set `FFMPEG_BIN` if `ffmpeg` is not on PATH.
+
+For a browser outside the LAN, open **Media Nodes → node → Connectivity**, enter that node's public
+API URL and public media host/ports, then enable **Use public endpoints for clients**. Central-to-node
+traffic continues over the registered LAN address. Forward the configured TCP ports and MediaMTX's
+`WEBRTC_UDP_PORT` (normally UDP 8189, with the same external port). If the web client is served over
+HTTPS, terminate TLS on the public HLS/WebRTC ports and enable the HTTPS toggle to avoid mixed-content
+blocking. The node API is currently unauthenticated; prefer a VPN or a protected reverse proxy instead
+of exposing it directly to the internet.
 
 ## 3. Create the database tables (Aerich)
 

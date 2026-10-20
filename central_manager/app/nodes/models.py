@@ -27,6 +27,15 @@ class MediaNode(Model):
     rtsp_port = fields.IntField(default=8554)
     hls_port = fields.IntField(default=8888)
     webrtc_port = fields.IntField(default=8889)
+    # Optional browser-facing endpoints.  The node continues to use api_url/media_host for
+    # central-to-node traffic; these are only used in URLs returned to remote clients.
+    public_enabled = fields.BooleanField(default=False)
+    public_api_url = fields.CharField(max_length=256, null=True)
+    public_media_host = fields.CharField(max_length=256, null=True)
+    public_rtsp_port = fields.IntField(null=True)
+    public_hls_port = fields.IntField(null=True)
+    public_webrtc_port = fields.IntField(null=True)
+    public_media_tls = fields.BooleanField(default=False)
     capacity_cameras = fields.IntField(default=100)
     # Deprecated: the cap now lives on each StorageVolume. Kept only to seed the node's default volume
     # (first heartbeat after the upgrade) and for old clients; drop in a later migration.
@@ -46,6 +55,30 @@ class MediaNode(Model):
     class Meta:
         table = "media_nodes"
         ordering = ["id"]
+
+    @property
+    def client_api_url(self) -> str:
+        return self.public_api_url if self.public_enabled and self.public_api_url else self.api_url
+
+    @property
+    def client_media_host(self) -> str:
+        return self.public_media_host if self.public_enabled and self.public_media_host else self.media_host
+
+    @property
+    def client_rtsp_port(self) -> int:
+        return self.public_rtsp_port if self.public_enabled and self.public_rtsp_port else self.rtsp_port
+
+    @property
+    def client_hls_port(self) -> int:
+        return self.public_hls_port if self.public_enabled and self.public_hls_port else self.hls_port
+
+    @property
+    def client_webrtc_port(self) -> int:
+        return self.public_webrtc_port if self.public_enabled and self.public_webrtc_port else self.webrtc_port
+
+    @property
+    def client_media_scheme(self) -> str:
+        return "https" if self.public_enabled and self.public_media_tls else "http"
 
 
 class VolumeState(str, Enum):

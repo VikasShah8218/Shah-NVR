@@ -267,7 +267,7 @@ export const useUpdateNode = () =>
   useCentralMutation(
     (api, { id, body }: { id: number; body: NodeUpdate }) =>
       unwrap<MediaNode>(api.PATCH("/api/v1/nodes/{node_id}", { params: { path: { node_id: id } }, body })),
-    { success: (n) => `Limits saved for ${n.name}` },
+    { success: (n) => `Node settings saved for ${n.name}` },
   )
 
 export const useUpdateOnvifServer = () =>
