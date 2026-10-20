@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { onvifErrorText } from "@/lib/onvif"
+import { selectedNodeAccess, useNodeAccessMap } from "@/lib/nodeAccess"
 import { useSettings } from "@/lib/settings"
 import { ApiError, centralClient, nodeClient, nodeGet, unwrap } from "./client"
 import type {
@@ -101,14 +102,33 @@ export function useCamera(cameraId: number) {
 
 export function useLive(cameraId: number | null) {
   const { url, api } = useCentral()
-  return useQuery({
-    queryKey: [url, "live", cameraId],
+  const { settings } = useSettings()
+  const nodes = useNodes(30_000)
+  const detected = useNodeAccessMap(nodes.data ?? [])
+  const primaryAccess = settings.nodeAccess === "lan" ? "lan" : "public"
+  const primary = useQuery({
+    queryKey: [url, "live", cameraId, primaryAccess],
     enabled: cameraId != null,
     queryFn: () =>
-      unwrap<LiveInfo>(api.GET("/api/v1/cameras/{camera_id}/live", { params: { path: { camera_id: cameraId! } } })),
+      unwrap<LiveInfo>(api.GET("/api/v1/cameras/{camera_id}/live", {
+        params: { path: { camera_id: cameraId! }, query: { access: primaryAccess } },
+      })),
     refetchInterval: 15_000, // picks up a new owner after failover
     retry: false,
   })
+  const node = nodes.data?.find((candidate) => candidate.id === primary.data?.node_id)
+  const resolvedAccess = node ? selectedNodeAccess(node, settings.nodeAccess, detected.data) : primaryAccess
+  const alternate = useQuery({
+    queryKey: [url, "live", cameraId, resolvedAccess],
+    enabled: cameraId != null && !!primary.data && resolvedAccess !== primaryAccess,
+    queryFn: () =>
+      unwrap<LiveInfo>(api.GET("/api/v1/cameras/{camera_id}/live", {
+        params: { path: { camera_id: cameraId! }, query: { access: resolvedAccess } },
+      })),
+    refetchInterval: 15_000,
+    retry: false,
+  })
+  return resolvedAccess !== primaryAccess && (alternate.data || alternate.error) ? alternate : primary
 }
 
 export function useTimeline(cameraId: number | null, profile: string, start: Date, end: Date, refetchMs = 30_000) {

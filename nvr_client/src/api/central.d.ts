@@ -1570,18 +1570,6 @@ export interface components {
             public_webrtc_port: number | null;
             /** Public Media Tls */
             public_media_tls: boolean;
-            /** Client Api Url */
-            client_api_url: string;
-            /** Client Media Host */
-            client_media_host: string;
-            /** Client Rtsp Port */
-            client_rtsp_port: number;
-            /** Client Hls Port */
-            client_hls_port: number;
-            /** Client Webrtc Port */
-            client_webrtc_port: number;
-            /** Client Media Scheme */
-            client_media_scheme: string;
             /** Capacity Cameras */
             capacity_cameras: number;
             /** Storage Quota Bytes */
@@ -2682,6 +2670,7 @@ export interface operations {
         parameters: {
             query?: {
                 profile?: string | null;
+                access?: "lan" | "public";
             };
             header?: never;
             path: {
@@ -2756,6 +2745,8 @@ export interface operations {
                 end?: string | null;
                 /** @description Shortcut: the last N minutes */
                 minutes?: number | null;
+                /** @description Node addresses embedded in the playlist */
+                access?: "lan" | "public";
             };
             header?: never;
             path: {
@@ -2792,6 +2783,8 @@ export interface operations {
                 start?: string | null;
                 end?: string | null;
                 minutes?: number | null;
+                /** @description Node addresses embedded in the playlist */
+                access?: "lan" | "public";
             };
             header?: never;
             path: {

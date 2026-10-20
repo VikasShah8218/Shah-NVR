@@ -56,29 +56,26 @@ class MediaNode(Model):
         table = "media_nodes"
         ordering = ["id"]
 
-    @property
-    def client_api_url(self) -> str:
-        return self.public_api_url if self.public_enabled and self.public_api_url else self.api_url
+    def use_public(self, access: str) -> bool:
+        return access == "public" and self.public_enabled and bool(self.public_api_url and self.public_media_host)
 
-    @property
-    def client_media_host(self) -> str:
-        return self.public_media_host if self.public_enabled and self.public_media_host else self.media_host
+    def api_url_for(self, access: str) -> str:
+        return self.public_api_url if self.use_public(access) else self.api_url  # type: ignore[return-value]
 
-    @property
-    def client_rtsp_port(self) -> int:
-        return self.public_rtsp_port if self.public_enabled and self.public_rtsp_port else self.rtsp_port
+    def media_host_for(self, access: str) -> str:
+        return self.public_media_host if self.use_public(access) else self.media_host  # type: ignore[return-value]
 
-    @property
-    def client_hls_port(self) -> int:
-        return self.public_hls_port if self.public_enabled and self.public_hls_port else self.hls_port
+    def rtsp_port_for(self, access: str) -> int:
+        return (self.public_rtsp_port or self.rtsp_port) if self.use_public(access) else self.rtsp_port
 
-    @property
-    def client_webrtc_port(self) -> int:
-        return self.public_webrtc_port if self.public_enabled and self.public_webrtc_port else self.webrtc_port
+    def hls_port_for(self, access: str) -> int:
+        return (self.public_hls_port or self.hls_port) if self.use_public(access) else self.hls_port
 
-    @property
-    def client_media_scheme(self) -> str:
-        return "https" if self.public_enabled and self.public_media_tls else "http"
+    def webrtc_port_for(self, access: str) -> int:
+        return (self.public_webrtc_port or self.webrtc_port) if self.use_public(access) else self.webrtc_port
+
+    def media_scheme_for(self, access: str) -> str:
+        return "https" if self.use_public(access) and self.public_media_tls else "http"
 
 
 class VolumeState(str, Enum):

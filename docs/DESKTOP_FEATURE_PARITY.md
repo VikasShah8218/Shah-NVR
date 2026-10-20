@@ -49,13 +49,13 @@ Two-way talk remains separate product work and is not part of this parity item.
 
 Central Manager retains each node's private registration address while storing an
 optional public API URL, media hostname, RTSP/HLS/WebRTC ports and HTTPS preference.
-The web node-detail Connectivity tab controls whether browser-facing live, playback,
-download and node-administration links use that public mapping.
+The web node-detail Connectivity tab controls whether a public mapping is available.
+Each browser independently chooses Auto, LAN only or Public only; Auto probes private
+Node APIs and falls back to the public mapping.
 
-Desktop parity requires the same node connectivity form and resolved endpoint fields.
-Native RTSP playback must use the resolved public RTSP host/port when enabled, while
-all desktop node API and recording-download calls must use `client_api_url`. The desktop
-must continue using its normal LAN paths when public mode is disabled.
+Desktop parity requires the same node connectivity form plus a local Auto/LAN/Public
+preference. Native RTSP, node API and recording-download calls must use the locally
+resolved route, without changing the preference for other users.
 
 ## Pending feature: H3 ONVIF PTZ controls
 

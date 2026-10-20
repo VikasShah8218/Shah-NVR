@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "test:encoder": "node --experimental-strip-types --test tests/encoder.test.ts",
     "test:ptz": "node --experimental-strip-types --test tests/ptz.test.ts",
+    "test:node-access": "node --experimental-strip-types --test tests/nodeAccess.test.ts",
     "preview": "vite preview",
     "gen:api": "openapi-typescript openapi/central.json -o src/api/central.d.ts && openapi-typescript openapi/node.json -o src/api/node.d.ts"
   },

@@ -15,7 +15,8 @@ def _iso(dt: datetime) -> str:
 
 
 def build_vod_playlist(
-    segments: list[RecordingSegment], nodes: dict[int, MediaNode], start: datetime, end: datetime
+    segments: list[RecordingSegment], nodes: dict[int, MediaNode], start: datetime, end: datetime,
+    access: str = "lan",
 ) -> str | None:
     """HLS VOD playlist pointing directly at the media nodes that hold each chunk.
 
@@ -50,8 +51,8 @@ def build_vod_playlist(
 
         # Nodes serve parts on one absolute timeline, so consecutive chunks join seamlessly.
         # A decoder configuration change (including resolution/SPS/PPS) needs a fresh boundary.
-        client_api_url = getattr(node, "client_api_url", node.api_url)
-        base = f"{client_api_url.rstrip('/')}/api/v1/media/{seg.id}"
+        api_url = node.api_url_for(access) if hasattr(node, "api_url_for") else node.api_url
+        base = f"{api_url.rstrip('/')}/api/v1/media/{seg.id}"
         config = seg.config_signature
         if body and (seg.codec != prev_codec or config != prev_config or chosen[0][2] - prev_end > GAP_TOLERANCE):
             body.append("#EXT-X-DISCONTINUITY")
@@ -90,7 +91,8 @@ def _audio_codec(seg: RecordingSegment) -> str | None:
 
 
 def build_audio_playlist(
-    segments: list[RecordingSegment], nodes: dict[int, MediaNode], start: datetime, end: datetime
+    segments: list[RecordingSegment], nodes: dict[int, MediaNode], start: datetime, end: datetime,
+    access: str = "lan",
 ) -> str | None:
     """Audio-only HLS. Nodes convert each selected slice to AAC; recorded video remains untouched."""
     body: list[str] = []
@@ -111,8 +113,8 @@ def build_audio_playlist(
         duration_ms = max(1, round((clip_end - clip_start).total_seconds() * 1000))
         seconds = duration_ms / 1000
         max_duration = max(max_duration, seconds)
-        client_api_url = getattr(node, "client_api_url", node.api_url)
-        base = f"{client_api_url.rstrip('/')}/api/v1/media/{seg.id}/audio.aac"
+        api_url = node.api_url_for(access) if hasattr(node, "api_url_for") else node.api_url
+        base = f"{api_url.rstrip('/')}/api/v1/media/{seg.id}/audio.aac"
         body.extend([
             f"#EXT-X-PROGRAM-DATE-TIME:{_iso(clip_start)}",
             f"#EXTINF:{seconds:.3f},",

@@ -223,12 +223,6 @@ class NodeOut(BaseModel):
     public_hls_port: int | None
     public_webrtc_port: int | None
     public_media_tls: bool
-    client_api_url: str
-    client_media_host: str
-    client_rtsp_port: int
-    client_hls_port: int
-    client_webrtc_port: int
-    client_media_scheme: str
     capacity_cameras: int
     storage_quota_bytes: int | None  # total cap of all volumes (None if any volume is uncapped)
     volumes: list[VolumeOut] = []

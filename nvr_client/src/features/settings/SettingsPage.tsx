@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { type LiveProtocol, useSettings } from "@/lib/settings"
+import { type LiveProtocol, type NodeAccessPreference, useSettings } from "@/lib/settings"
 
 type TestState = { kind: "idle" } | { kind: "testing" } | { kind: "ok"; text: string } | { kind: "fail"; text: string }
 
@@ -91,6 +91,22 @@ export function SettingsPage() {
                     {s} seconds
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label>Media node connection</Label>
+              <p className="text-xs text-muted-foreground">Auto uses LAN when reachable and otherwise uses each node&apos;s public mapping.</p>
+            </div>
+            <Select value={settings.nodeAccess} onValueChange={(v) => { update({ nodeAccess: v as NodeAccessPreference }); qc.removeQueries({ queryKey: ["node-access"] }) }}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Auto (LAN → public)</SelectItem>
+                <SelectItem value="lan">LAN only</SelectItem>
+                <SelectItem value="public">Public only</SelectItem>
               </SelectContent>
             </Select>
           </div>

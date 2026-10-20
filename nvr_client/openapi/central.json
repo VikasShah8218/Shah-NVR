@@ -410,6 +410,20 @@
               ],
               "title": "Profile"
             }
+          },
+          {
+            "name": "access",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "lan",
+                "public"
+              ],
+              "type": "string",
+              "default": "lan",
+              "title": "Access"
+            }
           }
         ],
         "responses": {
@@ -632,6 +646,22 @@
               "title": "Minutes"
             },
             "description": "Shortcut: the last N minutes"
+          },
+          {
+            "name": "access",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "lan",
+                "public"
+              ],
+              "type": "string",
+              "description": "Node addresses embedded in the playlist",
+              "default": "lan",
+              "title": "Access"
+            },
+            "description": "Node addresses embedded in the playlist"
           }
         ],
         "responses": {
@@ -735,6 +765,22 @@
               ],
               "title": "Minutes"
             }
+          },
+          {
+            "name": "access",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "lan",
+                "public"
+              ],
+              "type": "string",
+              "description": "Node addresses embedded in the playlist",
+              "default": "lan",
+              "title": "Access"
+            },
+            "description": "Node addresses embedded in the playlist"
           }
         ],
         "responses": {
@@ -5199,30 +5245,6 @@
             "type": "boolean",
             "title": "Public Media Tls"
           },
-          "client_api_url": {
-            "type": "string",
-            "title": "Client Api Url"
-          },
-          "client_media_host": {
-            "type": "string",
-            "title": "Client Media Host"
-          },
-          "client_rtsp_port": {
-            "type": "integer",
-            "title": "Client Rtsp Port"
-          },
-          "client_hls_port": {
-            "type": "integer",
-            "title": "Client Hls Port"
-          },
-          "client_webrtc_port": {
-            "type": "integer",
-            "title": "Client Webrtc Port"
-          },
-          "client_media_scheme": {
-            "type": "string",
-            "title": "Client Media Scheme"
-          },
           "capacity_cameras": {
             "type": "integer",
             "title": "Capacity Cameras"
@@ -5317,12 +5339,6 @@
           "public_hls_port",
           "public_webrtc_port",
           "public_media_tls",
-          "client_api_url",
-          "client_media_host",
-          "client_rtsp_port",
-          "client_hls_port",
-          "client_webrtc_port",
-          "client_media_scheme",
           "capacity_cameras",
           "storage_quota_bytes",
           "version",

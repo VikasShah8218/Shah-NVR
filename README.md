@@ -75,6 +75,7 @@ cd ../media_node
 python -m pytest tests -q
 cd ../nvr_client
 npm.cmd run test:encoder
+npm.cmd run test:node-access
 npm.cmd run build
 npm.cmd run lint
 ```
@@ -107,8 +108,10 @@ Each service reads the `.env` next to its `main.py` (`.env.example` lists every 
 - `media_node/.env`: set `PUBLIC_HOST` to this machine's LAN IP if VLC runs on another PC. `127.0.0.1` works for same-PC testing. Set `FFMPEG_BIN` if `ffmpeg` is not on PATH.
 
 For a browser outside the LAN, open **Media Nodes → node → Connectivity**, enter that node's public
-API URL and public media host/ports, then enable **Use public endpoints for clients**. Central-to-node
-traffic continues over the registered LAN address. Forward the configured TCP ports and MediaMTX's
+API URL and public media host/ports, then enable **Public mapping available**. Central-to-node traffic
+continues over the registered LAN address. Each browser independently selects **Auto**, **LAN only** or
+**Public only** under Settings → Media node connection; Auto probes LAN first and falls back to public.
+Forward the configured TCP ports and MediaMTX's
 `WEBRTC_UDP_PORT` (normally UDP 8189, with the same external port). If the web client is served over
 HTTPS, terminate TLS on the public HLS/WebRTC ports and enable the HTTPS toggle to avoid mixed-content
 blocking. The node API is currently unauthenticated; prefer a VPN or a protected reverse proxy instead

@@ -62,8 +62,10 @@ def test_playback_playlist_uses_browser_facing_node_url():
         id="abc", node_id=1, codec="h264", config_signature=None,
         start_time=start, end_time=start + timedelta(seconds=10), parts=[10000],
     )
-    node = SimpleNamespace(api_url="http://192.168.1.115:7100", client_api_url="https://nvr.example.com:17100",
-                           state=NodeState.ACTIVE)
-    playlist = build_vod_playlist([segment], {1: node}, start, start + timedelta(seconds=10))
+    node = SimpleNamespace(
+        api_url="http://192.168.1.115:7100", state=NodeState.ACTIVE,
+        api_url_for=lambda access: "https://nvr.example.com:17100" if access == "public" else "http://192.168.1.115:7100",
+    )
+    playlist = build_vod_playlist([segment], {1: node}, start, start + timedelta(seconds=10), "public")
     assert "https://nvr.example.com:17100/api/v1/media/abc" in playlist
     assert "192.168.1.115" not in playlist

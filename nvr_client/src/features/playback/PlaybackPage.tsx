@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { formatBytes, formatDuration } from "@/lib/format"
 import { useSettings } from "@/lib/settings"
+import { nodeApiUrl, playbackAccess, selectedNodeAccess, useNodeAccessMap } from "@/lib/nodeAccess"
 import { DAY, HOUR, fmtDay, fmtTime, startOfLocalDay } from "@/lib/time"
 import { Timeline } from "./Timeline"
 import { VodPlayer } from "./VodPlayer"
@@ -32,6 +33,7 @@ export function PlaybackPage() {
   const { settings } = useSettings()
   const cameras = useCameras()
   const nodes = useNodes(30_000)
+  const detected = useNodeAccessMap(nodes.data ?? [])
 
   const initialT = params.get("t") ? new Date(params.get("t")!) : null
   const [cameraId, setCameraId] = useState<number | null>(params.get("camera") ? Number(params.get("camera")) : null)
@@ -61,19 +63,25 @@ export function PlaybackPage() {
   const isToday = startOfLocalDay(new Date()).getTime() === dayStart
   const timeline = useTimeline(cameraId, profile, new Date(dayStart), new Date(dayEnd), isToday ? 20_000 : 0)
   const segments: Segment[] = timeline.data?.segments ?? []
-  const nodeUrl = useMemo(() => new Map((nodes.data ?? []).map((n) => [n.id, n.client_api_url])), [nodes.data])
+  const access = playbackAccess(
+    nodes.data ?? [], [...new Set(segments.map((segment) => segment.node_id))], settings.nodeAccess, detected.data,
+  )
+  const nodeUrl = useMemo(
+    () => new Map((nodes.data ?? []).map((n) => [n.id, nodeApiUrl(n, selectedNodeAccess(n, settings.nodeAccess, detected.data))])),
+    [nodes.data, settings.nodeAccess, detected.data],
+  )
 
   const viewEnd = viewStart + zoom
   const src = useMemo(
-    () => (cameraId != null && playFrom ? playbackUrl(settings.centralUrl, cameraId, profile, playFrom, playTo) : null),
-    [settings.centralUrl, cameraId, profile, playFrom, playTo],
+    () => (cameraId != null && playFrom ? playbackUrl(settings.centralUrl, cameraId, profile, playFrom, playTo, access) : null),
+    [settings.centralUrl, cameraId, profile, playFrom, playTo, access],
   )
   const hasRecordedAudio = segments.some((segment) =>
     !!segment.audio_codec || /(^|\+)(aac|opus|g711|g711a|g711u|g722|lpcm|g726)(\+|$)/i.test(segment.codec ?? ""),
   )
   const audioSrc = useMemo(
-    () => (cameraId != null && playFrom && hasRecordedAudio ? playbackAudioUrl(settings.centralUrl, cameraId, profile, playFrom, playTo) : null),
-    [settings.centralUrl, cameraId, profile, playFrom, playTo, hasRecordedAudio],
+    () => (cameraId != null && playFrom && hasRecordedAudio ? playbackAudioUrl(settings.centralUrl, cameraId, profile, playFrom, playTo, access) : null),
+    [settings.centralUrl, cameraId, profile, playFrom, playTo, hasRecordedAudio, access],
   )
 
   // Keep the URL shareable / reload-safe.

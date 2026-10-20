@@ -47,15 +47,15 @@ export function ConnectivityTab({ node }: { node: MediaNode }) {
       <CardHeader className="pb-0">
         <CardTitle className="text-sm font-medium">Internet / public access</CardTitle>
         <p className="text-xs text-muted-foreground">
-          These addresses are returned to browsers outside the node&apos;s LAN. Heartbeats, camera assignments, and recording
-          uploads continue over the private Node API address.
+          These addresses are available to browsers that select Auto or Public mode. Heartbeats, camera assignments, and
+          recording uploads continue over the private Node API address.
         </p>
       </CardHeader>
       <CardContent className="space-y-5">
         <label className="flex items-center justify-between gap-4 rounded-lg border p-4">
           <span>
-            <span className="block text-sm font-medium">Use public endpoints for clients</span>
-            <span className="block text-xs text-muted-foreground">Switch live view, playback, downloads, and VLC links.</span>
+            <span className="block text-sm font-medium">Public mapping available</span>
+            <span className="block text-xs text-muted-foreground">Allow browsers configured for Auto or Public mode to use this mapping.</span>
           </span>
           <Switch checked={enabled} onCheckedChange={setEnabled} />
         </label>
@@ -83,7 +83,7 @@ export function ConnectivityTab({ node }: { node: MediaNode }) {
         </div>
 
         <div className="space-y-1 rounded-lg border bg-muted/30 p-3 font-mono text-xs">
-          <div>Active API: {enabled && apiUrl ? apiUrl : node.api_url}</div>
+          <div>Public API preview: {enabled && apiUrl ? apiUrl : "disabled"}</div>
           <div>RTSP: rtsp://{enabled && host ? host : node.media_host}:{enabled ? rtspPort : node.rtsp_port}</div>
           <div>{tls && enabled ? "https" : "http"}://{enabled && host ? host : node.media_host}:{enabled ? hlsPort : node.hls_port} (HLS)</div>
           <div>{tls && enabled ? "https" : "http"}://{enabled && host ? host : node.media_host}:{enabled ? webrtcPort : node.webrtc_port} (WebRTC)</div>

@@ -85,12 +85,12 @@ export async function nodeGet<T>(apiUrl: string, path: string, query?: Record<st
 export const mediaFileUrl = (apiUrl: string, segmentId: string) =>
   `${apiUrl.replace(/\/+$/, "")}/api/v1/media/${segmentId}/file.mp4`
 
-export function playbackUrl(centralUrl: string, cameraId: number, profile: string, start: Date, end: Date) {
-  const q = new URLSearchParams({ profile, start: start.toISOString(), end: end.toISOString() })
+export function playbackUrl(centralUrl: string, cameraId: number, profile: string, start: Date, end: Date, access: "lan" | "public") {
+  const q = new URLSearchParams({ profile, start: start.toISOString(), end: end.toISOString(), access })
   return `${centralUrl}/api/v1/playback/${cameraId}/index.m3u8?${q}`
 }
 
-export function playbackAudioUrl(centralUrl: string, cameraId: number, profile: string, start: Date, end: Date) {
-  const q = new URLSearchParams({ profile, start: start.toISOString(), end: end.toISOString() })
+export function playbackAudioUrl(centralUrl: string, cameraId: number, profile: string, start: Date, end: Date, access: "lan" | "public") {
+  const q = new URLSearchParams({ profile, start: start.toISOString(), end: end.toISOString(), access })
   return `${centralUrl}/api/v1/playback/${cameraId}/audio.m3u8?${q}`
 }

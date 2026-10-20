@@ -40,21 +40,22 @@ def test_public_toggle_changes_only_client_facing_endpoints():
             public_webrtc_port=18889,
             public_media_tls=True,
         ))
-        assert out.client_api_url == "https://nvr.example.com:17100"
-        assert out.client_media_host == "nvr.example.com"
-        assert out.client_rtsp_port == 18554
-        assert out.client_hls_port == 18888
-        assert out.client_webrtc_port == 18889
-        assert out.client_media_scheme == "https"
-
         stored = await MediaNode.get(id=node.id)
+        assert stored.api_url_for("public") == "https://nvr.example.com:17100"
+        assert stored.media_host_for("public") == "nvr.example.com"
+        assert stored.rtsp_port_for("public") == 18554
+        assert stored.hls_port_for("public") == 18888
+        assert stored.webrtc_port_for("public") == 18889
+        assert stored.media_scheme_for("public") == "https"
+
         assert stored.api_url == "http://192.168.1.115:7100"
         assert stored.media_host == "192.168.1.115"
 
         disabled = await update_node(node.id, NodeUpdate(public_enabled=False))
-        assert disabled.client_api_url == "http://192.168.1.115:7100"
-        assert disabled.client_media_host == "192.168.1.115"
-        assert disabled.client_media_scheme == "http"
+        stored = await MediaNode.get(id=disabled.id)
+        assert stored.api_url_for("public") == "http://192.168.1.115:7100"
+        assert stored.media_host_for("public") == "192.168.1.115"
+        assert stored.media_scheme_for("public") == "http"
 
     run(body)
 
@@ -81,9 +82,14 @@ def test_live_urls_use_public_media_mapping():
         await CameraStream.create(camera=camera, profile="main", source_url="rtsp://camera/main")
         await CameraAssignment.create(camera=camera, node=node, generation=1)
 
-        live = await get_live(camera.id)
+        live = await get_live(camera.id, access="public")
         assert live.streams[0].rtsp == "rtsp://nvr.example.com:18554/cam-1/main"
         assert live.streams[0].hls == "https://nvr.example.com:18888/cam-1/main/index.m3u8"
         assert live.streams[0].webrtc == "https://nvr.example.com:18889/cam-1/main"
+
+        lan = await get_live(camera.id, access="lan")
+        assert lan.streams[0].rtsp == "rtsp://192.168.1.115:8554/cam-1/main"
+        assert lan.streams[0].hls == "http://192.168.1.115:8888/cam-1/main/index.m3u8"
+        assert lan.streams[0].webrtc == "http://192.168.1.115:8889/cam-1/main"
 
     run(body)
