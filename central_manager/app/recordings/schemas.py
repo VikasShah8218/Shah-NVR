@@ -18,6 +18,9 @@ class SegmentIn(BaseModel):
     duration_ms: int = Field(ge=0)
     size_bytes: int = Field(ge=0)
     codec: str | None = None
+    audio_codec: str | None = None
+    audio_sample_rate: int | None = None
+    audio_channels: int | None = None
     config_signature: str | None = Field(None, max_length=64)
     file_path: str  # relative to the volume's folder
     volume_id: int | None = None  # None = the node's default folder (nodes older than storage volumes)
@@ -58,6 +61,9 @@ class SegmentOut(BaseModel):
     duration_ms: int
     size_bytes: int
     codec: str | None
+    audio_codec: str | None = None
+    audio_sample_rate: int | None = None
+    audio_channels: int | None = None
     status: SegmentStatus
 
 

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.nodes.models import NodeState
-from app.playback.utils import build_vod_playlist
+from app.playback.utils import build_audio_playlist, build_vod_playlist
 
 
 @pytest.mark.parametrize("first,second,expected", [
@@ -29,3 +29,28 @@ def test_codec_switch_always_has_discontinuity():
     playlist = build_vod_playlist(segments, {1: SimpleNamespace(api_url="http://node", state=NodeState.ACTIVE)},
                                   start, start + timedelta(seconds=20))
     assert playlist.count("#EXT-X-DISCONTINUITY") == 1
+
+
+def test_audio_playlist_uses_node_aac_sidecar_and_clips_range():
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    segment = SimpleNamespace(
+        id="abc", node_id=1, codec="h264+g711u", audio_codec=None,
+        start_time=start, end_time=start + timedelta(seconds=60),
+    )
+    node = SimpleNamespace(api_url="http://node:7100", state=NodeState.ACTIVE)
+    playlist = build_audio_playlist(
+        [segment], {1: node}, start + timedelta(seconds=10), start + timedelta(seconds=20),
+    )
+    assert "#EXT-X-PROGRAM-DATE-TIME:2026-10-17T00:00:10.000Z" in playlist
+    assert "audio.aac?start_ms=10000&duration_ms=10000" in playlist
+    assert "#EXTINF:10.000" in playlist
+
+
+def test_audio_playlist_skips_video_only_segments():
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    segment = SimpleNamespace(
+        id="abc", node_id=1, codec="h264", audio_codec=None,
+        start_time=start, end_time=start + timedelta(seconds=60),
+    )
+    node = SimpleNamespace(api_url="http://node", state=NodeState.ACTIVE)
+    assert build_audio_playlist([segment], {1: node}, start, start + timedelta(seconds=60)) is None

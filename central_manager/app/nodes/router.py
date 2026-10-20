@@ -338,9 +338,23 @@ async def report_stream_status(node_id: int, body: StreamStatusBatchIn):
     for item in body.items:
         if item.camera_id not in owned:
             continue
-        await CameraStream.filter(camera_id=item.camera_id, profile=item.profile).update(
+        fields = dict(
             status=item.status,
             status_detail=item.detail,
             bytes_received=item.bytes_received,
             last_status_at=now,
         )
+        if item.audio is not None:
+            audio = item.audio.model_dump()
+            fields.update(
+                audio_observed=audio["observed"],
+                audio_last_observed_at=now,
+            )
+            if audio["observed"]:
+                fields.update(
+                    audio_codec=audio["codec"],
+                    audio_codec_raw=audio["codec_raw"],
+                    audio_sample_rate=audio["sample_rate"],
+                    audio_channels=audio["channels"],
+                )
+        await CameraStream.filter(camera_id=item.camera_id, profile=item.profile).update(**fields)

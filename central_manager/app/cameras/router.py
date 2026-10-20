@@ -145,6 +145,10 @@ async def get_live(camera_id: int, profile: str | None = None):
                 rtsp=f"rtsp://{node.media_host}:{node.rtsp_port}/{s.path_name()}",
                 hls=f"http://{node.media_host}:{node.hls_port}/{s.path_name()}/index.m3u8",
                 webrtc=f"http://{node.media_host}:{node.webrtc_port}/{s.path_name()}",
+                audio_state=s.audio_state,
+                audio_codec=s.audio_codec,
+                audio_sample_rate=s.audio_sample_rate,
+                audio_channels=s.audio_channels,
             )
             for s in streams
         ],

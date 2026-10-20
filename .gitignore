@@ -30,6 +30,7 @@ docs
 docs/*
 !docs/DESKTOP_FEATURE_PARITY.md
 !docs/H5_ONVIF_SERVER.md
+!docs/H6_AUDIO_INTEGRATION.md
 IMPLEMENTATION_PLAN.md
 Initial_archetecture.txt
 *PLAN*.md

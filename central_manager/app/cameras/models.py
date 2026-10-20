@@ -65,6 +65,17 @@ class CameraStream(Model):
     rtsp_transport = fields.CharField(max_length=16, default="tcp")
     onvif_profile_token = fields.CharField(max_length=128, null=True)  # ONVIF media profile behind source_url
 
+    # H6 audio metadata. ONVIF values are provisional; the owning node replaces codec/properties with the
+    # actual MediaMTX track whenever the RTSP path is online. None means that the stream has not been checked.
+    audio_advertised = fields.BooleanField(null=True)
+    audio_observed = fields.BooleanField(null=True)
+    audio_codec = fields.CharField(max_length=32, null=True)
+    audio_codec_raw = fields.CharField(max_length=64, null=True)
+    audio_sample_rate = fields.IntField(null=True)
+    audio_channels = fields.IntField(null=True)
+    audio_bitrate_kbps = fields.IntField(null=True)
+    audio_last_observed_at = fields.DatetimeField(null=True)
+
     # Runtime state reported by the owning media node.
     status = fields.CharEnumField(StreamStatus, max_length=32, default=StreamStatus.UNASSIGNED)
     status_detail = fields.CharField(max_length=512, null=True)
@@ -80,6 +91,18 @@ class CameraStream(Model):
     def path_name(self) -> str:
         """MediaMTX path name, shared by live URLs and recording folders."""
         return f"cam-{self.camera_id}/{self.profile}"  # type: ignore[attr-defined]
+
+    @property
+    def audio_state(self) -> str:
+        if self.audio_observed is True:
+            return "unsupported" if self.audio_codec == "unsupported" else "available"
+        if self.audio_observed is False:
+            return "advertised_not_observed" if self.audio_advertised else "none"
+        if self.audio_advertised is True:
+            return "advertised_not_observed"
+        if self.audio_advertised is False:
+            return "none"
+        return "unknown"
 
 
 class EncoderChange(Model):

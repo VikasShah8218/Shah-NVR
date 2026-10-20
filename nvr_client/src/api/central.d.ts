@@ -130,6 +130,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/playback/{camera_id}/audio.m3u8": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Browser-compatible AAC audio playlist for a recorded time range */
+        get: operations["audio_playlist_api_v1_playback__camera_id__audio_m3u8_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nodes": {
         parameters: {
             query?: never;
@@ -871,6 +888,19 @@ export interface components {
             /** Cameras */
             cameras: components["schemas"]["CameraAssignmentOut"][];
         };
+        /** AudioTrackIn */
+        AudioTrackIn: {
+            /** Observed */
+            observed: boolean;
+            /** Codec */
+            codec?: string | null;
+            /** Codec Raw */
+            codec_raw?: string | null;
+            /** Sample Rate */
+            sample_rate?: number | null;
+            /** Channels */
+            channels?: number | null;
+        };
         /** CameraAssignmentOut */
         CameraAssignmentOut: {
             /** Camera Id */
@@ -1467,6 +1497,17 @@ export interface components {
             hls: string;
             /** Webrtc */
             webrtc: string;
+            /**
+             * Audio State
+             * @default unknown
+             */
+            audio_state: string;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Audio Sample Rate */
+            audio_sample_rate?: number | null;
+            /** Audio Channels */
+            audio_channels?: number | null;
         };
         /** ManualAssignIn */
         ManualAssignIn: {
@@ -1745,6 +1786,18 @@ export interface components {
             bitrate_kbps: number | null;
             /** Has Audio */
             has_audio: boolean;
+            /** Audio Encoder Token */
+            audio_encoder_token?: string | null;
+            /** Audio Encoding */
+            audio_encoding?: string | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Audio Bitrate Kbps */
+            audio_bitrate_kbps?: number | null;
+            /** Audio Sample Rate */
+            audio_sample_rate?: number | null;
+            /** Audio Channels */
+            audio_channels?: number | null;
             /** Has Ptz */
             has_ptz: boolean;
             /** Rtsp */
@@ -1938,6 +1991,12 @@ export interface components {
             size_bytes: number;
             /** Codec */
             codec?: string | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Audio Sample Rate */
+            audio_sample_rate?: number | null;
+            /** Audio Channels */
+            audio_channels?: number | null;
             /** Config Signature */
             config_signature?: string | null;
             /** File Path */
@@ -1976,6 +2035,12 @@ export interface components {
             size_bytes: number;
             /** Codec */
             codec: string | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Audio Sample Rate */
+            audio_sample_rate?: number | null;
+            /** Audio Channels */
+            audio_channels?: number | null;
             status: components["schemas"]["SegmentStatus"];
         };
         /**
@@ -2069,6 +2134,27 @@ export interface components {
             last_segment_at: string | null;
             /** Onvif Profile Token */
             onvif_profile_token?: string | null;
+            /**
+             * Audio State
+             * @default unknown
+             */
+            audio_state: string;
+            /** Audio Advertised */
+            audio_advertised?: boolean | null;
+            /** Audio Observed */
+            audio_observed?: boolean | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Audio Codec Raw */
+            audio_codec_raw?: string | null;
+            /** Audio Sample Rate */
+            audio_sample_rate?: number | null;
+            /** Audio Channels */
+            audio_channels?: number | null;
+            /** Audio Bitrate Kbps */
+            audio_bitrate_kbps?: number | null;
+            /** Audio Last Observed At */
+            audio_last_observed_at?: string | null;
         };
         /** StreamPick */
         StreamPick: {
@@ -2109,6 +2195,7 @@ export interface components {
              * @default 0
              */
             bytes_received: number;
+            audio?: components["schemas"]["AudioTrackIn"] | null;
         };
         /** StreamUpdate */
         StreamUpdate: {
@@ -2623,6 +2710,42 @@ export interface operations {
                 start?: string | null;
                 end?: string | null;
                 /** @description Shortcut: the last N minutes */
+                minutes?: number | null;
+            };
+            header?: never;
+            path: {
+                camera_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audio_playlist_api_v1_playback__camera_id__audio_m3u8_get: {
+        parameters: {
+            query?: {
+                profile?: string;
+                start?: string | null;
+                end?: string | null;
                 minutes?: number | null;
             };
             header?: never;

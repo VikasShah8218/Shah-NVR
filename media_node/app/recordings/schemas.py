@@ -15,5 +15,8 @@ class LocalSegmentOut(BaseModel):
     duration_ms: int
     size_bytes: int
     codec: str | None
+    audio_codec: str | None = None
+    audio_sample_rate: int | None = None
+    audio_channels: int | None = None
     part_count: int
     uploaded: bool

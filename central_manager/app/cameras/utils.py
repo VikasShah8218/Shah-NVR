@@ -61,6 +61,15 @@ async def camera_to_out(camera: Camera) -> CameraOut:
                 last_status_at=s.last_status_at,
                 last_segment_at=s.last_segment_at,
                 onvif_profile_token=s.onvif_profile_token,
+                audio_state=s.audio_state,
+                audio_advertised=s.audio_advertised,
+                audio_observed=s.audio_observed,
+                audio_codec=s.audio_codec,
+                audio_codec_raw=s.audio_codec_raw,
+                audio_sample_rate=s.audio_sample_rate,
+                audio_channels=s.audio_channels,
+                audio_bitrate_kbps=s.audio_bitrate_kbps,
+                audio_last_observed_at=s.audio_last_observed_at,
             )
             for s in camera.streams
         ],

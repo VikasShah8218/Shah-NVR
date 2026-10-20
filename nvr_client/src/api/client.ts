@@ -89,3 +89,8 @@ export function playbackUrl(centralUrl: string, cameraId: number, profile: strin
   const q = new URLSearchParams({ profile, start: start.toISOString(), end: end.toISOString() })
   return `${centralUrl}/api/v1/playback/${cameraId}/index.m3u8?${q}`
 }
+
+export function playbackAudioUrl(centralUrl: string, cameraId: number, profile: string, start: Date, end: Date) {
+  const q = new URLSearchParams({ profile, start: start.toISOString(), end: end.toISOString() })
+  return `${centralUrl}/api/v1/playback/${cameraId}/audio.m3u8?${q}`
+}

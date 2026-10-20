@@ -167,6 +167,7 @@ function Overview({ camera: c }: { camera: Camera }) {
               <TableHead>Source URL</TableHead>
               <TableHead>Record</TableHead>
               <TableHead>Transport</TableHead>
+              <TableHead>Audio</TableHead>
               <TableHead>Received</TableHead>
               <TableHead>Last chunk</TableHead>
               <TableHead>Last report</TableHead>
@@ -185,6 +186,20 @@ function Overview({ camera: c }: { camera: Camera }) {
                 </TableCell>
                 <TableCell>{s.record ? "Yes" : "Live only"}</TableCell>
                 <TableCell className="uppercase">{s.rtsp_transport}</TableCell>
+                <TableCell className="text-xs">
+                  {s.audio_state === "available" ? (
+                    <span title={s.audio_codec_raw ?? undefined}>
+                      {(s.audio_codec ?? "audio").toUpperCase()}
+                      {s.audio_sample_rate ? ` · ${s.audio_sample_rate / 1000} kHz` : ""}
+                      {s.audio_channels ? ` · ${s.audio_channels === 1 ? "mono" : `${s.audio_channels} ch`}` : ""}
+                      {s.audio_bitrate_kbps ? ` · ${s.audio_bitrate_kbps} kbps` : ""}
+                    </span>
+                  ) : s.audio_state === "advertised_not_observed" ? (
+                    <span className="text-warning">Advertised, not received</span>
+                  ) : s.audio_state === "unsupported" ? (
+                    <span className="text-warning" title={s.audio_codec_raw ?? undefined}>Unsupported {s.audio_codec_raw ?? "audio"}</span>
+                  ) : s.audio_state === "none" ? "None" : <span className="text-muted-foreground">Unknown</span>}
+                </TableCell>
                 <TableCell className="tabular-nums">{formatBytes(s.bytes_received)}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{s.last_segment_at ? timeAgo(s.last_segment_at) : "—"}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{s.last_status_at ? timeAgo(s.last_status_at) : "—"}</TableCell>

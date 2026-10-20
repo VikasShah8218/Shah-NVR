@@ -123,6 +123,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/media/{segment_id}/audio.aac": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * AAC rendition of a recording's first audio track
+         * @description Transcode audio only; the original recording and video track are never modified or decoded.
+         */
+        get: operations["media_audio_api_v1_media__segment_id__audio_aac_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/segments": {
         parameters: {
             query?: never;
@@ -682,6 +702,12 @@ export interface components {
             size_bytes: number;
             /** Codec */
             codec: string | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Audio Sample Rate */
+            audio_sample_rate?: number | null;
+            /** Audio Channels */
+            audio_channels?: number | null;
             /** Part Count */
             part_count: number;
             /** Uploaded */
@@ -816,6 +842,18 @@ export interface components {
             bitrate_kbps: number | null;
             /** Has Audio */
             has_audio: boolean;
+            /** Audio Encoder Token */
+            audio_encoder_token?: string | null;
+            /** Audio Encoding */
+            audio_encoding?: string | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Audio Bitrate Kbps */
+            audio_bitrate_kbps?: number | null;
+            /** Audio Sample Rate */
+            audio_sample_rate?: number | null;
+            /** Audio Channels */
+            audio_channels?: number | null;
             /** Has Ptz */
             has_ptz: boolean;
             /** Rtsp */
@@ -1209,6 +1247,40 @@ export interface operations {
     media_file_api_v1_media__segment_id__file_mp4_get: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                segment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    media_audio_api_v1_media__segment_id__audio_aac_get: {
+        parameters: {
+            query?: {
+                start_ms?: number;
+                duration_ms?: number | null;
+            };
             header?: never;
             path: {
                 segment_id: string;

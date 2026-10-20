@@ -137,6 +137,7 @@ async def refresh_assignments() -> None:
 async def stream_status_tick() -> None:
     """Report per-stream state: CONNECTING / STREAMING / RECORDING / NOT_RECORDING."""
     from app.mediamtx.utils import mtx
+    from app.node.audio import observed_audio
 
     if runtime.node_id is None or not runtime.assignments:
         return
@@ -183,6 +184,7 @@ async def stream_status_tick() -> None:
                 "status": status,
                 "detail": detail,
                 "bytes_received": int(info.get("bytesReceived") or 0),
+                "audio": observed_audio(info),
             })
     try:
         await central.stream_status(runtime.node_id, items)

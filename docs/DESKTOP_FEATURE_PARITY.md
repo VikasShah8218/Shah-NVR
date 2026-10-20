@@ -1,25 +1,49 @@
 # Desktop Feature Parity Backlog
 
-Last audited: 2026-10-19  
+Last audited: 2026-10-20
 Compared: `nvr_client` and `nvr_desktop` at commit `0d15b46`
 
 ## Summary
 
-There is currently **one feature package implemented in the web client but not
-in the desktop client: H3 ONVIF PTZ controls**.
+There are currently **two feature packages implemented in the web client but
+not in the desktop client: H3 ONVIF PTZ controls and H6 one-way audio**.
 
 | Feature | Web client | Desktop client | Status |
 |---|---|---|---|
 | H1 ONVIF discovery and device management | Implemented | Implemented | In parity |
 | H2 ONVIF video encoder control | Implemented | Implemented | In parity |
 | H3 ONVIF PTZ control, initial slice | Implemented | Not implemented | **Desktop pending** |
+| H6 audio detection, live listening and recorded listening | Implemented | Not implemented | **Desktop pending** |
 
-H4 events, H5 Shah-NVR as an ONVIF device, H6 audio/two-way talk and the lower
+H4 events, H5 Shah-NVR as an ONVIF device, H6 two-way talk and the lower
 priority ONVIF roadmap items are not counted here. They have not yet been
 implemented as web-client features, so they are product-roadmap work rather
 than desktop parity gaps.
 
-## Pending feature 1: H3 ONVIF PTZ controls
+## Pending feature: H6 one-way audio
+
+The node and central manager detect ONVIF-advertised and MediaMTX-observed audio,
+retain codec/sample-rate/channel metadata, index recorded audio tracks and expose
+a browser-compatible recorded AAC sidecar. The web client provides muted-by-default
+live and recorded listening with volume controls.
+
+Desktop parity requires:
+
+- typed audio fields from the central camera/live/timeline APIs;
+- an audio capability/codec display on camera details and ONVIF profile selection;
+- removal of the desktop player's unconditional `audio=no` policy only for streams
+  where the operator explicitly unmutes;
+- muted-by-default live and playback speaker/volume controls;
+- one audible live tile at a time, reliable mute on tile close/camera change/app
+  backgrounding, and no automatic unmute after reconnect;
+- recorded audio through native mpv using the existing recording playlist, with
+  A/V synchronization across seeks and discontinuities; and
+- tests for video-only cameras, G.711/AAC recordings, mute lifecycle and existing
+  H1/H2/live-view metadata regressions.
+
+Two-way talk remains separate product work and is not part of this parity item.
+
+## Pending feature: H3 ONVIF PTZ controls
 
 ### What already exists outside desktop
 

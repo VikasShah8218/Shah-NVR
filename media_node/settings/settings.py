@@ -35,6 +35,8 @@ class Settings(BaseSettings):
 
     # MediaMTX
     MEDIAMTX_BIN: Path = BASE_DIR / "bin" / ("mediamtx.exe" if os.name == "nt" else "mediamtx")
+    # Used only to make browser-compatible AAC for recorded listening. Video is never transcoded.
+    FFMPEG_BIN: str = "ffmpeg"
     MEDIAMTX_API_PORT: int = 9997
     MEDIAMTX_METRICS_PORT: int = 9998
     RTSP_PORT: int = 8554

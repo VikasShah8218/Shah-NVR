@@ -1,5 +1,5 @@
 import Hls from "hls.js"
-import { FastForward, Loader2, Maximize, Pause, Play, Rewind, SkipBack, SkipForward } from "lucide-react"
+import { FastForward, Loader2, Maximize, Pause, Play, Rewind, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -11,15 +11,20 @@ const RATES = [0.5, 1, 2, 4, 8]
  * Plays a recorded HLS VOD playlist. Reports the real recorded wall-clock time of the playhead
  * (from EXT-X-PROGRAM-DATE-TIME via hls.js `playingDate`).
  */
-export function VodPlayer({ src, onTime, onEnded }: { src: string | null; onTime: (t: Date | null) => void; onEnded?: () => void }) {
+export function VodPlayer({ src, audioSrc, onTime, onEnded }: { src: string | null; audioSrc: string | null; onTime: (t: Date | null) => void; onEnded?: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
   const hlsRef = useRef<Hls | null>(null)
+  const audioHlsRef = useRef<Hls | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [playing, setPlaying] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rate, setRate] = useState(1)
   const [wall, setWall] = useState<Date | null>(null)
+  const [muted, setMuted] = useState(true)
+  const [audioError, setAudioError] = useState<string | null>(null)
+  const [volume, setVolume] = useState(() => Number(localStorage.getItem("shah-nvr.playback-volume") ?? 0.8))
 
   useEffect(() => {
     const video = videoRef.current
@@ -43,7 +48,6 @@ export function VodPlayer({ src, onTime, onEnded }: { src: string | null; onTime
     } else {
       setError("HLS is not supported by this browser")
     }
-    video.playbackRate = rate
     video.play().catch(() => {})
     return () => {
       hls?.destroy()
@@ -55,13 +59,65 @@ export function VodPlayer({ src, onTime, onEnded }: { src: string | null; onTime
   }, [src])
 
   useEffect(() => {
+    const audio = audioRef.current
+    const video = videoRef.current
+    if (!audio || !video || !audioSrc || muted) return
+    setAudioError(null)
+    let hls: Hls | null = null
+    if (Hls.isSupported()) {
+      hls = new Hls({ maxBufferLength: 30, enableWorker: true })
+      audioHlsRef.current = hls
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (!data.fatal) return
+        setAudioError(data.response?.code === 404 ? "This recording has no audio." : `Recorded audio: ${data.details}`)
+        setMuted(true)
+      })
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (!video.paused) audio.play().catch(() => {})
+      })
+      hls.loadSource(audioSrc)
+      hls.attachMedia(audio)
+    } else if (audio.canPlayType("application/vnd.apple.mpegurl")) {
+      audio.src = audioSrc
+      if (!video.paused) audio.play().catch(() => {})
+    } else {
+      setAudioError("Recorded audio is not supported by this browser.")
+    }
+    return () => {
+      hls?.destroy()
+      audioHlsRef.current = null
+      audio.pause()
+      audio.removeAttribute("src")
+      audio.load()
+    }
+  }, [audioSrc, muted])
+
+  useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = rate
+    if (audioRef.current) audioRef.current.playbackRate = rate
   }, [rate])
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume
+  }, [volume])
+
+  const syncAudio = () => {
+    if (muted) return
+    const audio = audioRef.current
+    const videoDate = hlsRef.current?.playingDate
+    const audioDate = audioHlsRef.current?.playingDate
+    if (!audio || !videoDate || !audioDate) return
+    const drift = (videoDate.getTime() - audioDate.getTime()) / 1000
+    if (Math.abs(drift) > 0.2 && Number.isFinite(audio.duration)) {
+      audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + drift))
+    }
+  }
 
   const onTimeUpdate = () => {
     const d = hlsRef.current?.playingDate ?? null
     setWall(d)
     onTime(d)
+    syncAudio()
   }
 
   const seekBy = (seconds: number) => {
@@ -85,13 +141,14 @@ export function VodPlayer({ src, onTime, onEnded }: { src: string | null; onTime
           playsInline
           muted
           onClick={toggle}
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          onPlaying={() => setLoading(false)}
-          onWaiting={() => setLoading(true)}
+          onPlay={() => { setPlaying(true); if (!muted) audioRef.current?.play().catch(() => {}) }}
+          onPause={() => { setPlaying(false); audioRef.current?.pause() }}
+          onPlaying={() => { setLoading(false); syncAudio(); if (!muted) audioRef.current?.play().catch(() => {}) }}
+          onWaiting={() => { setLoading(true); audioRef.current?.pause() }}
           onTimeUpdate={onTimeUpdate}
           onEnded={onEnded}
         />
+        <audio ref={audioRef} preload="none" />
         {!src && (
           <div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">
             Click on the timeline to start playback
@@ -127,6 +184,32 @@ export function VodPlayer({ src, onTime, onEnded }: { src: string | null; onTime
         </Button>
         <span className="ml-2 text-sm tabular-nums text-muted-foreground">{wall ? fmtDateTime(wall) : "—"}</span>
         <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            disabled={!audioSrc}
+            title={muted ? "Listen to recorded audio" : "Mute recorded audio"}
+            onClick={() => setMuted((value) => !value)}
+          >
+            {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+          </Button>
+          {!muted && (
+            <input
+              aria-label="Recorded audio volume"
+              className="w-20 accent-primary"
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={volume}
+              onChange={(event) => {
+                const next = Number(event.target.value)
+                setVolume(next)
+                localStorage.setItem("shah-nvr.playback-volume", String(next))
+              }}
+            />
+          )}
           <Select value={String(rate)} onValueChange={(v) => setRate(Number(v))}>
             <SelectTrigger size="sm" className="w-20">
               <SelectValue />
@@ -144,6 +227,7 @@ export function VodPlayer({ src, onTime, onEnded }: { src: string | null; onTime
           </Button>
         </div>
       </div>
+      {audioError && <div className="border-t px-3 py-1.5 text-xs text-warning">{audioError}</div>}
     </div>
   )
 }

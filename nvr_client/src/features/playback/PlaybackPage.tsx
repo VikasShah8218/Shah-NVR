@@ -2,7 +2,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Copy, Crosshair, Download, Fil
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router"
 import { toast } from "sonner"
-import { mediaFileUrl, playbackUrl } from "@/api/client"
+import { mediaFileUrl, playbackAudioUrl, playbackUrl } from "@/api/client"
 import { useCameras, useNodes, useTimeline } from "@/api/queries"
 import type { Segment } from "@/api/types"
 import { EmptyState, ErrorState, PageHeader } from "@/components/common"
@@ -67,6 +67,13 @@ export function PlaybackPage() {
   const src = useMemo(
     () => (cameraId != null && playFrom ? playbackUrl(settings.centralUrl, cameraId, profile, playFrom, playTo) : null),
     [settings.centralUrl, cameraId, profile, playFrom, playTo],
+  )
+  const hasRecordedAudio = segments.some((segment) =>
+    !!segment.audio_codec || /(^|\+)(aac|opus|g711|g711a|g711u|g722|lpcm|g726)(\+|$)/i.test(segment.codec ?? ""),
+  )
+  const audioSrc = useMemo(
+    () => (cameraId != null && playFrom && hasRecordedAudio ? playbackAudioUrl(settings.centralUrl, cameraId, profile, playFrom, playTo) : null),
+    [settings.centralUrl, cameraId, profile, playFrom, playTo, hasRecordedAudio],
   )
 
   // Keep the URL shareable / reload-safe.
@@ -188,7 +195,7 @@ export function PlaybackPage() {
         </div>
       </div>
 
-      <VodPlayer src={src} onTime={setPlayhead} />
+      <VodPlayer src={src} audioSrc={audioSrc} onTime={setPlayhead} />
 
       <Card className="gap-3 py-4">
         <CardContent className="space-y-3 px-4">
@@ -253,6 +260,7 @@ export function PlaybackPage() {
                   <TableHead>End</TableHead>
                   <TableHead>Length</TableHead>
                   <TableHead>Size</TableHead>
+                  <TableHead>Audio</TableHead>
                   <TableHead>Node</TableHead>
                   <TableHead />
                 </TableRow>
@@ -267,6 +275,7 @@ export function PlaybackPage() {
                       <TableCell className="tabular-nums">{fmtTime(new Date(s.end_time))}</TableCell>
                       <TableCell className="tabular-nums">{formatDuration(s.duration_ms)}</TableCell>
                       <TableCell className="tabular-nums">{formatBytes(s.size_bytes)}</TableCell>
+                      <TableCell className="text-xs">{s.audio_codec ? s.audio_codec.toUpperCase() : "—"}</TableCell>
                       <TableCell className="text-muted-foreground">node {s.node_id}</TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         {apiUrl && (

@@ -57,7 +57,13 @@ def pick_streams(probe: dict, picks: list[dict] | None) -> list[dict]:
             raise HTTPException(422, {"code": "unknown_profile",
                                       "message": f"Profile '{pick['token']}' not found on the camera (or has no RTSP address)"})
         streams.append({"profile": pick["profile"], "source_url": prof["rtsp"], "record": pick["record"],
-                        "onvif_profile_token": prof["token"]})
+                        "onvif_profile_token": prof["token"],
+                        "audio_advertised": bool(prof.get("has_audio")),
+                        "audio_codec": prof.get("audio_codec"),
+                        "audio_codec_raw": prof.get("audio_encoding"),
+                        "audio_sample_rate": prof.get("audio_sample_rate"),
+                        "audio_channels": prof.get("audio_channels"),
+                        "audio_bitrate_kbps": prof.get("audio_bitrate_kbps")})
     return streams
 
 

@@ -31,8 +31,8 @@ cd central_manager
 aerich upgrade
 ```
 
-This applies migrations 5 (encoder journal), 6 (recording decoder fingerprint), and 7
-(virtual ONVIF-server configuration and camera exposure); do not run
+This applies migrations 5 (encoder journal), 6 (recording decoder fingerprint), 7
+(virtual ONVIF-server configuration and camera exposure), and 8 (H6 audio metadata); do not run
 `init-db` or generate new migrations on an existing installation. Restart central and the media node,
 then rebuild/restart `nvr_client`. These migrations target PostgreSQL, the supported central database.
 New in-memory SQLite databases are used only by tests.
@@ -41,9 +41,10 @@ Workflow and safeguards:
 
 - Select main/sub. Manually added RTSP streams require an explicit ONVIF profile mapping; this does not
   change their RTSP URL. Use the same canonical ONVIF address for duplicate entries of one physical device.
-- Presets propose editable values within advertised limits. Estimates are decimal video GB/day at the
-  bitrate limit (`Mbps × 10.8`), excluding audio/overhead; VBR varies. Same bitrate means the same estimate
-  regardless of codec. "Best quality" is a suggestion, not a measured quality guarantee.
+- Presets propose editable values within advertised limits. Estimates are decimal GB/day at the video
+  bitrate limit (`Mbps × 10.8`) plus the advertised audio bitrate when available; container/network overhead
+  remains excluded and VBR varies. Same bitrate means the same estimate regardless of codec. "Best quality"
+  is a suggestion, not a measured quality guarantee.
 - Review before applying. Revisions reject stale edits; shared encoders require acknowledgement.
   A durable device mutex and operation IDs protect concurrent/repeated requests. The node sends no blind
   Set retry and never falls back to another media service after sending a Set.
@@ -89,7 +90,7 @@ mixed-success bulk. Confirm that camera names/metadata and the existing desktop 
 
 - Python 3.12+ (tested on 3.13) and the `nvr` virtualenv (`workon nvr`)
 - PostgreSQL with a database named `nvr`
-- FFmpeg on PATH (only needed for the camera simulator)
+- FFmpeg on PATH (camera simulator and browser-compatible recorded audio playback)
 - MediaMTX: already in `media_node/bin/mediamtx.exe` (v1.21.2, Windows amd64). On Linux, download the matching build from https://github.com/bluenviron/mediamtx/releases and set `MEDIAMTX_BIN`.
 
 ```bash
@@ -102,7 +103,7 @@ pip install -r central_manager/requirements.txt -r media_node/requirements.txt
 Each service reads the `.env` next to its `main.py` (`.env.example` lists every option).
 
 - `central_manager/.env`: set `DB_USER` / `DB_PASSWORD`.
-- `media_node/.env`: set `PUBLIC_HOST` to this machine's LAN IP if VLC runs on another PC. `127.0.0.1` works for same-PC testing.
+- `media_node/.env`: set `PUBLIC_HOST` to this machine's LAN IP if VLC runs on another PC. `127.0.0.1` works for same-PC testing. Set `FFMPEG_BIN` if `ffmpeg` is not on PATH.
 
 ## 3. Create the database tables (Aerich)
 

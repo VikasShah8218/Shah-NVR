@@ -142,12 +142,21 @@ class AssignmentsOut(BaseModel):
     cameras: list[CameraAssignmentOut]
 
 
+class AudioTrackIn(BaseModel):
+    observed: bool
+    codec: str | None = Field(default=None, max_length=32)
+    codec_raw: str | None = Field(default=None, max_length=64)
+    sample_rate: int | None = Field(default=None, gt=0, le=384000)
+    channels: int | None = Field(default=None, gt=0, le=32)
+
+
 class StreamStatusIn(BaseModel):
     camera_id: int
     profile: str
     status: StreamStatus
     detail: str | None = None
     bytes_received: int = 0
+    audio: AudioTrackIn | None = None
 
 
 class StreamStatusBatchIn(BaseModel):

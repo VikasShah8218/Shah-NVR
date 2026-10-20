@@ -54,6 +54,12 @@ class ProfileOut(BaseModel):
     fps: int | None
     bitrate_kbps: int | None
     has_audio: bool
+    audio_encoder_token: str | None = None
+    audio_encoding: str | None = None
+    audio_codec: str | None = None
+    audio_bitrate_kbps: int | None = None
+    audio_sample_rate: int | None = None
+    audio_channels: int | None = None
     has_ptz: bool
     rtsp: str | None
     snapshot: str | None

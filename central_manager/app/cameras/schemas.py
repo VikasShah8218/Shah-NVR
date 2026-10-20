@@ -37,6 +37,15 @@ class StreamOut(BaseModel):
     last_status_at: datetime | None
     last_segment_at: datetime | None
     onvif_profile_token: str | None = None  # ONVIF media profile behind source_url
+    audio_state: str = "unknown"
+    audio_advertised: bool | None = None
+    audio_observed: bool | None = None
+    audio_codec: str | None = None
+    audio_codec_raw: str | None = None
+    audio_sample_rate: int | None = None
+    audio_channels: int | None = None
+    audio_bitrate_kbps: int | None = None
+    audio_last_observed_at: datetime | None = None
 
 
 class CameraCreate(BaseModel):
@@ -111,6 +120,10 @@ class LiveStreamUrls(BaseModel):
     rtsp: str
     hls: str
     webrtc: str
+    audio_state: str = "unknown"
+    audio_codec: str | None = None
+    audio_sample_rate: int | None = None
+    audio_channels: int | None = None
 
 
 class LiveOut(BaseModel):

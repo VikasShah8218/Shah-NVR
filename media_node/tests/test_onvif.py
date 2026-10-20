@@ -96,6 +96,23 @@ def test_axis_media2_fault_is_a_fault():
         body("axis_Media2_GetProfiles_http500")
 
 
+def test_media1_audio_configuration_is_reported():
+    xml = etree.fromstring(b'''<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+      xmlns:trt="http://www.onvif.org/ver10/media/wsdl" xmlns:tt="http://www.onvif.org/ver10/schema">
+      <s:Body><trt:GetProfilesResponse><trt:Profiles token="p1"><tt:Name>Main</tt:Name>
+      <tt:VideoEncoderConfiguration token="v1"><tt:Encoding>H264</tt:Encoding></tt:VideoEncoderConfiguration>
+      <tt:AudioEncoderConfiguration token="a1"><tt:Encoding>AAC</tt:Encoding><tt:Bitrate>128</tt:Bitrate>
+      <tt:SampleRate>48000</tt:SampleRate><tt:Channels>2</tt:Channels></tt:AudioEncoderConfiguration>
+      </trt:Profiles></trt:GetProfilesResponse></s:Body></s:Envelope>''')
+    [profile] = services.parse_media1_profiles(xml.find("{http://www.w3.org/2003/05/soap-envelope}Body"))
+    assert profile["has_audio"] is True
+    assert profile["audio_encoder_token"] == "a1"
+    assert profile["audio_codec"] == "aac"
+    assert profile["audio_bitrate_kbps"] == 128
+    assert profile["audio_sample_rate"] == 48000
+    assert profile["audio_channels"] == 2
+
+
 @pytest.mark.parametrize("status,text,kind", [
     (400, "SOAP-ENV:Sender ter:NotAuthorized Sender not authorized", NotAuthorized),
     (400, "Sender not Authorized. Invalid username or password! You still have 0 attempt(s).", NotAuthorized),

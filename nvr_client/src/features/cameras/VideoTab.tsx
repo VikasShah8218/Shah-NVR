@@ -16,8 +16,8 @@ const selectClass = "h-9 rounded-md border bg-background px-3 text-sm"
 const presets: Preset[] = ["Storage saver", "Best quality", "Low-bandwidth substream"]
 const operationId = () => globalThis.crypto?.randomUUID?.() ?? `encoder-${Date.now()}-${Math.random().toString(36).slice(2)}`
 const message = (e: unknown) => e instanceof Error ? e.message : String(e)
-const estimate = (v: number | null | undefined) => {
-  const gb = videoGBPerDay(v)
+const estimate = (v: number | null | undefined, audioKbps = 0) => {
+  const gb = videoGBPerDay(v == null ? v : v + audioKbps)
   return gb == null ? "Unavailable" : `${gb.toFixed(1)} GB/day`
 }
 
@@ -61,6 +61,7 @@ function EncoderEditor({ camera, profile, active }: { camera: Camera; profile: s
     queryFn: () => api.recovery(camera.id, profile), enabled: active && !!history.data?.changes.length, retry: false,
     refetchInterval: 5000 })
   const pending = !!history.data?.pending
+  const audioKbps = camera.streams.find(s => s.profile === profile)?.audio_bitrate_kbps ?? 0
   const patch = (v: Partial<EncoderValues>) => setDraft({ ...values, ...v })
   const refresh = async () => {
     const next = await api.read(camera.id, profile)
@@ -183,11 +184,11 @@ function EncoderEditor({ camera, profile, active }: { camera: Camera; profile: s
             </div>
             <div className="flex flex-wrap gap-2">{presets.map(p => <Button key={p} variant="outline" disabled={!option}
               onClick={() => option && setDraft(presetValues(values, option, p))}>{p}</Button>)}</div>
-            <p className="text-sm">Video storage if recorded continuously: current <b>{estimate(current.bitrate_kbps)}</b> → proposed <b>{estimate(values.bitrate_kbps)}</b>.
-              {camera.retention_days != null && videoGBPerDay(values.bitrate_kbps) != null && ` About ${(videoGBPerDay(values.bitrate_kbps)! * camera.retention_days).toFixed(1)} GB for ${camera.retention_days} days.`}
+            <p className="text-sm">Storage if recorded continuously: current <b>{estimate(current.bitrate_kbps, audioKbps)}</b> → proposed <b>{estimate(values.bitrate_kbps, audioKbps)}</b>.
+              {camera.retention_days != null && videoGBPerDay(values.bitrate_kbps == null ? null : values.bitrate_kbps + audioKbps) != null && ` About ${(videoGBPerDay(values.bitrate_kbps! + audioKbps)! * camera.retention_days).toFixed(1)} GB for ${camera.retention_days} days.`}
             </p>
             {!camera.streams.find(s => s.profile === profile)?.record && <p className="text-xs text-muted-foreground">This stream is currently live-only; no recording storage is expected.</p>}
-            <p className="text-xs text-muted-foreground">Video only, decimal GB at configured bitrate. Audio/overhead are extra; VBR varies. Changing codec at the same bitrate does not by itself reduce this estimate. Presets are editable proposals, not guaranteed quality levels.</p>
+            <p className="text-xs text-muted-foreground">Decimal GB at configured video bitrate{audioKbps ? ` plus ${audioKbps} kbps advertised audio` : "; audio bitrate unavailable"}. Container overhead is extra; VBR varies. Changing codec at the same bitrate does not by itself reduce this estimate.</p>
             {(values.encoding === "H265" || current.encoding === "H265") && <p className="text-sm text-warning">
               H.265 browser support varies. An H.264 substream can help live viewing; it does not make H.265 main-stream recordings browser-compatible. No transcoding is performed.
             </p>}

@@ -528,3 +528,59 @@ Start with Phase 0, specifically the replay gateway spike. Device discovery and
 SOAP XML are substantial but predictable; ONVIF-compatible RTSP replay is the
 architectural risk. Once the target VMS accepts live and replay from the spike,
 the remaining services can be implemented against that proven contract.
+
+## 14. Pending task list
+
+The Device, Media, authenticated live RTSP, recording enumeration, and
+read-only recording search slices are implemented and verified. The following
+work remains pending.
+
+### P0: Profile G recorded RTSP replay
+
+- [ ] Add Replay SOAP `GetServiceCapabilities`.
+- [ ] Add `GetReplayUri` with short-lived, authenticated replay tokens.
+- [ ] Add `GetReplayConfiguration` and `SetReplayConfiguration`.
+- [ ] Add authenticated `/replay/<token>` handling to the RTSP gateway.
+- [ ] Parse and validate `Range: clock=<UTC-start>-<UTC-end>`.
+- [ ] Resolve the requested recording token and time range to usable local
+  `local_segments` rows and files.
+- [ ] Prove H.264 replay across at least two adjacent fMP4 chunks without
+  transcoding.
+- [ ] Implement RTSP `DESCRIBE`, `SETUP`, `PLAY`, `PAUSE`, repeated `PLAY`, and
+  `TEARDOWN` for replay sessions.
+- [ ] Preserve wall-clock progression, produce valid RTP/RTCP timing, and expose
+  the ONVIF replay feature tag.
+- [ ] Handle recording gaps and end-of-range cleanly.
+- [ ] Stop readers and release resources immediately after disconnect or
+  `TEARDOWN`.
+- [ ] Add bounded replay-session lifetime, range duration, and concurrency.
+- [ ] Add H.265 replay after the H.264 path passes physical acceptance.
+
+### P1: Protocol hardening
+
+- [ ] Send WS-Discovery `Hello` and `Bye` messages.
+- [ ] Persist/increment WS-Discovery metadata version and re-advertise after a
+  public-address change.
+- [ ] Validate multicast discovery on multiple network interfaces.
+- [ ] Add full live RTSP `SETUP -> PLAY -> RTP -> TEARDOWN` automation; the
+  current external verifier proves authentication and `DESCRIBE`.
+- [ ] Run malformed XML, expired authentication, authorization, session-limit,
+  disconnect, and load tests.
+
+### P2: Physical acceptance
+
+- [ ] Replay a known UTC H.264 interval from an external client.
+- [ ] Seek to a second interval in the same RTSP session.
+- [ ] Replay across adjacent chunks and confirm correct gap behaviour.
+- [ ] Repeat acceptance with H.265.
+- [ ] Test with ONVIF Device Manager and at least one intended production VMS.
+- [ ] Run simultaneous live and replay sessions without affecting recording,
+  WebRTC live view, or existing HLS playback.
+- [ ] Verify recovery after Central Manager and media-node restarts.
+
+### Separate configuration issues (not H5 defects)
+
+- [ ] Correct or remove `cam-1/sub`, whose physical camera currently returns
+  RTSP 503.
+- [ ] Correct or remove `cam-5/sub`, whose physical camera currently returns
+  RTSP 503.

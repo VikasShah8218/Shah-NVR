@@ -23,6 +23,9 @@ class LocalSegment(Model):
     size_bytes = fields.BigIntField()
     init_size = fields.IntField()
     codec = fields.CharField(max_length=32, null=True)
+    audio_codec = fields.CharField(max_length=32, null=True)
+    audio_sample_rate = fields.IntField(null=True)
+    audio_channels = fields.IntField(null=True)
     parts = fields.JSONField()
     tracks = fields.JSONField(default=dict)  # {track_id: {"ts": timescale, "t0": first decode time}}
     uploaded = fields.BooleanField(default=False)

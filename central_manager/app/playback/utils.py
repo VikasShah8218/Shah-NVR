@@ -76,3 +76,51 @@ def build_vod_playlist(
         # fragments, some parts start mid-GOP (see media_node fMP4 indexer).
     ]
     return "\n".join(header + body + ["#EXT-X-ENDLIST", ""])
+
+
+_AUDIO_CODECS = {"aac", "opus", "g711", "g711a", "g711u", "g722", "lpcm", "g726"}
+
+
+def _audio_codec(seg: RecordingSegment) -> str | None:
+    if seg.audio_codec:
+        return seg.audio_codec.lower()
+    # Backward compatibility: old node indexes stored "h264+g711u" in the aggregate codec column.
+    return next((c for c in (seg.codec or "").lower().split("+") if c in _AUDIO_CODECS), None)
+
+
+def build_audio_playlist(
+    segments: list[RecordingSegment], nodes: dict[int, MediaNode], start: datetime, end: datetime
+) -> str | None:
+    """Audio-only HLS. Nodes convert each selected slice to AAC; recorded video remains untouched."""
+    body: list[str] = []
+    max_duration = 1.0
+    cursor = start
+    previous_end: datetime | None = None
+    for seg in segments:
+        node = nodes.get(seg.node_id)
+        if node is None or node.state in UNAVAILABLE_NODE_STATES or not _audio_codec(seg):
+            continue
+        clip_start = max(start, seg.start_time, cursor)
+        clip_end = min(end, seg.end_time)
+        if clip_end <= clip_start:
+            continue
+        if body and previous_end is not None and clip_start - previous_end > GAP_TOLERANCE:
+            body.append("#EXT-X-DISCONTINUITY")
+        offset_ms = max(0, round((clip_start - seg.start_time).total_seconds() * 1000))
+        duration_ms = max(1, round((clip_end - clip_start).total_seconds() * 1000))
+        seconds = duration_ms / 1000
+        max_duration = max(max_duration, seconds)
+        base = f"{node.api_url.rstrip('/')}/api/v1/media/{seg.id}/audio.aac"
+        body.extend([
+            f"#EXT-X-PROGRAM-DATE-TIME:{_iso(clip_start)}",
+            f"#EXTINF:{seconds:.3f},",
+            f"{base}?start_ms={offset_ms}&duration_ms={duration_ms}",
+        ])
+        previous_end = clip_end
+        cursor = clip_end
+    if not body:
+        return None
+    return "\n".join([
+        "#EXTM3U", "#EXT-X-VERSION:3", f"#EXT-X-TARGETDURATION:{math.ceil(max_duration)}",
+        "#EXT-X-MEDIA-SEQUENCE:0", "#EXT-X-PLAYLIST-TYPE:VOD", *body, "#EXT-X-ENDLIST", "",
+    ])
