@@ -19,6 +19,13 @@ def job(mode="compressed", **options):
     }
 
 
+def test_ffmpeg_progress_accepts_stream_copy_na_values():
+    assert service._progress_seconds("out_time_us=N/A") is None
+    assert service._progress_seconds("out_time_ms=N/A") is None
+    assert service._progress_seconds("progress=continue") is None
+    assert service._progress_seconds("out_time_us=1250000") == 1.25
+
+
 def test_original_export_is_stream_copy(monkeypatch):
     monkeypatch.setattr(service.settings, "CENTRAL_URL", "http://central:8000")
     command, encoder = asyncio.run(service._command(job("original"), Path("out.mp4")))

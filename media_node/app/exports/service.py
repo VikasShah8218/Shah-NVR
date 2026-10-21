@@ -23,6 +23,17 @@ class ExportCancelled(Exception):
     pass
 
 
+def _progress_seconds(line: str) -> float | None:
+    """Parse FFmpeg's microsecond progress fields; stream copy can emit ``N/A`` initially."""
+    key, _, value = line.partition("=")
+    if key not in ("out_time_us", "out_time_ms"):
+        return None
+    try:
+        return max(0.0, int(value) / 1_000_000)
+    except (TypeError, ValueError):
+        return None
+
+
 async def _encoders() -> set[str]:
     try:
         proc = await asyncio.create_subprocess_exec(settings.FFMPEG_BIN, "-hide_banner", "-encoders",
@@ -108,9 +119,9 @@ async def _run(job: dict, output: Path) -> tuple[str, float]:
             if raw:
                 line = raw.decode(errors="replace").strip()
                 recent_output.append(line)
-                key, _, value = line.partition("=")
-                if key in ("out_time_us", "out_time_ms"):
-                    recorded = max(recorded, int(value or 0) / 1_000_000)
+                seconds = _progress_seconds(line)
+                if seconds is not None:
+                    recorded = max(recorded, seconds)
             now = time.monotonic()
             if now - last_report >= 2:
                 result = await central.export_progress(str(job["id"]), runtime.node_id, "PROCESSING",

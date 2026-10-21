@@ -352,7 +352,7 @@ export function PlaybackPage() {
         </CardContent>
       </Card>}
 
-      {cameraId != null && <ExportDialog open={exportOpen} onOpenChange={setExportOpen} cameraId={cameraId} profile={profile}
+      {cameraId != null && exportOpen && <ExportDialog open={exportOpen} onOpenChange={setExportOpen} cameraId={cameraId} profile={profile}
         initialStart={exportStart} initialEnd={exportEnd} />}
     </div>
   )

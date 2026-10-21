@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useCreateExport } from "@/api/queries"
 import type { ExportCreate, ExportMode } from "@/api/types"
 import { Button } from "@/components/ui/button"
@@ -28,7 +28,6 @@ export function ExportDialog({ open, onOpenChange, cameraId, profile, initialSta
   const [height, setHeight] = useState<ExportCreate["max_height"]>(0)
   const [fps, setFps] = useState(0)
   const [audio, setAudio] = useState(true)
-  useEffect(() => { if (open) { setStart(localValue(initialStart)); setEnd(localValue(initialEnd)) } }, [open, initialStart, initialEnd])
   const from = new Date(start), to = new Date(end)
   const duration = (to.getTime() - from.getTime()) / 3_600_000
   const valid = Number.isFinite(duration) && duration > 0 && duration <= 4 && to <= new Date()
