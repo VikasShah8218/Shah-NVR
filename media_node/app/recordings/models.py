@@ -1,5 +1,12 @@
+from enum import Enum
+
 from tortoise import fields
 from tortoise.models import Model
+
+
+class SegmentOrigin(str, Enum):
+    NVR = "NVR"
+    CAMERA_SD = "CAMERA_SD"
 
 
 class LocalSegment(Model):
@@ -26,6 +33,8 @@ class LocalSegment(Model):
     audio_codec = fields.CharField(max_length=32, null=True)
     audio_sample_rate = fields.IntField(null=True)
     audio_channels = fields.IntField(null=True)
+    origin = fields.CharEnumField(SegmentOrigin, max_length=16, default=SegmentOrigin.NVR)
+    backfill_job_id = fields.UUIDField(null=True)
     parts = fields.JSONField()
     tracks = fields.JSONField(default=dict)  # {track_id: {"ts": timescale, "t0": first decode time}}
     uploaded = fields.BooleanField(default=False)

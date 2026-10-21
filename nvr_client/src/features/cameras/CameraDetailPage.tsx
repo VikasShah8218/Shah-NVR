@@ -21,6 +21,7 @@ import { Timeline } from "../playback/Timeline"
 import { CameraFormSheet } from "./CameraFormSheet"
 import { DeviceTab } from "./DeviceTab"
 import { VideoTab } from "./VideoTab"
+import { BackfillTab } from "./BackfillTab"
 
 export function CameraDetailPage() {
   const id = Number(useParams().id)
@@ -61,6 +62,7 @@ export function CameraDetailPage() {
           <TabsTrigger value="assignment">Assignment</TabsTrigger>
           <TabsTrigger value="device">Device</TabsTrigger>
           <TabsTrigger value="video">Video</TabsTrigger>
+          <TabsTrigger value="backfill">Edge storage</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
           <Overview camera={c} />
@@ -76,6 +78,9 @@ export function CameraDetailPage() {
         </TabsContent>
         <TabsContent value="video">
           <VideoTab key={c.id} camera={c} active={tab === "video"} />
+        </TabsContent>
+        <TabsContent value="backfill">
+          <BackfillTab camera={c} active={tab === "backfill"} />
         </TabsContent>
       </Tabs>
       {editing && <CameraFormSheet camera={c} open onOpenChange={setEditing} />}

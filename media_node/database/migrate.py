@@ -32,4 +32,7 @@ async def migrate() -> None:
     await _add_column(conn, "local_segments", "audio_codec", "VARCHAR(32) NULL")
     await _add_column(conn, "local_segments", "audio_sample_rate", "INT NULL")
     await _add_column(conn, "local_segments", "audio_channels", "INT NULL")
+    # 2026-10-20 L3: distinguish ordinary recordings from camera-SD imports.
+    await _add_column(conn, "local_segments", "origin", "VARCHAR(16) NOT NULL DEFAULT 'NVR'")
+    await _add_column(conn, "local_segments", "backfill_job_id", "CHAR(36) NULL")
     await conn.execute_script("CREATE INDEX IF NOT EXISTS idx_local_segments_volume ON local_segments (volume_id, start_time)")

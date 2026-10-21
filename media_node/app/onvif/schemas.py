@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -106,3 +108,21 @@ class DeviceStateOut(BaseModel):
 
 class RebootOut(BaseModel):
     message: str
+
+
+class ProfileGRecordingOut(BaseModel):
+    token: str
+    source_id: str | None = None
+    earliest: datetime | None = None
+    latest: datetime | None = None
+    replay_available: bool = False
+
+
+class ProfileGProbeOut(BaseModel):
+    supported: bool
+    recording_service: bool
+    search_service: bool
+    replay_service: bool
+    earliest: datetime | None = None
+    latest: datetime | None = None
+    recordings: list[ProfileGRecordingOut]

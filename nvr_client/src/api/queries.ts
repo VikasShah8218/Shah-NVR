@@ -7,6 +7,11 @@ import { ApiError, centralClient, nodeClient, nodeGet, unwrap } from "./client"
 import type {
   Assignment,
   AssignmentHistory,
+  BackfillConfig,
+  BackfillConfigUpdate,
+  BackfillJob,
+  BackfillJobCreate,
+  BackfillProbe,
   Camera,
   CameraCreate,
   CameraUpdate,
@@ -150,6 +155,29 @@ export function useTimeline(cameraId: number | null, profile: string, start: Dat
   })
 }
 
+export function useBackfill(cameraId: number, enabled = true) {
+  const { url, api } = useCentral()
+  return useQuery({
+    queryKey: [url, "backfill", cameraId],
+    enabled,
+    queryFn: () => unwrap<BackfillConfig>(api.GET("/api/v1/cameras/{camera_id}/backfill", {
+      params: { path: { camera_id: cameraId } },
+    })),
+  })
+}
+
+export function useBackfillJobs(cameraId: number, enabled = true) {
+  const { url, api } = useCentral()
+  return useQuery({
+    queryKey: [url, "backfill-jobs", cameraId],
+    enabled,
+    queryFn: () => unwrap<BackfillJob[]>(api.GET("/api/v1/cameras/{camera_id}/backfill/jobs", {
+      params: { path: { camera_id: cameraId }, query: { limit: 50 } },
+    })),
+    refetchInterval: 3000,
+  })
+}
+
 export function useAssignments() {
   const { url, api, poll } = useCentral()
   return useQuery({
@@ -258,6 +286,34 @@ export const useDeleteCamera = () =>
   useCentralMutation(
     (api, id: number) => unwrap(api.DELETE("/api/v1/cameras/{camera_id}", { params: { path: { camera_id: id } } })),
     { success: "Camera deleted" },
+  )
+
+const BACKFILL_KEYS = ["backfill", "backfill-jobs", "timeline"]
+
+export const useProbeBackfill = () =>
+  useCentralMutation(
+    (api, cameraId: number) => unwrap<BackfillProbe>(api.POST("/api/v1/cameras/{camera_id}/backfill/probe", {
+      params: { path: { camera_id: cameraId } },
+    })),
+    { success: "Camera edge storage tested", invalidate: BACKFILL_KEYS, errorText: onvifErrorText },
+  )
+
+export const useUpdateBackfill = () =>
+  useCentralMutation(
+    (api, { cameraId, body }: { cameraId: number; body: BackfillConfigUpdate }) =>
+      unwrap<BackfillConfig>(api.PATCH("/api/v1/cameras/{camera_id}/backfill", {
+        params: { path: { camera_id: cameraId } }, body,
+      })),
+    { success: "Edge-storage settings saved", invalidate: BACKFILL_KEYS },
+  )
+
+export const useCreateBackfillJob = () =>
+  useCentralMutation(
+    (api, { cameraId, body }: { cameraId: number; body: BackfillJobCreate }) =>
+      unwrap<BackfillJob>(api.POST("/api/v1/cameras/{camera_id}/backfill/jobs", {
+        params: { path: { camera_id: cameraId } }, body,
+      })),
+    { success: "Backfill job queued", invalidate: BACKFILL_KEYS },
   )
 
 /** Apply stream changes for an existing camera (add / update / remove profiles). */

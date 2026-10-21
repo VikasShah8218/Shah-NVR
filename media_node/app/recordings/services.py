@@ -21,7 +21,7 @@ from tortoise.functions import Sum
 
 from app.node.models import KeyValue
 from app.node.utils import CentralError, central, runtime
-from app.recordings.models import LocalSegment, SkippedFile
+from app.recordings.models import LocalSegment, SegmentOrigin, SkippedFile
 from app.recordings.utils import Mp4IndexError, decoder_signature, index_fmp4, parse_rel_path, segment_uuid
 from app.storage.services import storage
 from app.storage.utils import FREE_BELOW
@@ -154,6 +154,28 @@ async def scan_tick() -> None:
         logger.debug("Indexed %s on %s (%.1fs, %s parts)", rel, root, idx.duration_ms / 1000, len(idx.parts))
 
 
+async def register_backfill_segment(*, volume_id: int | None, rel_path: str, camera_id: int,
+                                    profile: str, generation: int, start_time, index, job_id) -> LocalSegment:
+    """Publish one already validated camera-SD fMP4 without letting the scanner misclassify its origin."""
+    end_time = start_time + timedelta(milliseconds=index.duration_ms)
+    segment, _ = await LocalSegment.update_or_create(
+        rel_path=rel_path,
+        defaults=dict(
+            id=_segment_id(volume_id, rel_path), volume_id=volume_id, camera_id=camera_id, profile=profile,
+            generation=generation, start_time=start_time, end_time=end_time, duration_ms=index.duration_ms,
+            size_bytes=index.size_bytes, init_size=index.init_size, codec=index.codec,
+            audio_codec=index.audio_codec, audio_sample_rate=index.audio_sample_rate,
+            audio_channels=index.audio_channels, parts=index.parts, tracks=index.tracks,
+            origin=SegmentOrigin.CAMERA_SD, backfill_job_id=job_id, uploaded=False,
+        ),
+    )
+    _known.add(rel_path)
+    runtime.last_segment_end[(camera_id, profile)] = max(
+        runtime.last_segment_end.get((camera_id, profile), end_time), end_time,
+    )
+    return segment
+
+
 # ---------------------------------------------------------------- uploader
 
 
@@ -178,6 +200,8 @@ async def upload_tick() -> None:
                 "audio_codec": s.audio_codec,
                 "audio_sample_rate": s.audio_sample_rate,
                 "audio_channels": s.audio_channels,
+                "origin": s.origin,
+                "backfill_job_id": str(s.backfill_job_id) if s.backfill_job_id else None,
                 "config_signature": decoder_signature(s.tracks),
                 "file_path": s.rel_path,
                 "volume_id": storage.central_id(s.volume_id),

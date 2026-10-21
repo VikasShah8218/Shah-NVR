@@ -2484,6 +2484,248 @@
         }
       }
     },
+    "/api/v1/cameras/{camera_id}/backfill": {
+      "get": {
+        "tags": [
+          "L3 Backfill"
+        ],
+        "summary": "Get Backfill",
+        "operationId": "get_backfill_api_v1_cameras__camera_id__backfill_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackfillConfigOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "L3 Backfill"
+        ],
+        "summary": "Update Backfill",
+        "operationId": "update_backfill_api_v1_cameras__camera_id__backfill_patch",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackfillConfigUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackfillConfigOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/backfill/probe": {
+      "post": {
+        "tags": [
+          "L3 Backfill"
+        ],
+        "summary": "Probe Backfill",
+        "operationId": "probe_backfill_api_v1_cameras__camera_id__backfill_probe_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackfillProbeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/backfill/jobs": {
+      "post": {
+        "tags": [
+          "L3 Backfill"
+        ],
+        "summary": "Create Backfill Job",
+        "operationId": "create_backfill_job_api_v1_cameras__camera_id__backfill_jobs_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackfillJobCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackfillJobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "L3 Backfill"
+        ],
+        "summary": "List Backfill Jobs",
+        "operationId": "list_backfill_jobs_api_v1_cameras__camera_id__backfill_jobs_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BackfillJobOut"
+                  },
+                  "title": "Response List Backfill Jobs Api V1 Cameras  Camera Id  Backfill Jobs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/nodes/register": {
       "post": {
         "tags": [
@@ -2811,6 +3053,193 @@
         }
       }
     },
+    "/internal/v1/backfill/claim": {
+      "post": {
+        "tags": [
+          "Internal: L3 Backfill"
+        ],
+        "summary": "Claim Job",
+        "operationId": "claim_job_internal_v1_backfill_claim_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ClaimedJobOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Claim Job Internal V1 Backfill Claim Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/backfill/{job_id}/progress": {
+      "post": {
+        "tags": [
+          "Internal: L3 Backfill"
+        ],
+        "summary": "Job Progress",
+        "operationId": "job_progress_internal_v1_backfill__job_id__progress_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobProgressIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/backfill/{job_id}/complete": {
+      "post": {
+        "tags": [
+          "Internal: L3 Backfill"
+        ],
+        "summary": "Job Complete",
+        "operationId": "job_complete_internal_v1_backfill__job_id__complete_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobCompleteIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/backfill/{job_id}/fail": {
+      "post": {
+        "tags": [
+          "Internal: L3 Backfill"
+        ],
+        "summary": "Job Fail",
+        "operationId": "job_fail_internal_v1_backfill__job_id__fail_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobFailIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "tags": [
@@ -3102,6 +3531,454 @@
           "observed"
         ],
         "title": "AudioTrackIn"
+      },
+      "BackfillConfigOut": {
+        "properties": {
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "manual",
+              "automatic"
+            ],
+            "title": "Mode"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "capability": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "supported",
+              "unsupported",
+              "degraded"
+            ],
+            "title": "Capability"
+          },
+          "recording_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Token"
+          },
+          "earliest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "mode",
+          "profile",
+          "capability",
+          "recording_token",
+          "earliest",
+          "latest",
+          "checked_at",
+          "error"
+        ],
+        "title": "BackfillConfigOut"
+      },
+      "BackfillConfigUpdate": {
+        "properties": {
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "manual",
+                  "automatic"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9_-]{1,32}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "recording_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Token"
+          }
+        },
+        "type": "object",
+        "title": "BackfillConfigUpdate"
+      },
+      "BackfillJobCreate": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9_-]{1,32}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time",
+          "end_time"
+        ],
+        "title": "BackfillJobCreate"
+      },
+      "BackfillJobOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "recording_token": {
+            "type": "string",
+            "title": "Recording Token"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time"
+          },
+          "state": {
+            "$ref": "#/components/schemas/BackfillState"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "title": "Attempt Count"
+          },
+          "progress_percent": {
+            "type": "number",
+            "title": "Progress Percent"
+          },
+          "imported_seconds": {
+            "type": "number",
+            "title": "Imported Seconds"
+          },
+          "imported_bytes": {
+            "type": "integer",
+            "title": "Imported Bytes"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "camera_id",
+          "node_id",
+          "profile",
+          "recording_token",
+          "start_time",
+          "end_time",
+          "state",
+          "requested_by",
+          "attempt_count",
+          "progress_percent",
+          "imported_seconds",
+          "imported_bytes",
+          "error_code",
+          "error_message",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "updated_at"
+        ],
+        "title": "BackfillJobOut"
+      },
+      "BackfillProbeOut": {
+        "properties": {
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "manual",
+              "automatic"
+            ],
+            "title": "Mode"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "capability": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "supported",
+              "unsupported",
+              "degraded"
+            ],
+            "title": "Capability"
+          },
+          "recording_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Token"
+          },
+          "earliest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "recordings": {
+            "items": {
+              "$ref": "#/components/schemas/EdgeRecordingOut"
+            },
+            "type": "array",
+            "title": "Recordings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "mode",
+          "profile",
+          "capability",
+          "recording_token",
+          "earliest",
+          "latest",
+          "checked_at",
+          "error",
+          "recordings"
+        ],
+        "title": "BackfillProbeOut"
+      },
+      "BackfillState": {
+        "type": "string",
+        "enum": [
+          "QUEUED",
+          "CLAIMED",
+          "DOWNLOADING",
+          "INDEXING",
+          "COMPLETED",
+          "PARTIAL",
+          "FAILED",
+          "CANCELLED"
+        ],
+        "title": "BackfillState"
       },
       "CameraAssignmentOut": {
         "properties": {
@@ -3622,6 +4499,85 @@
           "message"
         ],
         "title": "ChangeResult"
+      },
+      "ClaimIn": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id"
+        ],
+        "title": "ClaimIn"
+      },
+      "ClaimedJobOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "recording_token": {
+            "type": "string",
+            "title": "Recording Token"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time"
+          },
+          "assignment_generation": {
+            "type": "integer",
+            "title": "Assignment Generation"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "title": "Port"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "camera_id",
+          "profile",
+          "recording_token",
+          "start_time",
+          "end_time",
+          "assignment_generation",
+          "host",
+          "port",
+          "username",
+          "password"
+        ],
+        "title": "ClaimedJobOut"
       },
       "ClockOut": {
         "properties": {
@@ -4184,6 +5140,59 @@
         ],
         "title": "DriveInfo",
         "description": "A local fixed drive of the node (offered in \"Add storage\")."
+      },
+      "EdgeRecordingOut": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "earliest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "replay_available": {
+            "type": "boolean",
+            "title": "Replay Available",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "EdgeRecordingOut"
       },
       "EncoderOption": {
         "properties": {
@@ -4954,6 +5963,90 @@
           "pending"
         ],
         "title": "HistoryOut"
+      },
+      "JobCompleteIn": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "imported_seconds": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Imported Seconds"
+          },
+          "imported_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Imported Bytes"
+          },
+          "partial": {
+            "type": "boolean",
+            "title": "Partial",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "imported_seconds",
+          "imported_bytes"
+        ],
+        "title": "JobCompleteIn"
+      },
+      "JobFailIn": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 512,
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "code",
+          "message"
+        ],
+        "title": "JobFailIn"
+      },
+      "JobProgressIn": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "DOWNLOADING",
+              "INDEXING"
+            ],
+            "title": "State"
+          },
+          "progress_percent": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Progress Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "state",
+          "progress_percent"
+        ],
+        "title": "JobProgressIn"
       },
       "LiveOut": {
         "properties": {
@@ -6646,6 +7739,22 @@
             ],
             "title": "Config Signature"
           },
+          "origin": {
+            "$ref": "#/components/schemas/SegmentOrigin",
+            "default": "NVR"
+          },
+          "backfill_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backfill Job Id"
+          },
           "file_path": {
             "type": "string",
             "title": "File Path"
@@ -6683,6 +7792,14 @@
           "parts"
         ],
         "title": "SegmentIn"
+      },
+      "SegmentOrigin": {
+        "type": "string",
+        "enum": [
+          "NVR",
+          "CAMERA_SD"
+        ],
+        "title": "SegmentOrigin"
       },
       "SegmentOut": {
         "properties": {
@@ -6764,6 +7881,22 @@
               }
             ],
             "title": "Audio Channels"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/SegmentOrigin",
+            "default": "NVR"
+          },
+          "backfill_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backfill Job Id"
           },
           "status": {
             "$ref": "#/components/schemas/SegmentStatus"

@@ -477,6 +477,47 @@
         }
       }
     },
+    "/api/v1/onvif/profile-g/probe": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Read-only camera edge-storage capability and recording ranges",
+        "operationId": "profile_g_probe_api_v1_onvif_profile_g_probe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileGProbeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/onvif/device": {
       "post": {
         "tags": [
@@ -1831,6 +1872,22 @@
             ],
             "title": "Audio Channels"
           },
+          "origin": {
+            "$ref": "#/components/schemas/SegmentOrigin",
+            "default": "NVR"
+          },
+          "backfill_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backfill Job Id"
+          },
           "part_count": {
             "type": "integer",
             "title": "Part Count"
@@ -2148,6 +2205,119 @@
           "suggested"
         ],
         "title": "ProbeOut"
+      },
+      "ProfileGProbeOut": {
+        "properties": {
+          "supported": {
+            "type": "boolean",
+            "title": "Supported"
+          },
+          "recording_service": {
+            "type": "boolean",
+            "title": "Recording Service"
+          },
+          "search_service": {
+            "type": "boolean",
+            "title": "Search Service"
+          },
+          "replay_service": {
+            "type": "boolean",
+            "title": "Replay Service"
+          },
+          "earliest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "recordings": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileGRecordingOut"
+            },
+            "type": "array",
+            "title": "Recordings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "supported",
+          "recording_service",
+          "search_service",
+          "replay_service",
+          "recordings"
+        ],
+        "title": "ProfileGProbeOut"
+      },
+      "ProfileGRecordingOut": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "earliest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "replay_available": {
+            "type": "boolean",
+            "title": "Replay Available",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "ProfileGRecordingOut"
       },
       "ProfileOut": {
         "properties": {
@@ -2750,6 +2920,14 @@
           "message"
         ],
         "title": "RebootOut"
+      },
+      "SegmentOrigin": {
+        "type": "string",
+        "enum": [
+          "NVR",
+          "CAMERA_SD"
+        ],
+        "title": "SegmentOrigin"
       },
       "SnapshotIn": {
         "properties": {

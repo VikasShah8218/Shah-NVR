@@ -194,6 +194,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/onvif/profile-g/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Read-only camera edge-storage capability and recording ranges */
+        post: operations["profile_g_probe_api_v1_onvif_profile_g_probe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/onvif/device": {
         parameters: {
             query?: never;
@@ -708,6 +725,10 @@ export interface components {
             audio_sample_rate?: number | null;
             /** Audio Channels */
             audio_channels?: number | null;
+            /** @default NVR */
+            origin: components["schemas"]["SegmentOrigin"];
+            /** Backfill Job Id */
+            backfill_job_id?: string | null;
             /** Part Count */
             part_count: number;
             /** Uploaded */
@@ -821,6 +842,39 @@ export interface components {
             /** Profiles */
             profiles: components["schemas"]["ProfileOut"][];
             suggested: components["schemas"]["SuggestedOut"];
+        };
+        /** ProfileGProbeOut */
+        ProfileGProbeOut: {
+            /** Supported */
+            supported: boolean;
+            /** Recording Service */
+            recording_service: boolean;
+            /** Search Service */
+            search_service: boolean;
+            /** Replay Service */
+            replay_service: boolean;
+            /** Earliest */
+            earliest?: string | null;
+            /** Latest */
+            latest?: string | null;
+            /** Recordings */
+            recordings: components["schemas"]["ProfileGRecordingOut"][];
+        };
+        /** ProfileGRecordingOut */
+        ProfileGRecordingOut: {
+            /** Token */
+            token: string;
+            /** Source Id */
+            source_id?: string | null;
+            /** Earliest */
+            earliest?: string | null;
+            /** Latest */
+            latest?: string | null;
+            /**
+             * Replay Available
+             * @default false
+             */
+            replay_available: boolean;
         };
         /** ProfileOut */
         ProfileOut: {
@@ -1036,6 +1090,11 @@ export interface components {
             /** Message */
             message: string;
         };
+        /**
+         * SegmentOrigin
+         * @enum {string}
+         */
+        SegmentOrigin: "NVR" | "CAMERA_SD";
         /** SnapshotIn */
         SnapshotIn: {
             /** Host */
@@ -1394,6 +1453,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProbeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    profile_g_probe_api_v1_onvif_profile_g_probe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileGProbeOut"];
                 };
             };
             /** @description Validation Error */

@@ -677,6 +677,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cameras/{camera_id}/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Backfill */
+        get: operations["get_backfill_api_v1_cameras__camera_id__backfill_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Backfill */
+        patch: operations["update_backfill_api_v1_cameras__camera_id__backfill_patch"];
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/backfill/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Probe Backfill */
+        post: operations["probe_backfill_api_v1_cameras__camera_id__backfill_probe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/backfill/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Backfill Jobs */
+        get: operations["list_backfill_jobs_api_v1_cameras__camera_id__backfill_jobs_get"];
+        put?: never;
+        /** Create Backfill Job */
+        post: operations["create_backfill_job_api_v1_cameras__camera_id__backfill_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/nodes/register": {
         parameters: {
             query?: never;
@@ -808,6 +861,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/backfill/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Claim Job */
+        post: operations["claim_job_internal_v1_backfill_claim_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/backfill/{job_id}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Job Progress */
+        post: operations["job_progress_internal_v1_backfill__job_id__progress_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/backfill/{job_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Job Complete */
+        post: operations["job_complete_internal_v1_backfill__job_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/backfill/{job_id}/fail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Job Fail */
+        post: operations["job_fail_internal_v1_backfill__job_id__fail_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -901,6 +1022,146 @@ export interface components {
             /** Channels */
             channels?: number | null;
         };
+        /** BackfillConfigOut */
+        BackfillConfigOut: {
+            /** Camera Id */
+            camera_id: number;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "off" | "manual" | "automatic";
+            /** Profile */
+            profile: string;
+            /**
+             * Capability
+             * @enum {string}
+             */
+            capability: "unknown" | "supported" | "unsupported" | "degraded";
+            /** Recording Token */
+            recording_token: string | null;
+            /** Earliest */
+            earliest: string | null;
+            /** Latest */
+            latest: string | null;
+            /** Checked At */
+            checked_at: string | null;
+            /** Error */
+            error: string | null;
+        };
+        /** BackfillConfigUpdate */
+        BackfillConfigUpdate: {
+            /** Mode */
+            mode?: ("off" | "manual" | "automatic") | null;
+            /** Profile */
+            profile?: string | null;
+            /** Recording Token */
+            recording_token?: string | null;
+        };
+        /** BackfillJobCreate */
+        BackfillJobCreate: {
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: date-time
+             */
+            end_time: string;
+            /** Profile */
+            profile?: string | null;
+        };
+        /** BackfillJobOut */
+        BackfillJobOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Camera Id */
+            camera_id: number;
+            /** Node Id */
+            node_id: number | null;
+            /** Profile */
+            profile: string;
+            /** Recording Token */
+            recording_token: string;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: date-time
+             */
+            end_time: string;
+            state: components["schemas"]["BackfillState"];
+            /** Requested By */
+            requested_by: string;
+            /** Attempt Count */
+            attempt_count: number;
+            /** Progress Percent */
+            progress_percent: number;
+            /** Imported Seconds */
+            imported_seconds: number;
+            /** Imported Bytes */
+            imported_bytes: number;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** BackfillProbeOut */
+        BackfillProbeOut: {
+            /** Camera Id */
+            camera_id: number;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "off" | "manual" | "automatic";
+            /** Profile */
+            profile: string;
+            /**
+             * Capability
+             * @enum {string}
+             */
+            capability: "unknown" | "supported" | "unsupported" | "degraded";
+            /** Recording Token */
+            recording_token: string | null;
+            /** Earliest */
+            earliest: string | null;
+            /** Latest */
+            latest: string | null;
+            /** Checked At */
+            checked_at: string | null;
+            /** Error */
+            error: string | null;
+            /** Recordings */
+            recordings: components["schemas"]["EdgeRecordingOut"][];
+        };
+        /**
+         * BackfillState
+         * @enum {string}
+         */
+        BackfillState: "QUEUED" | "CLAIMED" | "DOWNLOADING" | "INDEXING" | "COMPLETED" | "PARTIAL" | "FAILED" | "CANCELLED";
         /** CameraAssignmentOut */
         CameraAssignmentOut: {
             /** Camera Id */
@@ -1038,6 +1299,45 @@ export interface components {
             recovery: {
                 [key: string]: string;
             };
+        };
+        /** ClaimIn */
+        ClaimIn: {
+            /** Node Id */
+            node_id: number;
+        };
+        /** ClaimedJobOut */
+        ClaimedJobOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Camera Id */
+            camera_id: number;
+            /** Profile */
+            profile: string;
+            /** Recording Token */
+            recording_token: string;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: date-time
+             */
+            end_time: string;
+            /** Assignment Generation */
+            assignment_generation: number;
+            /** Host */
+            host: string;
+            /** Port */
+            port: number;
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
         };
         /** ClockOut */
         ClockOut: {
@@ -1212,6 +1512,22 @@ export interface components {
             total_bytes: number;
             /** Free Bytes */
             free_bytes: number;
+        };
+        /** EdgeRecordingOut */
+        EdgeRecordingOut: {
+            /** Token */
+            token: string;
+            /** Source Id */
+            source_id?: string | null;
+            /** Earliest */
+            earliest?: string | null;
+            /** Latest */
+            latest?: string | null;
+            /**
+             * Replay Available
+             * @default false
+             */
+            replay_available: boolean;
         };
         /** EncoderOption */
         EncoderOption: {
@@ -1473,6 +1789,41 @@ export interface components {
             /** Changes */
             changes: components["schemas"]["ChangeOut"][];
             pending: components["schemas"]["ChangeOut"] | null;
+        };
+        /** JobCompleteIn */
+        JobCompleteIn: {
+            /** Node Id */
+            node_id: number;
+            /** Imported Seconds */
+            imported_seconds: number;
+            /** Imported Bytes */
+            imported_bytes: number;
+            /**
+             * Partial
+             * @default false
+             */
+            partial: boolean;
+        };
+        /** JobFailIn */
+        JobFailIn: {
+            /** Node Id */
+            node_id: number;
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
+        /** JobProgressIn */
+        JobProgressIn: {
+            /** Node Id */
+            node_id: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "DOWNLOADING" | "INDEXING";
+            /** Progress Percent */
+            progress_percent: number;
         };
         /** LiveOut */
         LiveOut: {
@@ -2032,6 +2383,10 @@ export interface components {
             audio_channels?: number | null;
             /** Config Signature */
             config_signature?: string | null;
+            /** @default NVR */
+            origin: components["schemas"]["SegmentOrigin"];
+            /** Backfill Job Id */
+            backfill_job_id?: string | null;
             /** File Path */
             file_path: string;
             /** Volume Id */
@@ -2039,6 +2394,11 @@ export interface components {
             /** Parts */
             parts: number[];
         };
+        /**
+         * SegmentOrigin
+         * @enum {string}
+         */
+        SegmentOrigin: "NVR" | "CAMERA_SD";
         /** SegmentOut */
         SegmentOut: {
             /**
@@ -2074,6 +2434,10 @@ export interface components {
             audio_sample_rate?: number | null;
             /** Audio Channels */
             audio_channels?: number | null;
+            /** @default NVR */
+            origin: components["schemas"]["SegmentOrigin"];
+            /** Backfill Job Id */
+            backfill_job_id?: string | null;
             status: components["schemas"]["SegmentStatus"];
         };
         /**
@@ -3960,6 +4324,171 @@ export interface operations {
             };
         };
     };
+    get_backfill_api_v1_cameras__camera_id__backfill_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackfillConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_backfill_api_v1_cameras__camera_id__backfill_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BackfillConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackfillConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    probe_backfill_api_v1_cameras__camera_id__backfill_probe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackfillProbeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_backfill_jobs_api_v1_cameras__camera_id__backfill_jobs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                camera_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackfillJobOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_backfill_job_api_v1_cameras__camera_id__backfill_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BackfillJobCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackfillJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     register_node_internal_v1_nodes_register_post: {
         parameters: {
             query?: never;
@@ -4170,6 +4699,138 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DeletedIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_job_internal_v1_backfill_claim_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimedJobOut"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_progress_internal_v1_backfill__job_id__progress_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobProgressIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_complete_internal_v1_backfill__job_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobCompleteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_fail_internal_v1_backfill__job_id__fail_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobFailIn"];
             };
         };
         responses: {

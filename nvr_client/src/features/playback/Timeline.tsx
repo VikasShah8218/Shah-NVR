@@ -52,7 +52,8 @@ export function Timeline({
   const drag = useRef<{ x: number; start: number; moved: boolean } | null>(null)
   const [hover, setHover] = useState<number | null>(null)
   const span = viewEnd - viewStart
-  const ranges = useMemo(() => mergeRanges(segments), [segments])
+  const ranges = useMemo(() => mergeRanges(segments.filter((segment) => segment.origin !== "CAMERA_SD")), [segments])
+  const backfillRanges = useMemo(() => mergeRanges(segments.filter((segment) => segment.origin === "CAMERA_SD")), [segments])
   const now = Date.now()
 
   const pct = (t: number) => ((t - viewStart) / span) * 100
@@ -100,6 +101,12 @@ export function Timeline({
         onPointerUp={onPointerUp}
         onPointerLeave={() => setHover(null)}
       >
+        <defs>
+          <pattern id="camera-sd-backfill" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="8" height="8" fill="var(--info)" opacity="0.45" />
+            <rect width="3" height="8" fill="var(--info)" opacity="0.9" />
+          </pattern>
+        </defs>
         {/* gaps (background) */}
         <rect x="0" y="18" width="100%" height={height - 26} rx="4" fill="var(--muted)" />
         {/* future */}
@@ -119,6 +126,16 @@ export function Timeline({
               fill="var(--success)"
               opacity="0.75"
             />
+          ))}
+        {/* footage recovered from camera edge storage */}
+        {backfillRanges
+          .filter(([a, b]) => b > viewStart && a < viewEnd)
+          .map(([a, b], i) => (
+            <rect key={`sd-${i}`} x={`${Math.max(0, pct(a))}%`} y="18"
+              width={`${Math.max(0.15, pct(Math.min(b, viewEnd)) - Math.max(0, pct(a)))}%`}
+              height={height - 26} fill="url(#camera-sd-backfill)">
+              <title>Filled from camera SD storage</title>
+            </rect>
           ))}
         {/* ticks */}
         {ticks.map((t) => (

@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.recordings.models import SegmentStatus
+from app.recordings.models import SegmentOrigin, SegmentStatus
 
 # ---------------------------------------------------------------- internal (node -> central)
 
@@ -22,6 +22,8 @@ class SegmentIn(BaseModel):
     audio_sample_rate: int | None = None
     audio_channels: int | None = None
     config_signature: str | None = Field(None, max_length=64)
+    origin: SegmentOrigin = SegmentOrigin.NVR
+    backfill_job_id: UUID | None = None
     file_path: str  # relative to the volume's folder
     volume_id: int | None = None  # None = the node's default folder (nodes older than storage volumes)
     parts: list[int] = Field(min_length=1)
@@ -64,6 +66,8 @@ class SegmentOut(BaseModel):
     audio_codec: str | None = None
     audio_sample_rate: int | None = None
     audio_channels: int | None = None
+    origin: SegmentOrigin = SegmentOrigin.NVR
+    backfill_job_id: UUID | None = None
     status: SegmentStatus
 
 

@@ -15,6 +15,9 @@ from tortoise.contrib.fastapi import RegisterTortoise
 
 from app.assignments.router import router as assignments_router
 from app.assignments.services import scheduler_tick
+from app.backfill.router import internal_router as backfill_internal_router
+from app.backfill.router import router as backfill_router
+from app.backfill.services import backfill_scheduler_tick
 from app.cameras.router import router as cameras_router
 from app.cluster.router import router as cluster_router
 from app.nodes.router import internal_router as nodes_internal_router
@@ -45,6 +48,8 @@ async def lifespan(app: FastAPI):
             asyncio.create_task(run_periodic("node-health", settings.HEALTH_INTERVAL_SECONDS, node_health_tick)),
             asyncio.create_task(run_periodic("scheduler", settings.SCHEDULER_INTERVAL_SECONDS, scheduler_tick)),
             asyncio.create_task(run_periodic("retention", settings.RETENTION_INTERVAL_SECONDS, retention_tick)),
+            asyncio.create_task(run_periodic("backfill", settings.BACKFILL_SCHEDULER_INTERVAL_SECONDS,
+                                             backfill_scheduler_tick)),
         ]
         logger.info("%s started", settings.APP_NAME)
         try:
@@ -73,8 +78,10 @@ for r in (
     onvif_router,
     encoder_router,
     ptz_router,
+    backfill_router,
     nodes_internal_router,
     recordings_internal_router,
+    backfill_internal_router,
 ):
     app.include_router(r)
 

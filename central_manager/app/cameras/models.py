@@ -42,6 +42,15 @@ class Camera(Model):
     onvif_reachable = fields.BooleanField(null=True)  # last ONVIF check (no login) answered
     clock_offset_seconds = fields.FloatField(null=True)  # camera clock minus node clock
     onvif_checked_at = fields.DatetimeField(null=True)
+    # L3 edge-storage recovery. Automatic mode is intentionally opt-in.
+    backfill_mode = fields.CharField(max_length=16, default="off")  # off | manual | automatic
+    backfill_profile = fields.CharField(max_length=32, default="main")
+    backfill_recording_token = fields.CharField(max_length=256, null=True)
+    backfill_capability = fields.CharField(max_length=16, default="unknown")
+    backfill_earliest = fields.DatetimeField(null=True)
+    backfill_latest = fields.DatetimeField(null=True)
+    backfill_checked_at = fields.DatetimeField(null=True)
+    backfill_error = fields.CharField(max_length=512, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 

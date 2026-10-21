@@ -13,7 +13,8 @@ from fastapi import APIRouter, HTTPException, Response
 
 from app.onvif.discovery import discover
 from app.onvif.schemas import (ClockOut, DeviceIn, DeviceStateOut, DiscoveredDevice, DiscoverIn, NtpIn, ProbeOut,
-                               RebootOut, SnapshotIn)
+                               ProfileGProbeOut, RebootOut, SnapshotIn)
+from app.onvif.profile_g import ProfileGClient
 from app.onvif.services import OnvifDevice
 from app.onvif.soap import OnvifError
 from app.onvif import encoder
@@ -45,6 +46,38 @@ async def onvif_discover(body: DiscoverIn | None = None):
 async def onvif_probe(body: DeviceIn):
     async with device(body) as dev:
         return await dev.probe()
+
+
+@router.post("/profile-g/probe", response_model=ProfileGProbeOut,
+             summary="Read-only camera edge-storage capability and recording ranges")
+async def profile_g_probe(body: DeviceIn):
+    async with device(body) as dev:
+        await dev.clock()
+        client = ProfileGClient(dev)
+        await client.services()
+        summary = await client.summary()
+        recordings = await client.recordings()
+        output = []
+        for recording in recordings:
+            replay_available = False
+            if recording.earliest and recording.latest and recording.latest > recording.earliest:
+                try:
+                    await client.replay_uri(recording.token)
+                    replay_available = True
+                except OnvifError:
+                    pass
+            output.append({**recording.as_dict(), "replay_available": replay_available})
+        earliest = min((r.earliest for r in recordings if r.earliest), default=summary["earliest"])
+        latest = max((r.latest for r in recordings if r.latest), default=summary["latest"])
+        return {
+            "supported": any(r["replay_available"] for r in output),
+            "recording_service": bool(client.recording_url),
+            "search_service": bool(client.search_url),
+            "replay_service": bool(client.replay_url),
+            "earliest": earliest,
+            "latest": latest,
+            "recordings": output,
+        }
 
 
 @router.post("/device", response_model=DeviceStateOut, summary="Live identity, clock and read-only settings")

@@ -2,6 +2,9 @@
 
 A distributed network video recorder (NVR): two backend services and a web UI.
 
+The pending stabilization, security, deployment and feature-completion work is
+tracked in [Production Readiness Roadmap](docs/PRODUCTION_READINESS_ROADMAP.md).
+
 | Service | Folder | Role |
 |---|---|---|
 | **Central Manager** | `central_manager/` | The "main server". Camera registry, node registry, scheduler and failover, recording catalog, live-URL lookup and HLS playback playlists. **Never handles video.** |
@@ -33,7 +36,8 @@ aerich upgrade
 
 This applies migrations 5 (encoder journal), 6 (recording decoder fingerprint), 7
 (virtual ONVIF-server configuration and camera exposure), 8 (H6 audio metadata), and 9
-(per-node public client endpoints); do not run
+(per-node public client endpoints), and 10 (L3 edge-storage backfill jobs and
+recording provenance); do not run
 `init-db` or generate new migrations on an existing installation. Restart central and the media node,
 then rebuild/restart `nvr_client`. These migrations target PostgreSQL, the supported central database.
 New in-memory SQLite databases are used only by tests.
