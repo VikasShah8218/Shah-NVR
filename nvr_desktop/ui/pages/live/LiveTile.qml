@@ -45,6 +45,8 @@ Rectangle {
         fallbackSource: tile.camera ? tile.urls.fallback ?? "" : ""
         waitingText: tile.urls.error ? tile.urls.error : "Loading stream URLs…"
         showInfo: hover.hovered || Live.layout <= 4
+        player.muted: Live.activeAudioCameraId !== tile.cameraId
+        player.volume: Prefs.liveVolume
     }
 
     // empty tile
@@ -113,6 +115,13 @@ Rectangle {
             Text { text: tile.profile; color: Qt.rgba(1, 1, 1, 0.6); font.family: Theme.font; font.pixelSize: Theme.textXs }
             Item { Layout.fillWidth: true }
             AppButton {
+                visible: (hover.hovered || Live.activeAudioCameraId === tile.cameraId) && (tile.urls.audio_state === "available" || tile.urls.audio_state === "advertised_not_observed")
+                variant: "ghost"; size: "icon"; implicitWidth: 24; implicitHeight: 24
+                iconName: "waves"
+                tip: Live.activeAudioCameraId === tile.cameraId ? "Mute audio" : "Listen to this camera"
+                onClicked: Live.toggleAudio(tile.cameraId)
+            }
+            AppButton {
                 id: menuButton
                 visible: hover.hovered || menu.visible
                 variant: "ghost"
@@ -149,6 +158,7 @@ Rectangle {
         AppMenuItem { text: "LL-HLS"; radio: true; marked: tile.protocolOverride === "hls"; onTriggered: tile.protocolOverride = "hls" }
         MenuSeparator {}
         AppMenuItem { text: "Open main stream"; iconName: "maximize"; onTriggered: tile.expand(tile.cameraId) }
+        AppMenuItem { text: "PTZ controls"; iconName: "crosshair"; onTriggered: ptzDialog.open() }
         AppMenuItem {
             text: "Snapshot"
             iconName: "image-down"
@@ -168,6 +178,18 @@ Rectangle {
         AppMenuItem { text: "Camera details"; iconName: "external-link"; onTriggered: Router.go("camera", tile.cameraId) }
         MenuSeparator {}
         AppMenuItem { text: "Remove from view"; iconName: "x"; onTriggered: Live.clearTile(tile.index) }
+    }
+
+    AppDialog {
+        id: ptzDialog
+        width: Math.min(620, Overlay.overlay.width - 40)
+        title: (tile.camera ? tile.camera.name : "Camera") + " · PTZ"
+        onClosed: Ptz.close()
+        Loader {
+            active: ptzDialog.opened && !!tile.camera
+            Layout.fillWidth: true
+            sourceComponent: PtzPanel { cameraId: tile.cameraId ?? 0; profile: tile.profile }
+        }
     }
 
     component MenuSectionLabel: Text {

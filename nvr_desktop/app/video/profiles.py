@@ -22,7 +22,9 @@ BASE_OPTIONS = {
     "input_default_bindings": False,
     "input_vo_keyboard": False,
     "ytdl": False,
-    "audio": "no",  # NVR views are silent by default
+    "audio": "auto",  # tracks are available, while MpvPlayer remains muted by default
+    "mute": "yes",
+    "volume": 80,
     "background": "color",
     "background_color": "#1f232b",  # letterbox bars = Theme.video (same as the web client)
     "terminal": False,

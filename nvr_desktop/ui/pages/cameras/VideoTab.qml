@@ -164,7 +164,7 @@ ColumnLayout {
         }
         AppText { text: root.v.storage; wrapMode: Text.WordWrap; elide: Text.ElideNone; Layout.fillWidth: true }
         AppText {
-            text: "Video only, decimal GB at configured bitrate. VBR varies; audio/overhead are extra. Presets are editable proposals. H265 playback depends on decoder support; an H264 substream does not change H265 recordings."
+            text: "Decimal GB at configured video bitrate" + (root.v.audioKbps ? " plus " + root.v.audioKbps + " kbps observed audio" : "; audio bitrate unavailable") + ". Container overhead is extra; VBR varies. Presets are editable proposals. H265 playback depends on decoder support."
             variant: "small"; wrapMode: Text.WordWrap; elide: Text.ElideNone; Layout.fillWidth: true
         }
         AppText {

@@ -17,6 +17,7 @@ from app.core.tasks import run_task
 from app.features.live.sources import pick_sources, streams_by_profile
 from app.features.onvif.helpers import format_offset, onvif_error_text, service_names
 from app.features.playback.timeline import DAY, merge_ranges, ticks
+from app.features.nodes.store import NodesStore
 
 
 class CameraDetailStore(BaseStore):
@@ -28,8 +29,9 @@ class CameraDetailStore(BaseStore):
     deviceChanged = Signal()
     ntpSaved = Signal()
 
-    def __init__(self, ctx: AppContext, parent=None):
+    def __init__(self, ctx: AppContext, nodes: NodesStore | None = None, parent=None):
         super().__init__(ctx, parent)
+        self._nodes = nodes
         self._camera_id = 0
         self._camera: dict = {}
         self._live: dict = {}
@@ -93,7 +95,11 @@ class CameraDetailStore(BaseStore):
         cid = self._camera_id
         if not cid:
             return
-        self.fetch("live", lambda: self.api.live(cid).to_qml(), lambda live: self._apply_live(cid, live, ""),
+        def load_live():
+            node_id = (self._camera.get("assignment") or {}).get("node_id")
+            access = self._nodes.access(node_id) if self._nodes is not None and node_id else "lan"
+            return self.api.live(cid, access).to_qml()
+        self.fetch("live", load_live, lambda live: self._apply_live(cid, live, ""),
                    track_error=False, on_err=lambda exc: self._apply_live(cid, {}, str(exc)))
         self.loadRecordings(self._recordings_profile)
 

@@ -82,6 +82,20 @@ PageScroll {
             }
         }
         SettingRow {
+            title: "Media-node route"
+            hint: "Per workstation. Auto uses LAN when reachable, otherwise the node's configured public address. This choice is not shared with other users."
+            AppSelect {
+                implicitWidth: 220
+                options: [
+                    { value: "auto", label: "Auto (recommended)" },
+                    { value: "lan", label: "Always LAN" },
+                    { value: "public", label: "Prefer public" }
+                ]
+                value: Prefs.nodeAccess
+                onPicked: v => Prefs.nodeAccess = v
+            }
+        }
+        SettingRow {
             title: "Live video protocol"
             hint: "RTSP has the lowest delay; LL-HLS works through more networks. Auto tries RTSP first."
             AppSelect {

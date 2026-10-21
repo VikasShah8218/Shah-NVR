@@ -14,6 +14,8 @@ from app.core.context import AppContext
 from app.core.poller import Poller
 from app.core.store import BaseStore
 from app.features.live.sources import pick_sources, streams_by_profile
+from app.features.cameras.store import CamerasStore
+from app.features.nodes.store import NodesStore
 
 LAYOUTS = (1, 4, 9, 16)
 
@@ -21,14 +23,17 @@ LAYOUTS = (1, 4, 9, 16)
 class LiveStore(BaseStore):
     gridChanged = Signal()
     urlsChanged = Signal()
+    audioChanged = Signal()
 
-    def __init__(self, ctx: AppContext, parent=None):
+    def __init__(self, ctx: AppContext, cameras: CamerasStore, nodes: NodesStore, parent=None):
         super().__init__(ctx, parent)
+        self._cameras, self._nodes = cameras, nodes
         self._layout, self._tiles = ctx.prefs.live_layout()
         self._selected = 0
         self._urls: dict[int, dict] = {}  # camera id -> {profile: {"rtsp": ..., "hls": ...}}
         self._url_errors: dict[int, str] = {}
         self._urls_revision = 0  # bumped on every URL change so QML bindings calling sources() re-run
+        self._active_audio_camera_id = 0
         self.urlsChanged.connect(self._bump_revision)
         self._poller = Poller(self.refresh, 15, self)
         ctx.centralChanged.connect(self.refresh)
@@ -55,7 +60,13 @@ class LiveStore(BaseStore):
             self._url_errors[camera_id] = str(exc)
             self.urlsChanged.emit()
 
-        self.fetch(f"live-{camera_id}", lambda: self.api.live(camera_id).to_qml(), ok, track_error=False, on_err=err)
+        def load():
+            camera = self._cameras.byId(camera_id) or {}
+            node_id = (camera.get("assignment") or {}).get("node_id")
+            access = self._nodes.access(node_id) if node_id else "lan"
+            return self.api.live(camera_id, access).to_qml()
+
+        self.fetch(f"live-{camera_id}", load, ok, track_error=False, on_err=err)
 
     def _bump_revision(self) -> None:
         self._urls_revision += 1
@@ -99,11 +110,14 @@ class LiveStore(BaseStore):
 
     @Slot(int)
     def clearTile(self, index: int) -> None:
+        if self._tiles[index] == self._active_audio_camera_id:
+            self.muteAll()
         self._tiles[index] = None
         self._save()
 
     @Slot()
     def clearAll(self) -> None:
+        self.muteAll()
         self._tiles = [None] * 16
         self._save()
 
@@ -111,6 +125,19 @@ class LiveStore(BaseStore):
     selected = Property(int, lambda self: self._selected, notify=gridChanged)
     tiles = Property("QVariantList", lambda self: self._tiles[: self._layout], notify=gridChanged)
     onView = Property("QVariantList", lambda self: [t for t in self._tiles[: self._layout] if t], notify=gridChanged)
+
+    @Slot(int)
+    def toggleAudio(self, camera_id: int) -> None:
+        self._active_audio_camera_id = 0 if self._active_audio_camera_id == camera_id else camera_id
+        self.audioChanged.emit()
+
+    @Slot()
+    def muteAll(self) -> None:
+        if self._active_audio_camera_id:
+            self._active_audio_camera_id = 0
+            self.audioChanged.emit()
+
+    activeAudioCameraId = Property(int, lambda self: self._active_audio_camera_id, notify=audioChanged)
 
     # ------------------------------------------------------------------ snapshots
     @Slot(str, result=str)

@@ -17,6 +17,7 @@ CAMERA_ROLES = [
     "created_at", "updated_at", "streams", "assignment", "lastSegment", "recordStatus",
     "onvif_host", "onvif_port", "manufacturer", "deviceModel", "firmware", "serial", "mac",
     "onvif_services", "onvif_reachable", "clock_offset_seconds", "onvif_checked_at",
+    "expose_via_onvif",
 ]
 
 

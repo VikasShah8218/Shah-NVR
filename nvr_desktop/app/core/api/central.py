@@ -16,6 +16,9 @@ from app.core.api.encoder_models import EncoderChange, EncoderHistory, EncoderSt
 from app.core.api.models import (
     Assignment,
     AssignmentHistory,
+    BackfillConfig,
+    BackfillJob,
+    BackfillProbe,
     Camera,
     ClusterHealth,
     LiveInfo,
@@ -24,6 +27,9 @@ from app.core.api.models import (
     OnvifDeviceState,
     OnvifDiscovered,
     OnvifProbe,
+    OnvifServer,
+    PtzResult,
+    PtzState,
     StorageVolume,
     Timeline,
 )
@@ -111,16 +117,53 @@ class CentralApi:
     def delete_stream(self, camera_id: int, profile: str) -> None:
         self._request("DELETE", f"/api/v1/cameras/{camera_id}/streams/{profile}")
 
-    def live(self, camera_id: int) -> LiveInfo:
-        return LiveInfo.model_validate(self._request("GET", f"/api/v1/cameras/{camera_id}/live"))
+    def live(self, camera_id: int, access: str = "lan") -> LiveInfo:
+        return LiveInfo.model_validate(self._request(
+            "GET", f"/api/v1/cameras/{camera_id}/live", params={"access": access},
+        ))
 
     def timeline(self, camera_id: int, profile: str, start: datetime, end: datetime) -> Timeline:
         params = {"profile": profile, "start": start.isoformat(), "end": end.isoformat()}
         return Timeline.model_validate(self._request("GET", f"/api/v1/cameras/{camera_id}/recordings", params=params))
 
-    def playlist_url(self, camera_id: int, profile: str, start: datetime, end: datetime) -> str:
-        query = urlencode({"profile": profile, "start": start.isoformat(), "end": end.isoformat()})
-        return f"{self.base_url}/api/v1/playback/{camera_id}/index.m3u8?{query}"
+    def playlist_url(self, camera_id: int, profile: str, start: datetime, end: datetime,
+                     access: str = "lan", audio: bool = False) -> str:
+        query = urlencode({"profile": profile, "start": start.isoformat(), "end": end.isoformat(),
+                           "access": access})
+        media = "audio.m3u8" if audio else "index.m3u8"
+        return f"{self.base_url}/api/v1/playback/{camera_id}/{media}?{query}"
+
+    # ------------------------------------------------------------------ H3 PTZ
+    def ptz_open(self, camera_id: int, profile: str) -> PtzState:
+        path = f"/api/v1/cameras/{camera_id}/streams/{quote(profile, safe='')}/ptz"
+        return PtzState.model_validate(self._request("POST", path, timeout=60))
+
+    def ptz_command(self, camera_id: int, profile: str, body: dict) -> PtzResult:
+        path = f"/api/v1/cameras/{camera_id}/streams/{quote(profile, safe='')}/ptz/command"
+        return PtzResult.model_validate(self._request("POST", path, json=body, timeout=60))
+
+    # ------------------------------------------------------------------ L3 backfill
+    def backfill(self, camera_id: int) -> BackfillConfig:
+        return BackfillConfig.model_validate(self._request("GET", f"/api/v1/cameras/{camera_id}/backfill"))
+
+    def backfill_probe(self, camera_id: int) -> BackfillProbe:
+        return BackfillProbe.model_validate(self._request(
+            "POST", f"/api/v1/cameras/{camera_id}/backfill/probe", timeout=60,
+        ))
+
+    def update_backfill(self, camera_id: int, body: dict) -> BackfillConfig:
+        return BackfillConfig.model_validate(self._request(
+            "PATCH", f"/api/v1/cameras/{camera_id}/backfill", json=body,
+        ))
+
+    def backfill_jobs(self, camera_id: int) -> list[BackfillJob]:
+        rows = self._request("GET", f"/api/v1/cameras/{camera_id}/backfill/jobs", params={"limit": 50})
+        return [BackfillJob.model_validate(row) for row in rows]
+
+    def create_backfill_job(self, camera_id: int, body: dict) -> BackfillJob:
+        return BackfillJob.model_validate(self._request(
+            "POST", f"/api/v1/cameras/{camera_id}/backfill/jobs", json=body,
+        ))
 
     # ------------------------------------------------------------------ ONVIF H1
     def onvif_discover(self, node_id: int | None = None, seconds: float = 3.0) -> list[OnvifDiscovered]:
@@ -170,6 +213,14 @@ class CentralApi:
 
     def update_node(self, node_id: int, body: dict) -> MediaNode:
         return MediaNode.model_validate(self._request("PATCH", f"/api/v1/nodes/{node_id}", json=body))
+
+    def onvif_server(self, node_id: int) -> OnvifServer:
+        return OnvifServer.model_validate(self._request("GET", f"/api/v1/nodes/{node_id}/onvif-server"))
+
+    def update_onvif_server(self, node_id: int, body: dict) -> OnvifServer:
+        return OnvifServer.model_validate(self._request(
+            "PATCH", f"/api/v1/nodes/{node_id}/onvif-server", json=body,
+        ))
 
     def node_action(self, node_id: int, action: str) -> MediaNode:
         if action not in ("drain", "cordon", "activate"):

@@ -9,6 +9,7 @@ from __future__ import annotations
 from PySide6.QtCore import QObject, Signal
 
 from app.core.api.central import CentralApi
+from app.core.node_access import NodeAccessResolver
 from app.core.preferences import Preferences
 from app.core.toasts import ToastBus
 
@@ -21,9 +22,12 @@ class AppContext(QObject):
         self.prefs = prefs
         self.toasts = toasts
         self.central = CentralApi(prefs.centralUrl)
+        self.node_access = NodeAccessResolver()
         prefs.centralUrlChanged.connect(self._rebuild_central)
+        prefs.nodeAccessChanged.connect(self.node_access.clear)
 
     def _rebuild_central(self) -> None:
         old, self.central = self.central, CentralApi(self.prefs.centralUrl)
         old.close()
+        self.node_access.clear()
         self.centralChanged.emit()

@@ -19,6 +19,8 @@ from app.core.poller import Poller
 from app.core.store import BaseStore
 from app.core.tasks import run_task
 from app.features.nodes.resources import node_resources
+from app.features.nodes.store import NodesStore
+from app.features.cameras.store import CamerasStore
 
 HISTORY_POINTS = 240  # ~12 minutes at 3 s
 _history: dict[int, list[dict]] = {}  # kept per node across page visits (like the web client)
@@ -41,9 +43,11 @@ class NodeDetailStore(BaseStore):
     statusChanged = Signal()
     tabDataChanged = Signal()
     logsChanged = Signal()
+    onvifChanged = Signal()
 
-    def __init__(self, ctx: AppContext, parent=None):
+    def __init__(self, ctx: AppContext, cameras: CamerasStore, nodes: NodesStore, parent=None):
         super().__init__(ctx, parent)
+        self._cameras, self._nodes = cameras, nodes
         self._node_id = 0
         self._node: dict = {}
         self._status: dict = {}
@@ -54,21 +58,28 @@ class NodeDetailStore(BaseStore):
         self._log_source = "agent"
         self._logs: list[dict] = []
         self._logs_paused = False
+        self._onvif: dict = {}
+        self._route, self._resolved_url = "lan", ""
         self._poller = Poller(self.refresh, 3, self)
+        cameras.camerasChanged.connect(self.onvifChanged)
+        ctx.prefs.nodeAccessChanged.connect(self.nodeChanged)
 
     # ------------------------------------------------------------------ selection
     def _set_node_id(self, value: int) -> None:
         if value == self._node_id:
             return
         self._node_id = value
-        self._node, self._status, self._tab_data, self._logs = {}, {}, [], []
+        self._node, self._status, self._tab_data, self._logs, self._onvif = {}, {}, [], [], {}
+        self._route, self._resolved_url = "lan", ""
         self._set_loading(True)
         self._set_error("")
         self.nodeIdChanged.emit()
         self.nodeChanged.emit()
+        self._refresh_tab()
         self.statusChanged.emit()
         self.tabDataChanged.emit()
         self.logsChanged.emit()
+        self.onvifChanged.emit()
         if value:
             self._poller.start()
         else:
@@ -104,10 +115,9 @@ class NodeDetailStore(BaseStore):
         if not nid:
             return
         self.fetch("node", lambda: self.api.node(nid).to_qml(), lambda n: self._apply_node(nid, n))
-        api_url = self._node.get("api_url")
-        if api_url:
-            self.fetch("status", lambda: node_api.status(api_url).to_qml(),
-                       lambda s: self._apply_status(nid, s, ""), track_error=False)
+        if self._node:
+            self.fetch("status", self._load_status,
+                       lambda payload: self._apply_status(nid, payload[0], "", payload[1], payload[2]), track_error=False)
         self._refresh_tab()
 
     def _apply_node(self, nid: int, node: dict) -> None:
@@ -123,15 +133,31 @@ class NodeDetailStore(BaseStore):
                            "rx": r["netRx"], "tx": r["netTx"]})
             del points[:-HISTORY_POINTS]
         self.nodeChanged.emit()
+        self.fetch("status", self._load_status,
+                   lambda payload: self._apply_status(nid, payload[0], "", payload[1], payload[2]), track_error=False,
+                   on_err=lambda exc: self._apply_status(nid, {}, str(exc)))
+        self._refresh_tab()
 
-    def _apply_status(self, nid: int, status: dict, error: str) -> None:
+    def _resolved_api_url(self) -> str:
+        return self.ctx.node_access.api_url(self._node, self.ctx.prefs.nodeAccess)
+
+    def _load_status(self):
+        route = self.ctx.node_access.resolve(self._node, self.ctx.prefs.nodeAccess)
+        url = str(self._node.get("public_api_url") if route == "public" else self._node.get("api_url") or "")
+        return node_api.status(url).to_qml(), route, url
+
+    def _apply_status(self, nid: int, status: dict, error: str, route: str | None = None,
+                      resolved_url: str | None = None) -> None:
         if nid == self._node_id:
             self._status, self._status_error = status, error
+            if route:
+                self._route, self._resolved_url = route, resolved_url or ""
             self.statusChanged.emit()
+            self.nodeChanged.emit()
 
     def _refresh_tab(self) -> None:
-        nid, api_url, tab = self._node_id, self._node.get("api_url"), self._active_tab
-        if not nid or not api_url:
+        nid, tab = self._node_id, self._active_tab
+        if not nid or not self._node:
             return
 
         def ok(rows):
@@ -145,14 +171,46 @@ class NodeDetailStore(BaseStore):
                 self.tabDataChanged.emit()
 
         if tab == "cameras":
-            run_task(lambda: node_api.assignments(api_url), ok, fail)
+            run_task(lambda: node_api.assignments(self._resolved_api_url()), ok, fail)
         elif tab == "paths":
-            run_task(lambda: [_path_row(p) for p in node_api.mediamtx_paths(api_url)], ok, fail)
+            run_task(lambda: [_path_row(p) for p in node_api.mediamtx_paths(self._resolved_api_url())], ok, fail)
         elif tab == "chunks":
-            run_task(lambda: [s.to_qml() for s in node_api.segments(api_url, 100)], ok, fail)
+            run_task(lambda: [s.to_qml() for s in node_api.segments(self._resolved_api_url(), 100)], ok, fail)
         elif tab == "logs" and not self._logs_paused:
             source = self._log_source
-            run_task(lambda: node_api.logs(api_url, source), lambda lines: self._apply_logs(nid, source, lines), fail)
+            run_task(lambda: node_api.logs(self._resolved_api_url(), source), lambda lines: self._apply_logs(nid, source, lines), fail)
+        elif tab == "onvif":
+            self.fetch("onvif-server", lambda: self.api.onvif_server(nid).to_qml(),
+                       lambda value: self._apply_onvif(nid, value), track_error=False, on_err=fail)
+
+    def _apply_onvif(self, nid: int, value: dict) -> None:
+        if nid == self._node_id:
+            self._onvif = value
+            self.onvifChanged.emit()
+
+    @Slot("QVariant")
+    def saveConnectivity(self, body) -> None:
+        nid = self._node_id
+        clean = dict(body)
+        for key in ("public_api_url", "public_media_host"):
+            clean[key] = str(clean.get(key) or "").strip() or None
+        for key in ("public_rtsp_port", "public_hls_port", "public_webrtc_port"):
+            value = clean.get(key)
+            clean[key] = int(value) if value not in (None, "") else None
+        self.act(lambda: self.api.update_node(nid, clean).to_qml(), success="Public node address saved",
+                 after=lambda _value: (self.ctx.node_access.clear(), self.refresh(), self._nodes.refresh()))
+
+    @Slot(bool, str, str)
+    def saveOnvifServer(self, enabled: bool, name: str, location: str) -> None:
+        nid = self._node_id
+        body = {"enabled": enabled, "discovery_name": name.strip(), "location": location.strip() or None}
+        self.act(lambda: self.api.update_onvif_server(nid, body).to_qml(),
+                 success="Virtual ONVIF device settings saved", after=lambda value: self._apply_onvif(nid, value))
+
+    @Slot(int, bool)
+    def setCameraExposure(self, camera_id: int, exposed: bool) -> None:
+        self.act(lambda: self.api.update_camera(camera_id, {"expose_via_onvif": exposed}).to_qml(),
+                 success="ONVIF exposure updated", after=lambda _value: (self._cameras.refresh(), self._refresh_tab()))
 
     def _apply_logs(self, nid: int, source: str, lines: list[str]) -> None:
         if nid == self._node_id and source == self._log_source:
@@ -202,7 +260,7 @@ class NodeDetailStore(BaseStore):
     def download(self, chunk) -> None:
         """chunk: a row of the Recorded chunks tab."""
         start = parse_iso(chunk["start_time"]).astimezone()
-        download_chunk(self.ctx.toasts, self._node.get("api_url", ""), chunk["id"], chunk["camera_id"],
+        download_chunk(self.ctx.toasts, self._resolved_api_url(), chunk["id"], chunk["camera_id"],
                        chunk["profile"], start)
 
     node = Property("QVariant", lambda self: self._node, notify=nodeChanged)
@@ -212,6 +270,12 @@ class NodeDetailStore(BaseStore):
     tabData = Property("QVariantList", lambda self: self._tab_data, notify=tabDataChanged)
     tabError = Property(str, lambda self: self._tab_error, notify=tabDataChanged)
     logs = Property("QVariantList", lambda self: self._logs, notify=logsChanged)
+    onvif = Property("QVariant", lambda self: self._onvif, notify=onvifChanged)
+    assignedCameras = Property("QVariantList", lambda self: [c for c in self._cameras.cameras()
+                                                              if (c.get("assignment") or {}).get("node_id") == self._node_id],
+                               notify=onvifChanged)
+    route = Property(str, lambda self: self._route, notify=nodeChanged)
+    resolvedApiUrl = Property(str, lambda self: self._resolved_url or self._node.get("api_url", ""), notify=nodeChanged)
 
 
 def _path_row(path: dict) -> dict:

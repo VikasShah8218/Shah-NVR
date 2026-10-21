@@ -14,6 +14,7 @@ from settings.settings import settings
 
 LIVE_PROTOCOLS = ("auto", "rtsp", "hls")
 RENDER_MODES = ("auto", "cpu", "gpu")  # see app/video/render_mode.py
+NODE_ACCESS_MODES = ("auto", "lan", "public")
 DEFAULT_TILES = [None] * 16
 
 
@@ -25,6 +26,9 @@ class Preferences(QObject):
     hwdecChanged = Signal()
     sidebarCollapsedChanged = Signal()
     renderModeChanged = Signal()
+    nodeAccessChanged = Signal()
+    liveVolumeChanged = Signal()
+    playbackVolumeChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -99,6 +103,26 @@ class Preferences(QObject):
     def _set_sidebar(self, value: bool) -> None:
         self._set("sidebarCollapsed", bool(value), self.sidebarCollapsedChanged)
 
+    def _get_node_access(self) -> str:
+        value = self._get("nodeAccess", "auto")
+        return value if value in NODE_ACCESS_MODES else "auto"
+
+    def _set_node_access(self, value: str) -> None:
+        if value in NODE_ACCESS_MODES:
+            self._set("nodeAccess", value, self.nodeAccessChanged)
+
+    def _get_live_volume(self) -> float:
+        return max(0.0, min(1.0, self._get("liveVolume", 0.8, float)))
+
+    def _set_live_volume(self, value: float) -> None:
+        self._set("liveVolume", max(0.0, min(1.0, float(value))), self.liveVolumeChanged)
+
+    def _get_playback_volume(self) -> float:
+        return max(0.0, min(1.0, self._get("playbackVolume", 0.8, float)))
+
+    def _set_playback_volume(self, value: float) -> None:
+        self._set("playbackVolume", max(0.0, min(1.0, float(value))), self.playbackVolumeChanged)
+
     centralUrl = Property(str, _get_central_url, _set_central_url, notify=centralUrlChanged)
     pollSeconds = Property(int, _get_poll, _set_poll, notify=pollSecondsChanged)
     liveProtocol = Property(str, _get_protocol, _set_protocol, notify=liveProtocolChanged)
@@ -108,6 +132,9 @@ class Preferences(QObject):
     renderMode = Property(str, _get_render_mode, _set_render_mode, notify=renderModeChanged)
     activeRenderMode = Property(str, lambda self: self._active_render_mode, constant=True)
     renderModeAtStart = Property(str, lambda self: self._render_mode_at_start, constant=True)
+    nodeAccess = Property(str, _get_node_access, _set_node_access, notify=nodeAccessChanged)
+    liveVolume = Property(float, _get_live_volume, _set_live_volume, notify=liveVolumeChanged)
+    playbackVolume = Property(float, _get_playback_volume, _set_playback_volume, notify=playbackVolumeChanged)
 
     # ------------------------------------------------------------------ live grid (used by LiveStore)
     def live_layout(self) -> tuple[int, list[int | None]]:
@@ -140,5 +167,6 @@ class Preferences(QObject):
         self._store.clear()
         for signal in (self.centralUrlChanged, self.pollSecondsChanged, self.liveProtocolChanged,
                        self.gridUsesSubstreamChanged, self.hwdecChanged, self.sidebarCollapsedChanged,
-                       self.renderModeChanged):
+                       self.renderModeChanged, self.nodeAccessChanged, self.liveVolumeChanged,
+                       self.playbackVolumeChanged):
             signal.emit()

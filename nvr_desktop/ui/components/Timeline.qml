@@ -9,6 +9,7 @@ ColumnLayout {
     id: timeline
 
     property var ranges: []        // [{a, b}] merged recorded ranges (features/playback/timeline.py)
+    property var accentRanges: []  // optional provenance overlay, e.g. camera SD backfill
     property var ticks: []         // [{t, label}] aligned to local time
     property double viewStart: 0
     property double viewEnd: 1
@@ -68,6 +69,20 @@ ColumnLayout {
                 height: track.barH
                 color: Theme.success
                 opacity: 0.75
+            }
+        }
+
+        Repeater {
+            model: timeline.accentRanges.filter(r => r.b > timeline.viewStart && r.a < timeline.viewEnd)
+            delegate: Rectangle {
+                required property var modelData
+                readonly property real x0: Math.max(0, timeline.xOf(modelData.a))
+                x: x0
+                y: track.barTop
+                width: Math.max(1.5, timeline.xOf(Math.min(modelData.b, timeline.viewEnd)) - x0)
+                height: track.barH
+                color: Theme.primary
+                opacity: 0.9
             }
         }
 

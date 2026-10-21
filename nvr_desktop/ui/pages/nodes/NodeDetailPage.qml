@@ -207,6 +207,8 @@ PageScroll {
         options: [
             { value: "cameras", label: "Cameras" },
             { value: "storage", label: "Storage" },
+            { value: "connectivity", label: "Connectivity" },
+            { value: "onvif", label: "Virtual ONVIF" },
             { value: "paths", label: "MediaMTX paths" },
             { value: "chunks", label: "Recorded chunks" },
             { value: "logs", label: "Logs" }
@@ -218,13 +220,99 @@ PageScroll {
     Loader {
         visible: root.n.id !== undefined
         Layout.fillWidth: true
-        sourceComponent: ({ cameras: camerasTab, storage: storageTab, paths: pathsTab, chunks: chunksTab, logs: logsTab })[NodeDetail.activeTab]
+        sourceComponent: ({ cameras: camerasTab, storage: storageTab, connectivity: connectivityTab, onvif: onvifTab, paths: pathsTab, chunks: chunksTab, logs: logsTab })[NodeDetail.activeTab]
     }
 
     // ---------------------------------------------------------------- tab contents
     Component {
         id: storageTab
         StorageTab { node: root.n }
+    }
+
+    Component {
+        id: connectivityTab
+        Card {
+            title: "Client connectivity"
+            spacing: 12
+            AppText {
+                text: "Public endpoints are shared node configuration. Which route this desktop uses is local: " + NodeDetail.route.toUpperCase() + " (" + NodeDetail.resolvedApiUrl + ")."
+                variant: "muted"; wrapMode: Text.WordWrap; Layout.fillWidth: true
+            }
+            AppText {
+                text: "Forward the configured TCP ports and WebRTC UDP 8189 when browser WebRTC is required. Use HTTPS media endpoints when a public web client is served over HTTPS. Private heartbeats, assignments, and uploads remain unchanged."
+                variant: "small"; wrapMode: Text.WordWrap; Layout.fillWidth: true
+            }
+            AppSwitch { id: publicEnabled; text: "Enable public endpoints"; checked: root.n.public_enabled ?? false }
+            RowLayout {
+                Layout.fillWidth: true
+                AppInput { id: publicApi; Layout.fillWidth: true; placeholderText: "Public API URL, e.g. http://122.168.244.70:7100"; text: root.n.public_api_url ?? "" }
+                AppInput { id: publicHost; Layout.fillWidth: true; placeholderText: "Public media host or domain"; text: root.n.public_media_host ?? "" }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                AppInput { id: rtspPort; Layout.fillWidth: true; placeholderText: "RTSP port"; text: root.n.public_rtsp_port ?? "" }
+                AppInput { id: hlsPort; Layout.fillWidth: true; placeholderText: "HLS port"; text: root.n.public_hls_port ?? "" }
+                AppInput { id: webrtcPort; Layout.fillWidth: true; placeholderText: "WebRTC port"; text: root.n.public_webrtc_port ?? "" }
+                AppSwitch { id: mediaTls; text: "Media TLS"; checked: root.n.public_media_tls ?? false }
+            }
+            AppButton {
+                text: "Save connectivity"
+                onClicked: NodeDetail.saveConnectivity({
+                    public_enabled: publicEnabled.checked, public_api_url: publicApi.text,
+                    public_media_host: publicHost.text, public_rtsp_port: rtspPort.text,
+                    public_hls_port: hlsPort.text, public_webrtc_port: webrtcPort.text,
+                    public_media_tls: mediaTls.checked
+                })
+            }
+        }
+    }
+
+    Component {
+        id: onvifTab
+        ColumnLayout {
+            id: onvifPane
+            readonly property var o: NodeDetail.onvif
+            spacing: 12
+            ErrorState { text: NodeDetail.tabError }
+            Card {
+                title: "Virtual ONVIF NVR"
+                Layout.fillWidth: true
+                spacing: 10
+                AppSwitch { id: onvifEnabled; text: "Advertise this node as an ONVIF device"; checked: onvifPane.o.enabled ?? false }
+                AppText {
+                    visible: !onvifPane.o.credentials_configured
+                    text: "Configure ONVIF_SERVER_USERNAME and ONVIF_SERVER_PASSWORD in the media-node environment before enabling external access. Passwords are never sent to this desktop."
+                    color: Theme.warning; wrapMode: Text.WordWrap; Layout.fillWidth: true
+                }
+                AppInput { id: discoveryName; Layout.fillWidth: true; placeholderText: "Discovery name"; text: onvifPane.o.discovery_name ?? "Shah-NVR" }
+                AppInput { id: location; Layout.fillWidth: true; placeholderText: "Location (optional)"; text: onvifPane.o.location ?? "" }
+                Flow {
+                    Layout.fillWidth: true; spacing: 18
+                    FieldRow { label: "Status"; value: onvifPane.o.status ?? "unknown" }
+                    FieldRow { label: "Credentials"; value: onvifPane.o.credentials_configured ? "Configured" : "Not configured" }
+                    FieldRow { label: "Profiles"; value: onvifPane.o.exposed_profiles ?? 0 }
+                }
+                FieldRow { label: "SOAP endpoint"; value: onvifPane.o.xaddr ?? "—" }
+                FieldRow { label: "RTSP gateway"; value: onvifPane.o.rtsp_address ?? "—" }
+                AppText { visible: !!onvifPane.o.last_error; text: onvifPane.o.last_error ?? ""; color: Theme.danger; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                AppButton { text: "Save ONVIF server"; onClicked: NodeDetail.saveOnvifServer(onvifEnabled.checked, discoveryName.text, location.text) }
+            }
+            Card {
+                title: "Exposed cameras"
+                Layout.fillWidth: true
+                AppText { text: "Only selected cameras are enumerated to external VMS clients. Credentials remain hidden."; variant: "muted" }
+                Repeater {
+                    model: NodeDetail.assignedCameras
+                    RowLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        AppText { text: modelData.name; Layout.fillWidth: true }
+                        AppText { text: (modelData.streams ?? []).length + " profiles"; variant: "small" }
+                        AppSwitch { checked: modelData.expose_via_onvif ?? false; onToggled: NodeDetail.setCameraExposure(modelData.id, checked) }
+                    }
+                }
+            }
+        }
     }
 
     Component {

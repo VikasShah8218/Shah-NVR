@@ -334,6 +334,15 @@ class EncoderStore(QObject):
 
     def _view(self):
         current = self._state.get("current") or {}
+        camera = self._cameras.byId(self._cid) or {}
+        streams = camera.get("streams", []) if isinstance(camera, dict) else []
+        streams = streams if isinstance(streams, list) else []
+        stream = next((s for s in streams if s.get("profile") == self._profile), {})
+        audio_kbps = stream.get("audio_bitrate_kbps") or 0
+        current_total = current.get("bitrate_kbps")
+        current_total = current_total + audio_kbps if isinstance(current_total, (int, float)) else None
+        proposed_total = self._draft.get("bitrate_kbps")
+        proposed_total = proposed_total + audio_kbps if isinstance(proposed_total, (int, float)) else None
         options = alternatives(self._state.get("options", []), self._draft.get("encoding"))
         option = options[min(self._option, len(options)-1)] if options else {}
         errors = self._draft_errors() if current else []
@@ -355,6 +364,7 @@ class EncoderStore(QObject):
                 "reviewCount": len(self._review), "proposal": ", ".join(f"{k}: {current.get(k)} → {v}" for k, v in changes.items()),
                 "reviewTargets": ", ".join(f'{r["name"]} / {r["profile"]}' for r in self._review),
                 "reviewValues": ", ".join(f"{k}: {v}" for k, v in review_values.items() if v is not None),
-                "storage": f"Continuous video: current {storage_text(current.get('bitrate_kbps'))} → proposed {storage_text(self._draft.get('bitrate_kbps'))}"}
+                "storage": f"Continuous recording: current {storage_text(current_total)} → proposed {storage_text(proposed_total)}",
+                "audioKbps": audio_kbps}
 
     view = Property("QVariantMap", _view, notify=changed)

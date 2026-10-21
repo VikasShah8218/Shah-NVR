@@ -138,6 +138,8 @@ class MpvPlayer(QObject):
     durationChanged = Signal()
     pausedChanged = Signal()
     speedChanged = Signal()
+    mutedChanged = Signal()
+    volumeChanged = Signal()
     activeSourceChanged = Signal()
     eofReached = Signal()
     # for the surface (GUI thread)
@@ -160,6 +162,8 @@ class MpvPlayer(QObject):
         self._duration = 0.0
         self._paused = False
         self._speed = 1.0
+        self._muted = True
+        self._volume = 0.8
         self._failures = 0
         self._stopped = True
         self._render_ready = False  # mpv's video output needs the render context before loadfile
@@ -189,6 +193,8 @@ class MpvPlayer(QObject):
     def _ensure_mpv(self) -> mpv.MPV:
         if self.bridge.player is None:
             player = mpv.MPV(log_handler=_log_mpv_message, loglevel="warn", hwdec=self._hwdec_option(), **BASE_OPTIONS)
+            player["mute"] = self._muted
+            player["volume"] = self._volume * 100
             bridge = self.bridge  # callbacks capture the bridge, never the player object
             for name in OBSERVED_PROPERTIES:
                 player.observe_property(name, lambda prop, value, b=bridge: b.post_event("prop:" + prop, value))
@@ -405,12 +411,36 @@ class MpvPlayer(QObject):
         if self.mpv is not None:
             self.mpv["speed"] = float(value)
 
+    def _get_muted(self) -> bool:
+        return self._muted
+
+    def _set_muted(self, value: bool) -> None:
+        value = bool(value)
+        if value != self._muted:
+            self._muted = value
+            if self.mpv is not None:
+                self.mpv["mute"] = value
+            self.mutedChanged.emit()
+
+    def _get_volume(self) -> float:
+        return self._volume
+
+    def _set_volume(self, value: float) -> None:
+        value = max(0.0, min(1.0, float(value)))
+        if value != self._volume:
+            self._volume = value
+            if self.mpv is not None:
+                self.mpv["volume"] = value * 100
+            self.volumeChanged.emit()
+
     source = Property(str, _get_source, _set_source, notify=sourceChanged)
     fallbackSource = Property(str, _get_fallback, _set_fallback, notify=fallbackSourceChanged)
     mode = Property(str, _get_mode, _set_mode, notify=modeChanged)
     hwdec = Property(str, _get_hwdec, _set_hwdec, notify=hwdecChanged)
     paused = Property(bool, _get_paused, _set_paused, notify=pausedChanged)
     speed = Property(float, _get_speed, _set_speed, notify=speedChanged)
+    muted = Property(bool, _get_muted, _set_muted, notify=mutedChanged)
+    volume = Property(float, _get_volume, _set_volume, notify=volumeChanged)
     # not "state": a QQuickItem has a `state` property (QML states); keep the same name everywhere
     playState = Property(str, lambda self: self._state, notify=playStateChanged)
     errorText = Property(str, lambda self: self._error_text, notify=errorTextChanged)

@@ -137,6 +137,8 @@ PageScroll {
                     Layout.fillHeight: true
                     mode: "playback"
                     source: Playback.playlistUrl
+                    player.muted: !Playback.hasAudio
+                    player.volume: Prefs.playbackVolume
                     showInfo: false
                     waitingText: "Click on the timeline to start playback"
 
@@ -210,6 +212,19 @@ PageScroll {
                             variant: "muted"
                         }
                         Item { Layout.fillWidth: true }
+                        AppButton {
+                            visible: Playback.hasAudio
+                            variant: "ghost"; size: "icon"
+                            iconName: "waves"
+                            tip: video.player.muted ? "Listen to recorded audio" : "Mute audio"
+                            onClicked: video.player.muted = !video.player.muted
+                        }
+                        Slider {
+                            visible: Playback.hasAudio && !video.player.muted
+                            implicitWidth: 100
+                            from: 0; to: 1; value: Prefs.playbackVolume
+                            onMoved: Prefs.playbackVolume = value
+                        }
                         AppSelect {
                             implicitWidth: 84
                             implicitHeight: 30
@@ -254,6 +269,7 @@ PageScroll {
             }
             Item { Layout.fillWidth: true }
             Legend { swatch: Theme.alpha(Theme.success, 0.75); label: "recorded" }
+            Legend { swatch: Theme.primary; label: "camera SD backfill" }
             Legend { swatch: Theme.muted; label: "no recording"; outlined: true }
             AppText {
                 visible: Playback.hasTimeline
@@ -268,6 +284,7 @@ PageScroll {
             Layout.fillWidth: true
             barHeight: 64
             ranges: Playback.ranges
+            accentRanges: Playback.backfillRanges
             ticks: Playback.ticks
             viewStart: Playback.viewStart
             viewEnd: Playback.viewEnd
@@ -310,7 +327,7 @@ PageScroll {
             id: chunkList
             readonly property var columns: [
                 { title: "Start", width: 0 }, { title: "End", width: 140 }, { title: "Length", width: 110 },
-                { title: "Size", width: 110 }, { title: "Node", width: 110 }, { title: "", width: 36 }
+                { title: "Size", width: 100 }, { title: "Audio", width: 100 }, { title: "Origin", width: 100 }, { title: "Node", width: 90 }, { title: "", width: 36 }
             ]
             visible: Playback.chunks.length > 0
             Layout.fillWidth: true
@@ -327,8 +344,10 @@ PageScroll {
                 AppText { text: Fmt.time(modelData.startMs); Layout.fillWidth: true }
                 AppText { text: Fmt.time(modelData.endMs); Layout.preferredWidth: 140 }
                 AppText { text: Fmt.duration(modelData.duration_ms); Layout.preferredWidth: 110 }
-                AppText { text: Fmt.bytes(modelData.size_bytes); Layout.preferredWidth: 110 }
-                AppText { text: "node " + modelData.node_id; variant: "muted"; Layout.preferredWidth: 110 }
+                AppText { text: Fmt.bytes(modelData.size_bytes); Layout.preferredWidth: 100 }
+                AppText { text: modelData.audio_codec ?? "—"; Layout.preferredWidth: 100 }
+                AppText { text: modelData.origin === "CAMERA_SD" ? "Camera SD" : "NVR"; color: modelData.origin === "CAMERA_SD" ? Theme.primary : Theme.foreground; Layout.preferredWidth: 100 }
+                AppText { text: "node " + modelData.node_id; variant: "muted"; Layout.preferredWidth: 90 }
                 AppButton {
                     variant: "ghost"; size: "icon"; iconName: "download"; tip: "Download MP4"
                     Layout.preferredWidth: 36
