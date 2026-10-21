@@ -112,44 +112,6 @@ PageScroll {
         }
     }
 
-    // ================================================================= export jobs
-    Card {
-        visible: Playback.exports.length > 0
-        Layout.fillWidth: true
-        spacing: 10
-        AppText { text: "Exports"; font.weight: Font.Medium }
-        Repeater {
-            model: Playback.exports
-            delegate: Rectangle {
-                id: exportJob
-                required property var modelData
-                readonly property bool active: ["QUEUED", "CLAIMED", "PROCESSING", "FINALIZING"].indexOf(modelData.state) >= 0
-                Layout.fillWidth: true
-                implicitHeight: exportRow.implicitHeight + 20
-                radius: Theme.radius
-                color: "transparent"
-                border.color: Theme.border
-                RowLayout {
-                    id: exportRow
-                    anchors.fill: parent; anchors.margins: 10; spacing: 10
-                    ColumnLayout {
-                        Layout.fillWidth: true; spacing: 4
-                        RowLayout {
-                            AppText { text: (modelData.mode === "original" ? "Original" : "Compressed") + " · " + modelData.profile; font.weight: Font.Medium }
-                            AppText { text: Fmt.dateTime(modelData.start_time) + " – " + Fmt.dateTime(modelData.end_time); variant: "small" }
-                            AppText { text: modelData.state; color: modelData.state === "FAILED" ? Theme.danger : modelData.state === "READY" ? Theme.success : Theme.mutedForeground }
-                        }
-                        ProgressBar { visible: exportJob.active; Layout.fillWidth: true; from: 0; to: 100; value: modelData.progress_percent }
-                        AppText { visible: !!modelData.error_message; text: modelData.error_message ?? ""; color: Theme.danger; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                        AppText { visible: modelData.gap_seconds > 2; text: "Contains " + Math.round(modelData.gap_seconds) + " seconds without recordings."; color: Theme.warning }
-                    }
-                    AppButton { visible: modelData.state === "READY"; text: "Download " + Fmt.bytes(modelData.output_size_bytes); iconName: "download"; onClicked: Playback.downloadExport(modelData.id, modelData.output_name ?? "") }
-                    AppButton { visible: exportJob.active; text: "Cancel"; variant: "outline"; onClicked: Playback.cancelExport(modelData.id) }
-                }
-            }
-        }
-    }
-
     // ================================================================= player
     // Placeholder in the page; the player itself moves to the window overlay in fullscreen.
     Item {
@@ -396,6 +358,44 @@ PageScroll {
                     variant: "ghost"; size: "icon"; iconName: "download"; tip: "Download MP4"
                     Layout.preferredWidth: 36
                     onClicked: Playback.download(modelData.id, modelData.node_id)
+                }
+            }
+        }
+    }
+
+    // ================================================================= export jobs
+    Card {
+        visible: Playback.exports.length > 0
+        Layout.fillWidth: true
+        spacing: 10
+        AppText { text: "Exports"; font.weight: Font.Medium }
+        Repeater {
+            model: Playback.exports
+            delegate: Rectangle {
+                id: exportJob
+                required property var modelData
+                readonly property bool active: ["QUEUED", "CLAIMED", "PROCESSING", "FINALIZING"].indexOf(modelData.state) >= 0
+                Layout.fillWidth: true
+                implicitHeight: exportRow.implicitHeight + 20
+                radius: Theme.radius
+                color: "transparent"
+                border.color: Theme.border
+                RowLayout {
+                    id: exportRow
+                    anchors.fill: parent; anchors.margins: 10; spacing: 10
+                    ColumnLayout {
+                        Layout.fillWidth: true; spacing: 4
+                        RowLayout {
+                            AppText { text: (modelData.mode === "original" ? "Original" : "Compressed") + " · " + modelData.profile; font.weight: Font.Medium }
+                            AppText { text: Fmt.dateTime(modelData.start_time) + " – " + Fmt.dateTime(modelData.end_time); variant: "small" }
+                            AppText { text: modelData.state; color: modelData.state === "FAILED" ? Theme.danger : modelData.state === "READY" ? Theme.success : Theme.mutedForeground }
+                        }
+                        ProgressBar { visible: exportJob.active; Layout.fillWidth: true; from: 0; to: 100; value: modelData.progress_percent }
+                        AppText { visible: !!modelData.error_message; text: modelData.error_message ?? ""; color: Theme.danger; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                        AppText { visible: modelData.gap_seconds > 2; text: "Contains " + Math.round(modelData.gap_seconds) + " seconds without recordings."; color: Theme.warning }
+                    }
+                    AppButton { visible: modelData.state === "READY"; text: "Download " + Fmt.bytes(modelData.output_size_bytes); iconName: "download"; onClicked: Playback.downloadExport(modelData.id, modelData.output_name ?? "") }
+                    AppButton { visible: exportJob.active; text: "Cancel"; variant: "outline"; onClicked: Playback.cancelExport(modelData.id) }
                 }
             }
         }
