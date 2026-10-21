@@ -16,6 +16,12 @@ KV_ASSIGNMENTS = "assignments"
 VERSION = "0.1.0"
 
 
+def desired_webrtc_hosts(data: dict) -> list[str]:
+    """Sanitize central's browser-facing ICE hosts and always retain this node's LAN address."""
+    supplied = [str(h).strip() for h in data.get("webrtc_additional_hosts", []) if str(h).strip()]
+    return list(dict.fromkeys([settings.public_host, *supplied]))
+
+
 async def load_local_state() -> None:
     """Restore node id and last known assignments, so recording continues if central is down."""
     runtime.node_id = await KeyValue.get_value(KV_NODE_ID)
@@ -80,6 +86,8 @@ async def heartbeat_tick() -> None:
 
     if runtime.node_id is None and not await register():
         return
+    from app.onvif_server.service import onvif_server
+
     payload = {
         **metrics.cpu_memory(),
         **metrics.network_rates(),
@@ -95,12 +103,24 @@ async def heartbeat_tick() -> None:
         "drives": await asyncio.to_thread(local_drives),
         "volumes": storage.reports(),
         "onvif": (onvif_reports := take_reports()),
+        "onvif_server": onvif_server.status(),
     }
     try:
         data = await central.heartbeat(runtime.node_id, payload)
         runtime.last_central_contact = utcnow()
         ack_reports(onvif_reports)
         await storage.apply_config(data.get("volumes"), data.get("storage_quota_bytes"))
+        hosts = desired_webrtc_hosts(data)
+        if hosts != runtime.webrtc_additional_hosts:
+            from app.mediamtx.utils import mtx
+
+            await mtx.patch_global({"webrtcAdditionalHosts": hosts})
+            runtime.webrtc_additional_hosts = hosts
+            logger.info("MediaMTX WebRTC advertised hosts updated: %s", ", ".join(hosts))
+        config = data.get("onvif_server") or {}
+        if config != runtime.onvif_server_config:
+            runtime.onvif_server_config = config
+            await onvif_server.apply()
     except CentralError as exc:
         if exc.status_code == 404:  # central lost us (e.g. DB reset): register again
             logger.warning("Central does not know node_id=%s; re-registering", runtime.node_id)
@@ -130,6 +150,7 @@ async def refresh_assignments() -> None:
 async def stream_status_tick() -> None:
     """Report per-stream state: CONNECTING / STREAMING / RECORDING / NOT_RECORDING."""
     from app.mediamtx.utils import mtx
+    from app.node.audio import observed_audio
 
     if runtime.node_id is None or not runtime.assignments:
         return
@@ -176,6 +197,7 @@ async def stream_status_tick() -> None:
                 "status": status,
                 "detail": detail,
                 "bytes_received": int(info.get("bytesReceived") or 0),
+                "audio": observed_audio(info),
             })
     try:
         await central.stream_status(runtime.node_id, items)

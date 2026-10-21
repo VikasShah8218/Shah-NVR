@@ -59,7 +59,7 @@ def test_migration_adds_volume_columns_to_an_old_database(tmp_path):
     asyncio.run(run())
     con = sqlite3.connect(db)
     cols = {r[1] for r in con.execute("PRAGMA table_info(local_segments)")}
-    assert "volume_id" in cols
+    assert {"volume_id", "audio_codec", "audio_sample_rate", "audio_channels"} <= cols
     assert "volume_id" in {r[1] for r in con.execute("PRAGMA table_info(skipped_files)")}
     assert con.execute("SELECT volume_id, size_bytes FROM local_segments").fetchone() == (None, 10)  # old rows = default
     con.close()

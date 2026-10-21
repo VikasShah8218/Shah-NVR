@@ -2,6 +2,9 @@
 
 A distributed network video recorder (NVR): two backend services and a web UI.
 
+The pending stabilization, security, deployment and feature-completion work is
+tracked in [Production Readiness Roadmap](docs/PRODUCTION_READINESS_ROADMAP.md).
+
 | Service | Folder | Role |
 |---|---|---|
 | **Central Manager** | `central_manager/` | The "main server". Camera registry, node registry, scheduler and failover, recording catalog, live-URL lookup and HLS playback playlists. **Never handles video.** |
@@ -17,13 +20,83 @@ Camera ──RTSP──► Media Node (MediaMTX) ──► chunks on disk ──
 
 Authentication and TLS aren't implemented yet (planned for a later phase).
 
+## H2: camera video settings (server, node and web only)
+
+The web camera-detail **Video** tab reads the actual encoder configuration and advertised options through
+central → node → camera. It supports H.264/H.265, resolution, frame rate, bitrate, GOP, quality and codec
+profile; CBR/VBR is editable only when exposed through Media2. Media2 is preferred, with a Media1 read
+fallback. Unsupported/unknown limits stay read-only. Desktop support is deliberately unchanged.
+
+For an existing installation, back up PostgreSQL, stop central, then run the **existing** migrations:
+
+```powershell
+cd central_manager
+aerich upgrade
+```
+
+This applies migrations 5 (encoder journal), 6 (recording decoder fingerprint), 7
+(virtual ONVIF-server configuration and camera exposure), 8 (H6 audio metadata), and 9
+(per-node public client endpoints), and 10 (L3 edge-storage backfill jobs and
+recording provenance); do not run
+`init-db` or generate new migrations on an existing installation. Restart central and the media node,
+then rebuild/restart `nvr_client`. These migrations target PostgreSQL, the supported central database.
+New in-memory SQLite databases are used only by tests.
+
+Workflow and safeguards:
+
+- Select main/sub. Manually added RTSP streams require an explicit ONVIF profile mapping; this does not
+  change their RTSP URL. Use the same canonical ONVIF address for duplicate entries of one physical device.
+- Presets propose editable values within advertised limits. Estimates are decimal GB/day at the video
+  bitrate limit (`Mbps × 10.8`) plus the advertised audio bitrate when available; container/network overhead
+  remains excluded and VBR varies. Same bitrate means the same estimate regardless of codec. "Best quality"
+  is a suggestion, not a measured quality guarantee.
+- Review before applying. Revisions reject stale edits; shared encoders require acknowledgement.
+  A durable device mutex and operation IDs protect concurrent/repeated requests. The node sends no blind
+  Set retry and never falls back to another media service after sending a Set.
+- Readback verification is separate from recovery. Only the affected device's assigned MediaMTX paths
+  are restarted; heartbeat and recording evidence remain pending until observed. Inspect live view and
+  a new recorded chunk as well. On-demand streams may remain idle until watched.
+- Unknown outcomes stay locked. Wait two minutes, then use **Check uncertain operation** for fresh
+  readback on the original node. Review actual values before another action. Restore is explicit,
+  capability-checked and uses saved previous values; it is never an automatic retry or rollback.
+- Bulk copies changed fields only, at most 20 targets, with per-camera preflight/results. Shared or
+  unsupported targets are skipped, not silently changed to alternatives. A successful source apply
+  clears its draft; create a draft before preflighting bulk targets.
+- New recording indexes fingerprint decoder configuration, so resolution/SPS/PPS changes as well as
+  codec changes produce HLS discontinuities. Existing recordings are not rewritten. H.265 decoding
+  still depends on the browser/device; an H.264 substream does not make H.265 main recordings compatible.
+
+Security remains the existing trusted-network model: these APIs are not authenticated. Do not expose
+central or node ports publicly. Continue using one central process and one agent process per node.
+Camera firmware/vendor behavior and browser playback require physical-camera acceptance testing.
+
+Automated checks (no camera writes):
+
+```powershell
+cd central_manager
+python -m pytest tests -q
+cd ../media_node
+python -m pytest tests -q
+cd ../nvr_client
+npm.cmd run test:encoder
+npm.cmd run test:node-access
+npm.cmd run build
+npm.cmd run lint
+```
+
+Central tests force an in-memory database before importing application settings. Node encoder tests use
+an HTTP/SOAP camera simulator, covering Media1/2, readback, timeout uncertainty, stale/shared settings and
+targeted restart. Physical acceptance: apply a small bitrate change on one approved test camera, check
+live + recording, restore, then test H.265 (on a capable camera), main/sub isolation, shared encoders and
+mixed-success bulk. Confirm that camera names/metadata and the existing desktop still behave normally.
+
 ---
 
 ## 1. Requirements
 
 - Python 3.12+ (tested on 3.13) and the `nvr` virtualenv (`workon nvr`)
 - PostgreSQL with a database named `nvr`
-- FFmpeg on PATH (only needed for the camera simulator)
+- FFmpeg on PATH (camera simulator and browser-compatible recorded audio playback)
 - MediaMTX: already in `media_node/bin/mediamtx.exe` (v1.21.2, Windows amd64). On Linux, download the matching build from https://github.com/bluenviron/mediamtx/releases and set `MEDIAMTX_BIN`.
 
 ```bash
@@ -36,7 +109,17 @@ pip install -r central_manager/requirements.txt -r media_node/requirements.txt
 Each service reads the `.env` next to its `main.py` (`.env.example` lists every option).
 
 - `central_manager/.env`: set `DB_USER` / `DB_PASSWORD`.
-- `media_node/.env`: set `PUBLIC_HOST` to this machine's LAN IP if VLC runs on another PC. `127.0.0.1` works for same-PC testing.
+- `media_node/.env`: set `PUBLIC_HOST` to this machine's LAN IP if VLC runs on another PC. `127.0.0.1` works for same-PC testing. Set `FFMPEG_BIN` if `ffmpeg` is not on PATH.
+
+For a browser outside the LAN, open **Media Nodes → node → Connectivity**, enter that node's public
+API URL and public media host/ports, then enable **Public mapping available**. Central-to-node traffic
+continues over the registered LAN address. Each browser independently selects **Auto**, **LAN only** or
+**Public only** under Settings → Media node connection; Auto probes LAN first and falls back to public.
+Forward the configured TCP ports and MediaMTX's
+`WEBRTC_UDP_PORT` (normally UDP 8189, with the same external port). If the web client is served over
+HTTPS, terminate TLS on the public HLS/WebRTC ports and enable the HTTPS toggle to avoid mixed-content
+blocking. The node API is currently unauthenticated; prefer a VPN or a protected reverse proxy instead
+of exposing it directly to the internet.
 
 ## 3. Create the database tables (Aerich)
 

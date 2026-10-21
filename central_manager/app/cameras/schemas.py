@@ -37,6 +37,15 @@ class StreamOut(BaseModel):
     last_status_at: datetime | None
     last_segment_at: datetime | None
     onvif_profile_token: str | None = None  # ONVIF media profile behind source_url
+    audio_state: str = "unknown"
+    audio_advertised: bool | None = None
+    audio_observed: bool | None = None
+    audio_codec: str | None = None
+    audio_codec_raw: str | None = None
+    audio_sample_rate: int | None = None
+    audio_channels: int | None = None
+    audio_bitrate_kbps: int | None = None
+    audio_last_observed_at: datetime | None = None
 
 
 class CameraCreate(BaseModel):
@@ -65,6 +74,7 @@ class CameraUpdate(BaseModel):
     username: str | None = None
     password: str | None = None
     enabled: bool | None = None
+    expose_via_onvif: bool | None = None
     # Days to keep, counted back from the camera's latest recording. Leave out for the default (create) /
     # unchanged (update); send null to keep recordings until storage is full.
     retention_days: int | None = Field(default=None, ge=1, le=3650)
@@ -84,6 +94,7 @@ class CameraOut(BaseModel):
     username: str | None
     has_password: bool
     enabled: bool
+    expose_via_onvif: bool
     retention_days: int | None  # None = keep until storage is full
     # ONVIF device (null for cameras never seen over ONVIF)
     onvif_host: str | None = None
@@ -109,6 +120,10 @@ class LiveStreamUrls(BaseModel):
     rtsp: str
     hls: str
     webrtc: str
+    audio_state: str = "unknown"
+    audio_codec: str | None = None
+    audio_sample_rate: int | None = None
+    audio_channels: int | None = None
 
 
 class LiveOut(BaseModel):

@@ -19,6 +19,32 @@ _NO_LIMIT = 1_000_000  # kbps; cameras report 2147483647 for "unlimited"
 VIDEO_CODECS = ("H264", "H265")
 
 
+def normalize_audio_codec(value: str | None) -> str | None:
+    """Normalize common ONVIF/vendor names. Plain G711 remains ambiguous until MediaMTX observes A/u-law."""
+    if not value:
+        return None
+    compact = value.upper().replace("-", "").replace("_", "").replace(" ", "")
+    return {
+        "AAC": "aac", "MPEG4AAC": "aac", "MPEG4AUDIO": "aac",
+        "OPUS": "opus", "G711": "g711", "PCMA": "g711a", "G711A": "g711a",
+        "ALAW": "g711a", "PCMU": "g711u", "G711U": "g711u", "ULAW": "g711u",
+        "G722": "g722", "LPCM": "lpcm", "PCM": "lpcm", "G726": "g726",
+    }.get(compact, compact.lower())
+
+
+def _audio_fields(enc: etree._Element | None) -> dict:
+    raw = _t(enc, "tt:Encoding")
+    return {
+        "has_audio": enc is not None,
+        "audio_encoder_token": enc.get("token") if enc is not None else None,
+        "audio_encoding": raw,
+        "audio_codec": normalize_audio_codec(raw),
+        "audio_bitrate_kbps": _bitrate(_t(enc, "tt:Bitrate")),
+        "audio_sample_rate": _int(_t(enc, "tt:SampleRate")),
+        "audio_channels": _int(_t(enc, "tt:Channels")),
+    }
+
+
 def _t(el, path: str) -> str | None:
     v = el.findtext(path, namespaces=NS) if el is not None else None
     return v.strip() if v and v.strip() else None
@@ -88,13 +114,14 @@ def parse_media1_profiles(body: etree._Element) -> list[dict]:
     out = []
     for p in body.iterfind(".//trt:Profiles", NS):
         enc = p.find("tt:VideoEncoderConfiguration", NS)
+        audio = p.find("tt:AudioEncoderConfiguration", NS)
         out.append({
             "token": p.get("token"), "name": _t(p, "tt:Name"), "api": "media1",
             "encoding": (_t(enc, "tt:Encoding") or "").upper() or None,
             "width": _int(_t(enc, "tt:Resolution/tt:Width")), "height": _int(_t(enc, "tt:Resolution/tt:Height")),
             "fps": _int(_t(enc, "tt:RateControl/tt:FrameRateLimit")),
             "bitrate_kbps": _bitrate(_t(enc, "tt:RateControl/tt:BitrateLimit")),
-            "has_audio": p.find("tt:AudioEncoderConfiguration", NS) is not None,
+            **_audio_fields(audio),
             "has_ptz": p.find("tt:PTZConfiguration", NS) is not None,
         })
     return out
@@ -105,6 +132,7 @@ def parse_media2_profiles(body: etree._Element) -> list[dict]:
     for p in body.iterfind(".//tr2:Profiles", NS):
         conf = p.find("tr2:Configurations", NS)
         enc = conf.find("tr2:VideoEncoder", NS) if conf is not None else None
+        audio = conf.find("tr2:AudioEncoder", NS) if conf is not None else None
         encoding = (_t(enc, "tt:Encoding") or "").upper() or None
         out.append({
             "token": p.get("token"), "name": _t(p, "tr2:Name"), "api": "media2",
@@ -112,7 +140,7 @@ def parse_media2_profiles(body: etree._Element) -> list[dict]:
             "width": _int(_t(enc, "tt:Resolution/tt:Width")), "height": _int(_t(enc, "tt:Resolution/tt:Height")),
             "fps": _int(_t(enc, "tt:RateControl/tt:FrameRateLimit")),
             "bitrate_kbps": _bitrate(_t(enc, "tt:RateControl/tt:BitrateLimit")),
-            "has_audio": conf is not None and conf.find("tr2:AudioEncoder", NS) is not None,
+            **_audio_fields(audio),
             "has_ptz": conf is not None and conf.find("tr2:PTZ", NS) is not None,
         })
     return out

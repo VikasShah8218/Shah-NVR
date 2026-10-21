@@ -23,8 +23,12 @@ from app.node.services import check_public_host, heartbeat_tick, load_local_stat
 from app.node.utils import central
 from app.onvif.health import onvif_tick
 from app.onvif.router import router as onvif_router
+from app.onvif.ptz_router import router as ptz_router
+from app.onvif_server.router import router as onvif_server_router
+from app.onvif_server.service import onvif_server
 from app.recordings.router import router as recordings_router
 from app.recordings.services import deletion_tick, scan_tick, upload_tick
+from app.recordings.backfill import backfill_tick
 from app.storage.services import storage, storage_tick
 from database.config import TORTOISE_ORM
 from database.migrate import migrate
@@ -51,6 +55,7 @@ async def lifespan(app: FastAPI):
         await storage.refresh()  # pick the recording target before MediaMTX gets its first paths
         await supervisor.start()
         await register()
+        await onvif_server.apply()
 
         tasks = [
             asyncio.create_task(run_periodic(name, interval, func))
@@ -64,6 +69,7 @@ async def lifespan(app: FastAPI):
                 ("storage", settings.STORAGE_CHECK_INTERVAL_SECONDS, storage_tick),
                 ("address", settings.ADDRESS_CHECK_INTERVAL_SECONDS, check_public_host),
                 ("onvif-health", settings.ONVIF_CHECK_INTERVAL_SECONDS, onvif_tick),
+                ("backfill", settings.BACKFILL_INTERVAL_SECONDS, backfill_tick),
             )
         ]
         logger.info("Media node '%s' started; API %s", settings.NODE_NAME, settings.api_url)
@@ -73,6 +79,7 @@ async def lifespan(app: FastAPI):
             for t in tasks:
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            await onvif_server.stop()
             await supervisor.stop()
             await mtx.close()
             await central.close()
@@ -83,6 +90,8 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], a
 app.include_router(node_router)
 app.include_router(recordings_router)
 app.include_router(onvif_router)
+app.include_router(ptz_router)
+app.include_router(onvif_server_router)
 
 
 @app.get("/", tags=["System"])

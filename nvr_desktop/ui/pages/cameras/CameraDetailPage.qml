@@ -7,24 +7,31 @@ import "../../video"
 import "../assignments"
 
 // Port of nvr_client/src/features/cameras/CameraDetailPage.tsx:
-// tabs Overview (live preview, details, live URLs, streams) / Recordings (last 24 h) / Assignment.
+// tabs Overview / Device (ONVIF) / Video / Recordings / Assignment.
 PageScroll {
     id: root
     objectName: "cameraDetail"
 
     readonly property var c: CameraDetail.camera
     readonly property bool ready: c.id !== undefined
-    property string tab: "overview"
+    property string tab: Router.params && Router.params.tab ? Router.params.tab : "overview"
     property string previewProfile: ""
     property double now: Date.now()
 
     function showTab(name) { tab = name }
 
-    Component.onCompleted: CameraDetail.cameraId = Router.id
+    Component.onCompleted: {
+        CameraDetail.cameraId = Router.id
+    }
     Component.onDestruction: CameraDetail.cameraId = 0
     Connections {
         target: Router
-        function onChanged() { if (Router.page === "camera") CameraDetail.cameraId = Router.id }
+        function onChanged() {
+            if (Router.page === "camera") {
+                CameraDetail.cameraId = Router.id
+                root.tab = Router.params && Router.params.tab ? Router.params.tab : "overview"
+            }
+        }
     }
     Connections {
         target: CameraDetail
@@ -62,9 +69,11 @@ PageScroll {
 
     AppTabs {
         visible: root.ready
-        options: [{ value: "overview", label: "Overview" }, { value: "recordings", label: "Recordings" }, { value: "assignment", label: "Assignment" }]
+        options: [{ value: "overview", label: "Overview" }, { value: "device", label: "Device" }, { value: "video", label: "Video" }, { value: "recordings", label: "Recordings" }, { value: "backfill", label: "Backfill" }, { value: "assignment", label: "Assignment" }]
         current: root.tab
-        onPicked: v => root.tab = v
+        onPicked: v => {
+            root.tab = v
+        }
     }
 
     // ================================================================= Overview
@@ -102,6 +111,7 @@ PageScroll {
                     radius: Theme.radiusSm
                     source: active ? urls.source : ""
                     fallbackSource: active ? urls.fallback : ""
+                    player.muted: true
                     waitingText: !root.c.enabled ? "Camera is disabled" : urls.error !== "" ? urls.error : "Loading stream URLs…"
                 }
             }
@@ -185,7 +195,7 @@ PageScroll {
 
         TableCard {
             columns: [
-                { title: "Stream", width: 90 }, { title: "Status", width: 200 }, { title: "Source URL", width: 0 },
+                { title: "Stream", width: 90 }, { title: "Status", width: 180 }, { title: "Audio", width: 150 }, { title: "Source URL", width: 0 },
                 { title: "Record", width: 80 }, { title: "Transport", width: 80 }, { title: "Received", width: 90 },
                 { title: "Last chunk", width: 110 }, { title: "Last report", width: 110 }
             ]
@@ -195,8 +205,8 @@ PageScroll {
                 AppText { text: modelData.profile; font.weight: Font.Medium; Layout.preferredWidth: 90 }
                 ColumnLayout {
                     spacing: 2
-                    Layout.preferredWidth: 200
-                    Layout.maximumWidth: 200
+                    Layout.preferredWidth: 180
+                    Layout.maximumWidth: 180
                     StatusBadge { status: modelData.status }
                     AppText {
                         visible: !!modelData.status_detail
@@ -204,6 +214,19 @@ PageScroll {
                         variant: "small"
                         font.pixelSize: 11
                         Layout.fillWidth: true
+                    }
+                }
+                ColumnLayout {
+                    spacing: 1
+                    Layout.preferredWidth: 150
+                    AppText {
+                        text: modelData.audio_state === "available" ? "Available" : modelData.audio_state === "advertised_not_observed" ? "Advertised" : modelData.audio_state === "unsupported" ? "No audio" : "Unknown"
+                        color: modelData.audio_state === "available" ? Theme.success : modelData.audio_state === "advertised_not_observed" ? Theme.warning : Theme.mutedForeground
+                    }
+                    AppText {
+                        visible: !!modelData.audio_codec
+                        text: (modelData.audio_codec ?? "") + (modelData.audio_sample_rate ? " · " + modelData.audio_sample_rate + " Hz" : "") + (modelData.audio_channels ? " · " + modelData.audio_channels + " ch" : "")
+                        variant: "small"
                     }
                 }
                 AppText { text: modelData.source_url; variant: "mono"; Layout.fillWidth: true }
@@ -222,6 +245,28 @@ PageScroll {
                 }
             }
         }
+    }
+
+    // ================================================================= ONVIF device
+    DeviceTab {
+        visible: root.ready && root.tab === "device"
+        Layout.fillWidth: true
+        camera: root.c
+        active: visible
+    }
+
+    // ================================================================= H2 video settings
+    VideoTab {
+        visible: root.ready && root.tab === "video"
+        Layout.fillWidth: true
+        camera: root.c
+        active: visible
+    }
+
+    BackfillTab {
+        visible: root.ready && root.tab === "backfill"
+        Layout.fillWidth: true
+        camera: root.c
     }
 
     // ================================================================= Recordings

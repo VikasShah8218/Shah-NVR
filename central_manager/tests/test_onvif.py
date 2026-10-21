@@ -16,9 +16,12 @@ from app.onvif.services import default_name, pick_streams
 from database.config import APP_MODELS
 
 
-def profile(token, w, h, enc="H264"):
+def profile(token, w, h, enc="H264", audio=False):
     return {"token": token, "name": token, "api": "media2", "encoding": enc, "width": w, "height": h, "fps": 25,
-            "bitrate_kbps": None, "has_audio": False, "has_ptz": False,
+            "bitrate_kbps": None, "has_audio": audio, "has_ptz": False,
+            "audio_encoder_token": "a1" if audio else None, "audio_encoding": "G711" if audio else None,
+            "audio_codec": "g711" if audio else None, "audio_bitrate_kbps": 64 if audio else None,
+            "audio_sample_rate": 8000 if audio else None, "audio_channels": 1 if audio else None,
             "rtsp": f"rtsp://192.168.1.50/{token}", "snapshot": None}
 
 
@@ -28,7 +31,7 @@ PROBE = {
     "info": {"manufacturer": "Hanwha", "model": "SNV-L6014RM", "firmwareversion": "1.0", "serialnumber": "SN1",
              "hardwareid": None},
     "services": ["http://www.onvif.org/ver10/device/wsdl", "http://www.onvif.org/ver20/media/wsdl"],
-    "profiles": [profile("p_main", 1920, 1080), profile("p_sub", 640, 360), profile("p_jpeg", 1920, 1080, "JPEG")],
+    "profiles": [profile("p_main", 1920, 1080, audio=True), profile("p_sub", 640, 360), profile("p_jpeg", 1920, 1080, "JPEG")],
     "suggested": {"main": "p_main", "sub": "p_sub"},
 }
 
@@ -81,6 +84,9 @@ def test_add_camera_fills_streams_and_device(fake_node):
         assert streams["main"].source_url == "rtsp://192.168.1.50/p_main" and streams["main"].record
         assert streams["sub"].source_url == "rtsp://192.168.1.50/p_sub" and not streams["sub"].record
         assert streams["main"].onvif_profile_token == "p_main"
+        assert streams["main"].audio_advertised is True
+        assert streams["main"].audio_codec == "g711" and streams["main"].audio_sample_rate == 8000
+        assert streams["sub"].audio_advertised is False and streams["sub"].audio_state == "none"
         assert fake_node[0][2]["password"] == "pw"  # credentials travel to the node per request
 
         with pytest.raises(HTTPException) as e:  # same device again

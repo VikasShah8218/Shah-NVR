@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, status
 
 from app.assignments.models import CameraAssignment
@@ -118,7 +120,11 @@ async def delete_stream(camera_id: int, profile: str):
 
 
 @router.get("/{camera_id}/live", response_model=LiveOut)
-async def get_live(camera_id: int, profile: str | None = None):
+async def get_live(
+    camera_id: int,
+    profile: str | None = None,
+    access: Literal["lan", "public"] = "lan",
+):
     """Where to watch this camera live. Video comes from the media node, never from here."""
     camera = await _get_camera(camera_id)
     if not camera.enabled:
@@ -142,9 +148,15 @@ async def get_live(camera_id: int, profile: str | None = None):
         streams=[
             LiveStreamUrls(
                 profile=s.profile,
-                rtsp=f"rtsp://{node.media_host}:{node.rtsp_port}/{s.path_name()}",
-                hls=f"http://{node.media_host}:{node.hls_port}/{s.path_name()}/index.m3u8",
-                webrtc=f"http://{node.media_host}:{node.webrtc_port}/{s.path_name()}",
+                rtsp=f"rtsp://{node.media_host_for(access)}:{node.rtsp_port_for(access)}/{s.path_name()}",
+                hls=(f"{node.media_scheme_for(access)}://{node.media_host_for(access)}:"
+                     f"{node.hls_port_for(access)}/{s.path_name()}/index.m3u8"),
+                webrtc=(f"{node.media_scheme_for(access)}://{node.media_host_for(access)}:"
+                        f"{node.webrtc_port_for(access)}/{s.path_name()}"),
+                audio_state=s.audio_state,
+                audio_codec=s.audio_codec,
+                audio_sample_rate=s.audio_sample_rate,
+                audio_channels=s.audio_channels,
             )
             for s in streams
         ],

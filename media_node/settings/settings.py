@@ -35,6 +35,8 @@ class Settings(BaseSettings):
 
     # MediaMTX
     MEDIAMTX_BIN: Path = BASE_DIR / "bin" / ("mediamtx.exe" if os.name == "nt" else "mediamtx")
+    # Used only to make browser-compatible AAC for recorded listening. Video is never transcoded.
+    FFMPEG_BIN: str = "ffmpeg"
     MEDIAMTX_API_PORT: int = 9997
     MEDIAMTX_METRICS_PORT: int = 9998
     RTSP_PORT: int = 8554
@@ -44,6 +46,13 @@ class Settings(BaseSettings):
     HLS_VARIANT: str = "lowLatency"  # lowLatency | fmp4 | mpegts
     WEBRTC_PORT: int = 8889
     WEBRTC_UDP_PORT: int = 8189
+
+    # H5 virtual ONVIF NVR. Desired enable/name come from central; the secret stays on this node.
+    ONVIF_AUTH_MODE: str = "local"
+    ONVIF_SERVER_USERNAME: str = ""
+    ONVIF_SERVER_PASSWORD: str = ""
+    ONVIF_RTSP_PORT: int = 8555
+    ONVIF_AUTH_NONCE_SECONDS: int = 300
 
     # Recording
     SEGMENT_SECONDS: int = 60  # length of one recorded chunk
@@ -58,6 +67,7 @@ class Settings(BaseSettings):
     STATUS_INTERVAL_SECONDS: int = 10
     DELETION_INTERVAL_SECONDS: int = 60
     ONVIF_CHECK_INTERVAL_SECONDS: float = 300  # camera reachable + clock offset (no login, see app/onvif/health.py)
+    BACKFILL_INTERVAL_SECONDS: float = 5
 
     # Disk protection: above MAX, delete oldest recordings until below TARGET.
     STORAGE_CHECK_INTERVAL_SECONDS: float = 10
@@ -89,6 +99,10 @@ class Settings(BaseSettings):
     @property
     def db_path(self) -> Path:
         return self.DATA_DIR / "node_state.sqlite3"
+
+    @property
+    def onvif_credentials_configured(self) -> bool:
+        return bool(self.ONVIF_SERVER_USERNAME and self.ONVIF_SERVER_PASSWORD)
 
 
 @lru_cache

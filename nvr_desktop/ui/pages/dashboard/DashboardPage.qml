@@ -105,6 +105,7 @@ PageScroll {
                     required property string title
                     required property string detail
                     required property string page
+                    required property var tab
                     required property int index
                     required property var model
                     Layout.fillWidth: true
@@ -129,7 +130,7 @@ PageScroll {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: Router.go(page, model.id)
+                        onClicked: Router.go(page, model.id, tab ? { tab: tab } : {})
                     }
                 }
             }

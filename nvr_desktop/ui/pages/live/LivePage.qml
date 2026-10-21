@@ -25,7 +25,11 @@ Item {
     }
 
     Component.onCompleted: { for (const id of Live.onView) Live.ensureUrls(id) }
-    Component.onDestruction: if (appWindow) appWindow.immersive = false
+    Component.onDestruction: { Live.muteAll(); Ptz.close(); if (appWindow) appWindow.immersive = false }
+    Connections {
+        target: Qt.application
+        function onStateChanged() { if (Qt.application.state !== Qt.ApplicationActive) Live.muteAll() }
+    }
 
     RowLayout {
         anchors.fill: parent
@@ -250,7 +254,10 @@ Item {
         title: (root.expandedCamera ? root.expandedCamera.name : "") + " · main stream"
         onClosed: root.expandedCamera = null
 
+        ColumnLayout {
+            Layout.fillWidth: true
         VideoView {
+            id: expandedVideo
             readonly property var urls: {
                 Live.urlsRevision
                 return root.expandedCamera ? Live.sources(root.expandedCamera.id, "main", root.protocol) : ({})
@@ -260,7 +267,27 @@ Item {
             radius: Theme.radiusSm
             source: expandDialog.opened && root.expandedCamera ? urls.source ?? "" : ""
             fallbackSource: expandDialog.opened && root.expandedCamera ? urls.fallback ?? "" : ""
+            player.muted: !root.expandedCamera || Live.activeAudioCameraId !== root.expandedCamera.id
+            player.volume: Prefs.liveVolume
             waitingText: "Loading stream URLs…"
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            AppButton {
+                text: root.expandedCamera && Live.activeAudioCameraId === root.expandedCamera.id ? "Mute audio" : "Listen"
+                iconName: "waves"
+                visible: expandedVideo.urls.audio_state === "available" || expandedVideo.urls.audio_state === "advertised_not_observed"
+                onClicked: if (root.expandedCamera) Live.toggleAudio(root.expandedCamera.id)
+            }
+            AppButton { text: "PTZ"; iconName: "crosshair"; variant: "outline"; onClicked: expandedPtz.active = !expandedPtz.active }
+            Item { Layout.fillWidth: true }
+        }
+        Loader {
+            id: expandedPtz
+            active: false
+            Layout.fillWidth: true
+            sourceComponent: PtzPanel { cameraId: root.expandedCamera ? root.expandedCamera.id : 0; profile: "main" }
+        }
         }
     }
 }

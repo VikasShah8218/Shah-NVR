@@ -12,6 +12,8 @@ see time jump backwards. Only those header bytes change; video data is untouched
 """
 
 import os
+import hashlib
+import json
 import struct
 import uuid
 from dataclasses import dataclass, field
@@ -41,6 +43,9 @@ class Track:
     codec: str | None = None
     default_duration: int = 0
     default_flags: int = 0
+    config_signature: str | None = None
+    sample_rate: int | None = None
+    channels: int | None = None
 
 
 @dataclass
@@ -57,6 +62,9 @@ class Mp4Index:
     size_bytes: int  # bytes of complete boxes (a truncated tail is ignored)
     duration_ms: int
     codec: str | None
+    audio_codec: str | None = None
+    audio_sample_rate: int | None = None
+    audio_channels: int | None = None
     parts: list[dict] = field(default_factory=list)  # [{"o", "s", "d"}]
     tracks: dict[str, dict] = field(default_factory=dict)  # {track_id: {"ts": timescale, "t0": first tfdt}}
 
@@ -116,6 +124,13 @@ def _parse_moov(moov: bytes) -> dict[int, Track]:
             if stsd and stsd[0] + 16 <= stsd[1]:
                 fourcc = moov[stsd[0] + 12 : stsd[0] + 16]
                 track.codec = CODEC_NAMES.get(fourcc, fourcc.decode("ascii", "replace").strip())
+                # Includes sample entry dimensions + avcC/hvcC (SPS/PPS/VPS), but not per-file timestamps.
+                track.config_signature = hashlib.sha256(moov[stsd[0]:stsd[1]]).hexdigest()
+                # ISO AudioSampleEntry: the first entry begins eight bytes into the stsd payload.
+                if track.handler == "soun" and stsd[0] + 44 <= stsd[1]:
+                    track.channels = struct.unpack_from(">H", moov, stsd[0] + 32)[0] or None
+                    rate_16_16 = struct.unpack_from(">I", moov, stsd[0] + 40)[0]
+                    track.sample_rate = (rate_16_16 >> 16) or None
             tracks[track_id] = track
         elif typ == b"mvex":
             for t2, s2, _ in _children(moov, s, e):
@@ -271,14 +286,29 @@ def index_fmp4(path: Path, part_target_seconds: float) -> Mp4Index:
         })
 
     codecs = [t.codec for t in sorted(tracks.values(), key=lambda t: t.handler != "vide") if t.codec]
+    audio = next((t for t in tracks.values() if t.handler == "soun"), None)
     return Mp4Index(
         init_size=init_size,
         size_bytes=complete_end,
         duration_ms=sum(p["d"] for p in parts),
         codec="+".join(codecs) or None,
+        audio_codec=audio.codec if audio else None,
+        audio_sample_rate=audio.sample_rate if audio else None,
+        audio_channels=audio.channels if audio else None,
         parts=parts,
-        tracks={str(tid): {"ts": t.timescale, "t0": first_tfdt.get(tid, 0)} for tid, t in tracks.items() if t.timescale},
+        tracks={str(tid): {"ts": t.timescale, "t0": first_tfdt.get(tid, 0), "config": t.config_signature,
+                           "handler": t.handler, "codec": t.codec, "sample_rate": t.sample_rate,
+                           "channels": t.channels}
+                for tid, t in tracks.items() if t.timescale},
     )
+
+
+def decoder_signature(tracks: dict[str, dict]) -> str | None:
+    """Stable decoding configuration across chunks. Legacy indexes have no signature."""
+    if not tracks or any(not t.get("config") for t in tracks.values()):
+        return None
+    config = sorted((tid, t["ts"], t["config"]) for tid, t in tracks.items())
+    return hashlib.sha256(json.dumps(config).encode()).hexdigest()
 
 
 def rebase_timestamps(data: bytearray, tracks: dict[str, dict], start_time: datetime) -> bytearray:

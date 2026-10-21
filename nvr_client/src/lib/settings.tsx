@@ -1,12 +1,14 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react"
 
 export type LiveProtocol = "auto" | "webrtc" | "hls"
+export type NodeAccessPreference = "auto" | "lan" | "public"
 
 export interface ClientSettings {
   centralUrl: string
   pollSeconds: number
   liveProtocol: LiveProtocol
   gridUsesSubstream: boolean
+  nodeAccess: NodeAccessPreference
 }
 
 const STORAGE_KEY = "shah-nvr.settings"
@@ -16,6 +18,7 @@ export const DEFAULT_SETTINGS: ClientSettings = {
   pollSeconds: 5,
   liveProtocol: "auto",
   gridUsesSubstream: true,
+  nodeAccess: "auto",
 }
 
 /** localStorage can throw (private mode, blocked storage); the app must still work. */

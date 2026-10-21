@@ -123,6 +123,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/media/{segment_id}/audio.aac": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * AAC rendition of a recording's first audio track
+         * @description Transcode audio only; the original recording and video track are never modified or decoded.
+         */
+        get: operations["media_audio_api_v1_media__segment_id__audio_aac_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/segments": {
         parameters: {
             query?: never;
@@ -168,6 +188,23 @@ export interface paths {
         put?: never;
         /** Identity, clock and stream profiles of one device */
         post: operations["onvif_probe_api_v1_onvif_probe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/profile-g/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Read-only camera edge-storage capability and recording ranges */
+        post: operations["profile_g_probe_api_v1_onvif_profile_g_probe_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -270,6 +307,91 @@ export interface paths {
         put?: never;
         /** JPEG snapshot through the node (for previews while adding cameras) */
         post: operations["onvif_snapshot_api_v1_onvif_snapshot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/encoder/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Encoder Read */
+        post: operations["encoder_read_api_v1_onvif_encoder_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/encoder/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Encoder Check */
+        post: operations["encoder_check_api_v1_onvif_encoder_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/encoder/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Encoder Apply */
+        post: operations["encoder_apply_api_v1_onvif_encoder_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/ptz/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open Ptz */
+        post: operations["open_ptz_api_v1_onvif_ptz_open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/ptz/command": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ptz Command */
+        post: operations["ptz_command_api_v1_onvif_ptz_command_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -384,6 +506,183 @@ export interface components {
             /** Interface Ip */
             interface_ip: string;
         };
+        /** EncoderApplyIn */
+        EncoderApplyIn: {
+            /** Host */
+            host: string;
+            /**
+             * Port
+             * @default 80
+             */
+            port: number;
+            /**
+             * Username
+             * @default
+             */
+            username: string;
+            /**
+             * Password
+             * @default
+             */
+            password: string;
+            /** Xaddr */
+            xaddr?: string | null;
+            /** Profile Token */
+            profile_token?: string | null;
+            /** Revision */
+            revision: string;
+            values: components["schemas"]["EncoderValues"];
+            /**
+             * Acknowledge Shared
+             * @default false
+             */
+            acknowledge_shared: boolean;
+            /** Camera Ids */
+            camera_ids?: number[];
+        };
+        /** EncoderOption */
+        EncoderOption: {
+            /** Encoding */
+            encoding: string;
+            /**
+             * Resolutions
+             * @default []
+             */
+            resolutions: number[][];
+            /** Fps Range */
+            fps_range?: number[] | null;
+            /**
+             * Frame Rates
+             * @default []
+             */
+            frame_rates: number[];
+            /** Bitrate Range */
+            bitrate_range?: number[] | null;
+            /** Gop Range */
+            gop_range?: number[] | null;
+            /** Quality Range */
+            quality_range?: number[] | null;
+            /**
+             * Codec Profiles
+             * @default []
+             */
+            codec_profiles: string[];
+            /**
+             * Rate Controls
+             * @default []
+             */
+            rate_controls: string[];
+        };
+        /** EncoderProfile */
+        EncoderProfile: {
+            /** Token */
+            token: string;
+            /** Name */
+            name?: string | null;
+            /** Encoder Token */
+            encoder_token?: string | null;
+        };
+        /** EncoderReadIn */
+        EncoderReadIn: {
+            /** Host */
+            host: string;
+            /**
+             * Port
+             * @default 80
+             */
+            port: number;
+            /**
+             * Username
+             * @default
+             */
+            username: string;
+            /**
+             * Password
+             * @default
+             */
+            password: string;
+            /** Xaddr */
+            xaddr?: string | null;
+            /** Profile Token */
+            profile_token?: string | null;
+        };
+        /** EncoderResult */
+        EncoderResult: {
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "verified" | "mismatch" | "unknown";
+            before: components["schemas"]["EncoderState"];
+            after?: components["schemas"]["EncoderState"] | null;
+            /** Message */
+            message: string;
+            /**
+             * Recovery
+             * @default {}
+             */
+            recovery: {
+                [key: string]: unknown;
+            };
+        };
+        /** EncoderState */
+        EncoderState: {
+            /** Api */
+            api: string;
+            /** Profile Token */
+            profile_token: string | null;
+            /** Encoder Token */
+            encoder_token?: string | null;
+            /** Revision */
+            revision?: string | null;
+            current?: components["schemas"]["EncoderValues"] | null;
+            /**
+             * Options
+             * @default []
+             */
+            options: components["schemas"]["EncoderOption"][];
+            /**
+             * Profiles
+             * @default []
+             */
+            profiles: components["schemas"]["EncoderProfile"][];
+            /**
+             * Shared Profiles
+             * @default []
+             */
+            shared_profiles: string[];
+            /**
+             * Use Count
+             * @default 0
+             */
+            use_count: number;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
+        /** EncoderValues */
+        EncoderValues: {
+            /** Encoding */
+            encoding?: ("H264" | "H265") | null;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Fps */
+            fps?: number | null;
+            /** Bitrate Kbps */
+            bitrate_kbps?: number | null;
+            /** Gop */
+            gop?: number | null;
+            /** Quality */
+            quality?: number | null;
+            /** Rate Control */
+            rate_control?: ("CBR" | "VBR") | null;
+            /** Codec Profile */
+            codec_profile?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -420,6 +719,16 @@ export interface components {
             size_bytes: number;
             /** Codec */
             codec: string | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Audio Sample Rate */
+            audio_sample_rate?: number | null;
+            /** Audio Channels */
+            audio_channels?: number | null;
+            /** @default NVR */
+            origin: components["schemas"]["SegmentOrigin"];
+            /** Backfill Job Id */
+            backfill_job_id?: string | null;
             /** Part Count */
             part_count: number;
             /** Uploaded */
@@ -534,6 +843,39 @@ export interface components {
             profiles: components["schemas"]["ProfileOut"][];
             suggested: components["schemas"]["SuggestedOut"];
         };
+        /** ProfileGProbeOut */
+        ProfileGProbeOut: {
+            /** Supported */
+            supported: boolean;
+            /** Recording Service */
+            recording_service: boolean;
+            /** Search Service */
+            search_service: boolean;
+            /** Replay Service */
+            replay_service: boolean;
+            /** Earliest */
+            earliest?: string | null;
+            /** Latest */
+            latest?: string | null;
+            /** Recordings */
+            recordings: components["schemas"]["ProfileGRecordingOut"][];
+        };
+        /** ProfileGRecordingOut */
+        ProfileGRecordingOut: {
+            /** Token */
+            token: string;
+            /** Source Id */
+            source_id?: string | null;
+            /** Earliest */
+            earliest?: string | null;
+            /** Latest */
+            latest?: string | null;
+            /**
+             * Replay Available
+             * @default false
+             */
+            replay_available: boolean;
+        };
         /** ProfileOut */
         ProfileOut: {
             /** Token */
@@ -554,6 +896,18 @@ export interface components {
             bitrate_kbps: number | null;
             /** Has Audio */
             has_audio: boolean;
+            /** Audio Encoder Token */
+            audio_encoder_token?: string | null;
+            /** Audio Encoding */
+            audio_encoding?: string | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Audio Bitrate Kbps */
+            audio_bitrate_kbps?: number | null;
+            /** Audio Sample Rate */
+            audio_sample_rate?: number | null;
+            /** Audio Channels */
+            audio_channels?: number | null;
             /** Has Ptz */
             has_ptz: boolean;
             /** Rtsp */
@@ -561,11 +915,186 @@ export interface components {
             /** Snapshot */
             snapshot: string | null;
         };
+        /** PtzCapabilities */
+        PtzCapabilities: {
+            /**
+             * Pan Tilt
+             * @default false
+             */
+            pan_tilt: boolean;
+            /**
+             * Zoom
+             * @default false
+             */
+            zoom: boolean;
+            /**
+             * Presets
+             * @default false
+             */
+            presets: boolean;
+            /**
+             * Home
+             * @default false
+             */
+            home: boolean;
+            /**
+             * Home Set
+             * @default false
+             */
+            home_set: boolean;
+            /** Camera Timeout Seconds */
+            camera_timeout_seconds?: number | null;
+        };
+        /** PtzCommand */
+        PtzCommand: {
+            /** Session Id */
+            session_id: string;
+            /** Sequence */
+            sequence: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "move" | "stop" | "refresh" | "preset_save" | "preset_goto" | "preset_remove" | "home_goto" | "home_set";
+            /**
+             * Pan
+             * @default 0
+             */
+            pan: number;
+            /**
+             * Tilt
+             * @default 0
+             */
+            tilt: number;
+            /**
+             * Zoom
+             * @default 0
+             */
+            zoom: number;
+            /** Preset Token */
+            preset_token?: string | null;
+            /** Preset Name */
+            preset_name?: string | null;
+            /**
+             * Confirm
+             * @default false
+             */
+            confirm: boolean;
+        };
+        /** PtzCommandIn */
+        PtzCommandIn: {
+            /** Host */
+            host: string;
+            /**
+             * Port
+             * @default 80
+             */
+            port: number;
+            /**
+             * Username
+             * @default
+             */
+            username: string;
+            /**
+             * Password
+             * @default
+             */
+            password: string;
+            /** Xaddr */
+            xaddr?: string | null;
+            /** Profile Token */
+            profile_token: string;
+            command: components["schemas"]["PtzCommand"];
+        };
+        /** PtzOpenIn */
+        PtzOpenIn: {
+            /** Host */
+            host: string;
+            /**
+             * Port
+             * @default 80
+             */
+            port: number;
+            /**
+             * Username
+             * @default
+             */
+            username: string;
+            /**
+             * Password
+             * @default
+             */
+            password: string;
+            /** Xaddr */
+            xaddr?: string | null;
+            /** Profile Token */
+            profile_token: string;
+        };
+        /** PtzPreset */
+        PtzPreset: {
+            /** Token */
+            token: string;
+            /** Name */
+            name: string;
+        };
+        /** PtzResult */
+        PtzResult: {
+            /** Message */
+            message: string;
+            status?: components["schemas"]["PtzStatus"] | null;
+            /** Presets */
+            presets?: components["schemas"]["PtzPreset"][] | null;
+        };
+        /** PtzState */
+        PtzState: {
+            /** Session Id */
+            session_id: string;
+            /**
+             * Expires In Seconds
+             * @default 120
+             */
+            expires_in_seconds: number;
+            capabilities: components["schemas"]["PtzCapabilities"];
+            status: components["schemas"]["PtzStatus"];
+            /**
+             * Presets
+             * @default []
+             */
+            presets: components["schemas"]["PtzPreset"][];
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
+        /** PtzStatus */
+        PtzStatus: {
+            /** Pan */
+            pan?: number | null;
+            /** Tilt */
+            tilt?: number | null;
+            /** Zoom */
+            zoom?: number | null;
+            /** Pan Tilt State */
+            pan_tilt_state?: string | null;
+            /** Zoom State */
+            zoom_state?: string | null;
+            /**
+             * Position Valid
+             * @default false
+             */
+            position_valid: boolean;
+        };
         /** RebootOut */
         RebootOut: {
             /** Message */
             message: string;
         };
+        /**
+         * SegmentOrigin
+         * @enum {string}
+         */
+        SegmentOrigin: "NVR" | "CAMERA_SD";
         /** SnapshotIn */
         SnapshotIn: {
             /** Host */
@@ -805,6 +1334,40 @@ export interface operations {
             };
         };
     };
+    media_audio_api_v1_media__segment_id__audio_aac_get: {
+        parameters: {
+            query?: {
+                start_ms?: number;
+                duration_ms?: number | null;
+            };
+            header?: never;
+            path: {
+                segment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_local_segments_api_v1_segments_get: {
         parameters: {
             query?: {
@@ -890,6 +1453,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProbeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    profile_g_probe_api_v1_onvif_profile_g_probe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileGProbeOut"];
                 };
             };
             /** @description Validation Error */
@@ -1088,6 +1684,171 @@ export interface operations {
                 };
                 content: {
                     "image/jpeg": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    encoder_read_api_v1_onvif_encoder_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncoderReadIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncoderState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    encoder_check_api_v1_onvif_encoder_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncoderApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncoderState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    encoder_apply_api_v1_onvif_encoder_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncoderApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncoderResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_ptz_api_v1_onvif_ptz_open_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PtzOpenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PtzState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ptz_command_api_v1_onvif_ptz_command_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PtzCommandIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PtzResult"];
                 };
             };
             /** @description Validation Error */

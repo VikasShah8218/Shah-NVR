@@ -17,6 +17,8 @@ from app.nodes.schemas import (
     NodeRegisterIn,
     NodeRegisterOut,
     NodeUpdate,
+    OnvifServerOut,
+    OnvifServerUpdate,
     StreamAssignment,
     StreamStatusBatchIn,
     VolumeCreate,
@@ -75,10 +77,54 @@ async def update_node(node_id: int, body: NodeUpdate):
         quota = gb_to_bytes(data.pop("storage_quota_gb"))
         node.storage_quota_bytes = quota
         await StorageVolume.filter(node_id=node.id, is_default=True).update(quota_bytes=quota)
+    enabled = data.get("public_enabled", node.public_enabled)
+    public_api_url = data.get("public_api_url", node.public_api_url)
+    public_media_host = data.get("public_media_host", node.public_media_host)
+    if enabled and (not public_api_url or not public_media_host):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "Public Node API URL and public media host are required before public access can be enabled",
+        )
     if data:
         node.update_from_dict(data)
     await node.save()
     return await _node_out(node)
+
+
+def _onvif_server_out(node: MediaNode) -> OnvifServerOut:
+    runtime = (node.metrics or {}).get("onvif_server") or {}
+    return OnvifServerOut(
+        node_id=node.id,
+        enabled=node.onvif_server_enabled,
+        discovery_name=node.onvif_server_name,
+        location=node.onvif_server_location,
+        status=runtime.get("status", "disabled" if not node.onvif_server_enabled else "pending"),
+        credentials_configured=bool(runtime.get("credentials_configured", False)),
+        xaddr=runtime.get("xaddr"),
+        rtsp_address=runtime.get("rtsp_address"),
+        exposed_cameras=int(runtime.get("exposed_cameras") or 0),
+        exposed_profiles=int(runtime.get("exposed_profiles") or 0),
+        last_error=runtime.get("last_error"),
+    )
+
+
+@router.get("/{node_id}/onvif-server", response_model=OnvifServerOut)
+async def get_onvif_server(node_id: int):
+    return _onvif_server_out(await _get_node(node_id))
+
+
+@router.patch("/{node_id}/onvif-server", response_model=OnvifServerOut)
+async def update_onvif_server(node_id: int, body: OnvifServerUpdate):
+    node = await _get_node(node_id)
+    data = body.model_dump(exclude_unset=True)
+    if "enabled" in data:
+        node.onvif_server_enabled = data["enabled"]
+    if "discovery_name" in data:
+        node.onvif_server_name = data["discovery_name"].strip()
+    if "location" in data:
+        node.onvif_server_location = data["location"].strip() if data["location"] else None
+    await node.save()
+    return _onvif_server_out(node)
 
 
 @router.delete("/{node_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Remove a retired node")
@@ -250,6 +296,14 @@ async def heartbeat(node_id: int, body: HeartbeatIn):
         assignments=assigned,
         storage_quota_bytes=node.storage_quota_bytes,
         volumes=[vol.volume_config(v) for v in volumes],
+        onvif_server={
+            "enabled": node.onvif_server_enabled,
+            "discovery_name": node.onvif_server_name,
+            "location": node.onvif_server_location,
+        },
+        webrtc_additional_hosts=list(dict.fromkeys(
+            [node.media_host] + ([node.public_media_host] if node.public_enabled and node.public_media_host else [])
+        )),
     )
 
 
@@ -280,6 +334,7 @@ async def node_assignments(node_id: int):
                 ],
                 onvif_host=cam.onvif_host,
                 onvif_port=cam.onvif_port,
+                expose_via_onvif=cam.expose_via_onvif,
             )
         )
     return AssignmentsOut(node_id=node.id, state=node.state, cameras=cameras)
@@ -294,9 +349,23 @@ async def report_stream_status(node_id: int, body: StreamStatusBatchIn):
     for item in body.items:
         if item.camera_id not in owned:
             continue
-        await CameraStream.filter(camera_id=item.camera_id, profile=item.profile).update(
+        fields = dict(
             status=item.status,
             status_detail=item.detail,
             bytes_received=item.bytes_received,
             last_status_at=now,
         )
+        if item.audio is not None:
+            audio = item.audio.model_dump()
+            fields.update(
+                audio_observed=audio["observed"],
+                audio_last_observed_at=now,
+            )
+            if audio["observed"]:
+                fields.update(
+                    audio_codec=audio["codec"],
+                    audio_codec_raw=audio["codec_raw"],
+                    audio_sample_rate=audio["sample_rate"],
+                    audio_channels=audio["channels"],
+                )
+        await CameraStream.filter(camera_id=item.camera_id, profile=item.profile).update(**fields)

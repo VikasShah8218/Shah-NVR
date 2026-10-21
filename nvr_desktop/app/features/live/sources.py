@@ -10,8 +10,8 @@ EMPTY = {"source": "", "fallback": "", "protocol": "", "rtsp": "", "error": ""}
 
 
 def streams_by_profile(live: dict) -> dict[str, dict]:
-    """GET /cameras/{id}/live -> {profile: {"rtsp": url, "hls": url}}."""
-    return {s["profile"]: {"rtsp": s["rtsp"], "hls": s["hls"]} for s in live.get("streams", [])}
+    """Index live streams without dropping capability metadata (notably audio)."""
+    return {s["profile"]: dict(s) for s in live.get("streams", [])}
 
 
 def pick_sources(streams: dict[str, dict] | None, profile: str, protocol: str, error: str = "") -> dict:
@@ -20,6 +20,6 @@ def pick_sources(streams: dict[str, dict] | None, profile: str, protocol: str, e
         return {**EMPTY, "error": error}
     urls = streams.get(profile) or next(iter(streams.values()))
     if protocol == "hls":
-        return {"source": urls["hls"], "fallback": "", "protocol": "LL-HLS", "rtsp": urls["rtsp"], "error": ""}
+        return {**urls, "source": urls["hls"], "fallback": "", "protocol": "LL-HLS", "error": ""}
     fallback = urls["hls"] if protocol == "auto" else ""
-    return {"source": urls["rtsp"], "fallback": fallback, "protocol": "RTSP", "rtsp": urls["rtsp"], "error": ""}
+    return {**urls, "source": urls["rtsp"], "fallback": fallback, "protocol": "RTSP", "error": ""}

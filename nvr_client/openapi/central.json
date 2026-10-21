@@ -410,6 +410,20 @@
               ],
               "title": "Profile"
             }
+          },
+          {
+            "name": "access",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "lan",
+                "public"
+              ],
+              "type": "string",
+              "default": "lan",
+              "title": "Access"
+            }
           }
         ],
         "responses": {
@@ -632,6 +646,141 @@
               "title": "Minutes"
             },
             "description": "Shortcut: the last N minutes"
+          },
+          {
+            "name": "access",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "lan",
+                "public"
+              ],
+              "type": "string",
+              "description": "Node addresses embedded in the playlist",
+              "default": "lan",
+              "title": "Access"
+            },
+            "description": "Node addresses embedded in the playlist"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/playback/{camera_id}/audio.m3u8": {
+      "get": {
+        "tags": [
+          "Playback"
+        ],
+        "summary": "Browser-compatible AAC audio playlist for a recorded time range",
+        "operationId": "audio_playlist_api_v1_playback__camera_id__audio_m3u8_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "main",
+              "title": "Profile"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "minutes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Minutes"
+            }
+          },
+          {
+            "name": "access",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "lan",
+                "public"
+              ],
+              "type": "string",
+              "description": "Node addresses embedded in the playlist",
+              "default": "lan",
+              "title": "Access"
+            },
+            "description": "Node addresses embedded in the playlist"
           }
         ],
         "responses": {
@@ -805,6 +954,98 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/nodes/{node_id}/onvif-server": {
+      "get": {
+        "tags": [
+          "Media Nodes"
+        ],
+        "summary": "Get Onvif Server",
+        "operationId": "get_onvif_server_api_v1_nodes__node_id__onvif_server_get",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnvifServerOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Media Nodes"
+        ],
+        "summary": "Update Onvif Server",
+        "operationId": "update_onvif_server_api_v1_nodes__node_id__onvif_server_patch",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnvifServerUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnvifServerOut"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -1748,6 +1989,743 @@
         }
       }
     },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder": {
+      "get": {
+        "tags": [
+          "Encoder"
+        ],
+        "summary": "Get Encoder",
+        "operationId": "get_encoder_api_v1_cameras__camera_id__streams__profile__encoder_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncoderState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Encoder"
+        ],
+        "summary": "Put Encoder",
+        "operationId": "put_encoder_api_v1_cameras__camera_id__streams__profile__encoder_put",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncoderWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/mapping": {
+      "put": {
+        "tags": [
+          "Encoder"
+        ],
+        "summary": "Map Encoder",
+        "operationId": "map_encoder_api_v1_cameras__camera_id__streams__profile__encoder_mapping_put",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MappingIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncoderState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/check": {
+      "post": {
+        "tags": [
+          "Encoder"
+        ],
+        "summary": "Check Encoder",
+        "operationId": "check_encoder_api_v1_cameras__camera_id__streams__profile__encoder_check_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncoderWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncoderState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/history": {
+      "get": {
+        "tags": [
+          "Encoder"
+        ],
+        "summary": "Encoder History",
+        "operationId": "encoder_history_api_v1_cameras__camera_id__streams__profile__encoder_history_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/resolve": {
+      "post": {
+        "tags": [
+          "Encoder"
+        ],
+        "summary": "Resolve Encoder",
+        "operationId": "resolve_encoder_api_v1_cameras__camera_id__streams__profile__encoder_resolve_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/recovery": {
+      "get": {
+        "tags": [
+          "Encoder"
+        ],
+        "summary": "Encoder Recovery",
+        "operationId": "encoder_recovery_api_v1_cameras__camera_id__streams__profile__encoder_recovery_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/ptz": {
+      "post": {
+        "tags": [
+          "PTZ"
+        ],
+        "summary": "Open Ptz",
+        "operationId": "open_ptz_api_v1_cameras__camera_id__streams__profile__ptz_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PtzState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/ptz/command": {
+      "post": {
+        "tags": [
+          "PTZ"
+        ],
+        "summary": "Ptz Command",
+        "operationId": "ptz_command_api_v1_cameras__camera_id__streams__profile__ptz_command_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PtzCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PtzResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/backfill": {
+      "get": {
+        "tags": [
+          "L3 Backfill"
+        ],
+        "summary": "Get Backfill",
+        "operationId": "get_backfill_api_v1_cameras__camera_id__backfill_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackfillConfigOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "L3 Backfill"
+        ],
+        "summary": "Update Backfill",
+        "operationId": "update_backfill_api_v1_cameras__camera_id__backfill_patch",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackfillConfigUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackfillConfigOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/backfill/probe": {
+      "post": {
+        "tags": [
+          "L3 Backfill"
+        ],
+        "summary": "Probe Backfill",
+        "operationId": "probe_backfill_api_v1_cameras__camera_id__backfill_probe_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackfillProbeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/backfill/jobs": {
+      "post": {
+        "tags": [
+          "L3 Backfill"
+        ],
+        "summary": "Create Backfill Job",
+        "operationId": "create_backfill_job_api_v1_cameras__camera_id__backfill_jobs_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackfillJobCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackfillJobOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "L3 Backfill"
+        ],
+        "summary": "List Backfill Jobs",
+        "operationId": "list_backfill_jobs_api_v1_cameras__camera_id__backfill_jobs_get",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BackfillJobOut"
+                  },
+                  "title": "Response List Backfill Jobs Api V1 Cameras  Camera Id  Backfill Jobs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/v1/nodes/register": {
       "post": {
         "tags": [
@@ -2075,6 +3053,193 @@
         }
       }
     },
+    "/internal/v1/backfill/claim": {
+      "post": {
+        "tags": [
+          "Internal: L3 Backfill"
+        ],
+        "summary": "Claim Job",
+        "operationId": "claim_job_internal_v1_backfill_claim_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ClaimedJobOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Claim Job Internal V1 Backfill Claim Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/backfill/{job_id}/progress": {
+      "post": {
+        "tags": [
+          "Internal: L3 Backfill"
+        ],
+        "summary": "Job Progress",
+        "operationId": "job_progress_internal_v1_backfill__job_id__progress_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobProgressIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/backfill/{job_id}/complete": {
+      "post": {
+        "tags": [
+          "Internal: L3 Backfill"
+        ],
+        "summary": "Job Complete",
+        "operationId": "job_complete_internal_v1_backfill__job_id__complete_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobCompleteIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/backfill/{job_id}/fail": {
+      "post": {
+        "tags": [
+          "Internal: L3 Backfill"
+        ],
+        "summary": "Job Fail",
+        "operationId": "job_fail_internal_v1_backfill__job_id__fail_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobFailIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "tags": [
@@ -2304,6 +3469,517 @@
         ],
         "title": "AssignmentsOut"
       },
+      "AudioTrackIn": {
+        "properties": {
+          "observed": {
+            "type": "boolean",
+            "title": "Observed"
+          },
+          "codec": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codec"
+          },
+          "codec_raw": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codec Raw"
+          },
+          "sample_rate": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 384000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Rate"
+          },
+          "channels": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 32.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "observed"
+        ],
+        "title": "AudioTrackIn"
+      },
+      "BackfillConfigOut": {
+        "properties": {
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "manual",
+              "automatic"
+            ],
+            "title": "Mode"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "capability": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "supported",
+              "unsupported",
+              "degraded"
+            ],
+            "title": "Capability"
+          },
+          "recording_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Token"
+          },
+          "earliest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "mode",
+          "profile",
+          "capability",
+          "recording_token",
+          "earliest",
+          "latest",
+          "checked_at",
+          "error"
+        ],
+        "title": "BackfillConfigOut"
+      },
+      "BackfillConfigUpdate": {
+        "properties": {
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "manual",
+                  "automatic"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9_-]{1,32}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "recording_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Token"
+          }
+        },
+        "type": "object",
+        "title": "BackfillConfigUpdate"
+      },
+      "BackfillJobCreate": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9_-]{1,32}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time",
+          "end_time"
+        ],
+        "title": "BackfillJobCreate"
+      },
+      "BackfillJobOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "recording_token": {
+            "type": "string",
+            "title": "Recording Token"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time"
+          },
+          "state": {
+            "$ref": "#/components/schemas/BackfillState"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "title": "Attempt Count"
+          },
+          "progress_percent": {
+            "type": "number",
+            "title": "Progress Percent"
+          },
+          "imported_seconds": {
+            "type": "number",
+            "title": "Imported Seconds"
+          },
+          "imported_bytes": {
+            "type": "integer",
+            "title": "Imported Bytes"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "camera_id",
+          "node_id",
+          "profile",
+          "recording_token",
+          "start_time",
+          "end_time",
+          "state",
+          "requested_by",
+          "attempt_count",
+          "progress_percent",
+          "imported_seconds",
+          "imported_bytes",
+          "error_code",
+          "error_message",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "updated_at"
+        ],
+        "title": "BackfillJobOut"
+      },
+      "BackfillProbeOut": {
+        "properties": {
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "manual",
+              "automatic"
+            ],
+            "title": "Mode"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "capability": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "supported",
+              "unsupported",
+              "degraded"
+            ],
+            "title": "Capability"
+          },
+          "recording_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Token"
+          },
+          "earliest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "recordings": {
+            "items": {
+              "$ref": "#/components/schemas/EdgeRecordingOut"
+            },
+            "type": "array",
+            "title": "Recordings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "mode",
+          "profile",
+          "capability",
+          "recording_token",
+          "earliest",
+          "latest",
+          "checked_at",
+          "error",
+          "recordings"
+        ],
+        "title": "BackfillProbeOut"
+      },
+      "BackfillState": {
+        "type": "string",
+        "enum": [
+          "QUEUED",
+          "CLAIMED",
+          "DOWNLOADING",
+          "INDEXING",
+          "COMPLETED",
+          "PARTIAL",
+          "FAILED",
+          "CANCELLED"
+        ],
+        "title": "BackfillState"
+      },
       "CameraAssignmentOut": {
         "properties": {
           "camera_id": {
@@ -2346,6 +4022,11 @@
               }
             ],
             "title": "Onvif Port"
+          },
+          "expose_via_onvif": {
+            "type": "boolean",
+            "title": "Expose Via Onvif",
+            "default": true
           }
         },
         "type": "object",
@@ -2471,6 +4152,10 @@
           "enabled": {
             "type": "boolean",
             "title": "Enabled"
+          },
+          "expose_via_onvif": {
+            "type": "boolean",
+            "title": "Expose Via Onvif"
           },
           "retention_days": {
             "anyOf": [
@@ -2644,6 +4329,7 @@
           "username",
           "has_password",
           "enabled",
+          "expose_via_onvif",
           "retention_days",
           "created_at",
           "updated_at",
@@ -2711,6 +4397,17 @@
             ],
             "title": "Enabled"
           },
+          "expose_via_onvif": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expose Via Onvif"
+          },
           "retention_days": {
             "anyOf": [
               {
@@ -2727,6 +4424,160 @@
         },
         "type": "object",
         "title": "CameraUpdate"
+      },
+      "ChangeOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EncoderState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChangeResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "created_at"
+        ],
+        "title": "ChangeOut"
+      },
+      "ChangeResult": {
+        "properties": {
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EncoderState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "recovery": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Recovery",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChangeResult"
+      },
+      "ClaimIn": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id"
+        ],
+        "title": "ClaimIn"
+      },
+      "ClaimedJobOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "recording_token": {
+            "type": "string",
+            "title": "Recording Token"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time"
+          },
+          "assignment_generation": {
+            "type": "integer",
+            "title": "Assignment Generation"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "title": "Port"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "camera_id",
+          "profile",
+          "recording_token",
+          "start_time",
+          "end_time",
+          "assignment_generation",
+          "host",
+          "port",
+          "username",
+          "password"
+        ],
+        "title": "ClaimedJobOut"
       },
       "ClockOut": {
         "properties": {
@@ -3290,6 +5141,457 @@
         "title": "DriveInfo",
         "description": "A local fixed drive of the node (offered in \"Add storage\")."
       },
+      "EdgeRecordingOut": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "earliest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "replay_available": {
+            "type": "boolean",
+            "title": "Replay Available",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "EdgeRecordingOut"
+      },
+      "EncoderOption": {
+        "properties": {
+          "encoding": {
+            "type": "string",
+            "title": "Encoding"
+          },
+          "resolutions": {
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Resolutions",
+            "default": []
+          },
+          "fps_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps Range"
+          },
+          "frame_rates": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Frame Rates",
+            "default": []
+          },
+          "bitrate_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bitrate Range"
+          },
+          "gop_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gop Range"
+          },
+          "quality_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Range"
+          },
+          "codec_profiles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Codec Profiles",
+            "default": []
+          },
+          "rate_controls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rate Controls",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "encoding"
+        ],
+        "title": "EncoderOption"
+      },
+      "EncoderProfile": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "encoder_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoder Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "EncoderProfile"
+      },
+      "EncoderState": {
+        "properties": {
+          "api": {
+            "type": "string",
+            "title": "Api"
+          },
+          "profile_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Token"
+          },
+          "encoder_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoder Token"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EncoderValues"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/EncoderOption"
+            },
+            "type": "array",
+            "title": "Options",
+            "default": []
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/EncoderProfile"
+            },
+            "type": "array",
+            "title": "Profiles",
+            "default": []
+          },
+          "shared_profiles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Shared Profiles",
+            "default": []
+          },
+          "use_count": {
+            "type": "integer",
+            "title": "Use Count",
+            "default": 0
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "api",
+          "profile_token"
+        ],
+        "title": "EncoderState"
+      },
+      "EncoderValues": {
+        "properties": {
+          "encoding": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "H264",
+                  "H265"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoding"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "fps": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps"
+          },
+          "bitrate_kbps": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bitrate Kbps"
+          },
+          "gop": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gop"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality"
+          },
+          "rate_control": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "CBR",
+                  "VBR"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Control"
+          },
+          "codec_profile": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codec Profile"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EncoderValues"
+      },
+      "EncoderWrite": {
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 16,
+            "pattern": "^[a-zA-Z0-9-]+$",
+            "title": "Operation Id"
+          },
+          "revision": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Revision"
+          },
+          "values": {
+            "$ref": "#/components/schemas/EncoderValues"
+          },
+          "acknowledge_shared": {
+            "type": "boolean",
+            "title": "Acknowledge Shared",
+            "default": false
+          },
+          "restore_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restore From"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operation_id",
+          "revision",
+          "values"
+        ],
+        "title": "EncoderWrite"
+      },
       "GapOut": {
         "properties": {
           "start_time": {
@@ -3546,6 +5848,18 @@
             "title": "Onvif",
             "default": []
           },
+          "onvif_server": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Server"
+          },
           "extra": {
             "anyOf": [
               {
@@ -3598,6 +5912,20 @@
             "type": "array",
             "title": "Volumes",
             "default": []
+          },
+          "onvif_server": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Onvif Server",
+            "default": {}
+          },
+          "webrtc_additional_hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Webrtc Additional Hosts",
+            "default": []
           }
         },
         "type": "object",
@@ -3608,6 +5936,117 @@
           "assignments"
         ],
         "title": "HeartbeatOut"
+      },
+      "HistoryOut": {
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeOut"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "pending": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChangeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "changes",
+          "pending"
+        ],
+        "title": "HistoryOut"
+      },
+      "JobCompleteIn": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "imported_seconds": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Imported Seconds"
+          },
+          "imported_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Imported Bytes"
+          },
+          "partial": {
+            "type": "boolean",
+            "title": "Partial",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "imported_seconds",
+          "imported_bytes"
+        ],
+        "title": "JobCompleteIn"
+      },
+      "JobFailIn": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 512,
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "code",
+          "message"
+        ],
+        "title": "JobFailIn"
+      },
+      "JobProgressIn": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "DOWNLOADING",
+              "INDEXING"
+            ],
+            "title": "State"
+          },
+          "progress_percent": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Progress Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "state",
+          "progress_percent"
+        ],
+        "title": "JobProgressIn"
       },
       "LiveOut": {
         "properties": {
@@ -3667,6 +6106,44 @@
           "webrtc": {
             "type": "string",
             "title": "Webrtc"
+          },
+          "audio_state": {
+            "type": "string",
+            "title": "Audio State",
+            "default": "unknown"
+          },
+          "audio_codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Codec"
+          },
+          "audio_sample_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Sample Rate"
+          },
+          "audio_channels": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Channels"
           }
         },
         "type": "object",
@@ -3690,6 +6167,21 @@
           "node_id"
         ],
         "title": "ManualAssignIn"
+      },
+      "MappingIn": {
+        "properties": {
+          "profile_token": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Profile Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_token"
+        ],
+        "title": "MappingIn"
       },
       "MessageOut": {
         "properties": {
@@ -3783,6 +6275,69 @@
             "type": "integer",
             "title": "Webrtc Port"
           },
+          "public_enabled": {
+            "type": "boolean",
+            "title": "Public Enabled"
+          },
+          "public_api_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Api Url"
+          },
+          "public_media_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Media Host"
+          },
+          "public_rtsp_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Rtsp Port"
+          },
+          "public_hls_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Hls Port"
+          },
+          "public_webrtc_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Webrtc Port"
+          },
+          "public_media_tls": {
+            "type": "boolean",
+            "title": "Public Media Tls"
+          },
           "capacity_cameras": {
             "type": "integer",
             "title": "Capacity Cameras"
@@ -3870,6 +6425,13 @@
           "rtsp_port",
           "hls_port",
           "webrtc_port",
+          "public_enabled",
+          "public_api_url",
+          "public_media_host",
+          "public_rtsp_port",
+          "public_hls_port",
+          "public_webrtc_port",
+          "public_media_tls",
           "capacity_cameras",
           "storage_quota_bytes",
           "version",
@@ -4008,6 +6570,91 @@
               }
             ],
             "title": "Storage Quota Gb"
+          },
+          "public_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Enabled"
+          },
+          "public_api_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Api Url"
+          },
+          "public_media_host": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Media Host"
+          },
+          "public_rtsp_port": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 65535.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Rtsp Port"
+          },
+          "public_hls_port": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 65535.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Hls Port"
+          },
+          "public_webrtc_port": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 65535.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Webrtc Port"
+          },
+          "public_media_tls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Media Tls"
           }
         },
         "type": "object",
@@ -4202,6 +6849,136 @@
         ],
         "title": "OnvifHealthIn"
       },
+      "OnvifServerOut": {
+        "properties": {
+          "node_id": {
+            "type": "integer",
+            "title": "Node Id"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "discovery_name": {
+            "type": "string",
+            "title": "Discovery Name"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "credentials_configured": {
+            "type": "boolean",
+            "title": "Credentials Configured"
+          },
+          "xaddr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xaddr"
+          },
+          "rtsp_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rtsp Address"
+          },
+          "exposed_cameras": {
+            "type": "integer",
+            "title": "Exposed Cameras",
+            "default": 0
+          },
+          "exposed_profiles": {
+            "type": "integer",
+            "title": "Exposed Profiles",
+            "default": 0
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "enabled",
+          "discovery_name",
+          "location",
+          "status",
+          "credentials_configured"
+        ],
+        "title": "OnvifServerOut"
+      },
+      "OnvifServerUpdate": {
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "discovery_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discovery Name"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          }
+        },
+        "type": "object",
+        "title": "OnvifServerUpdate"
+      },
       "ProbeOut": {
         "properties": {
           "node_id": {
@@ -4350,6 +7127,72 @@
             "type": "boolean",
             "title": "Has Audio"
           },
+          "audio_encoder_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Encoder Token"
+          },
+          "audio_encoding": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Encoding"
+          },
+          "audio_codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Codec"
+          },
+          "audio_bitrate_kbps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Bitrate Kbps"
+          },
+          "audio_sample_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Sample Rate"
+          },
+          "audio_channels": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Channels"
+          },
           "has_ptz": {
             "type": "boolean",
             "title": "Has Ptz"
@@ -4393,6 +7236,367 @@
           "snapshot"
         ],
         "title": "ProfileOut"
+      },
+      "PtzCapabilities": {
+        "properties": {
+          "pan_tilt": {
+            "type": "boolean",
+            "title": "Pan Tilt",
+            "default": false
+          },
+          "zoom": {
+            "type": "boolean",
+            "title": "Zoom",
+            "default": false
+          },
+          "presets": {
+            "type": "boolean",
+            "title": "Presets",
+            "default": false
+          },
+          "home": {
+            "type": "boolean",
+            "title": "Home",
+            "default": false
+          },
+          "home_set": {
+            "type": "boolean",
+            "title": "Home Set",
+            "default": false
+          },
+          "camera_timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera Timeout Seconds"
+          }
+        },
+        "type": "object",
+        "title": "PtzCapabilities"
+      },
+      "PtzCommand": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 16,
+            "title": "Session Id"
+          },
+          "sequence": {
+            "type": "integer",
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Sequence"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "move",
+              "stop",
+              "refresh",
+              "preset_save",
+              "preset_goto",
+              "preset_remove",
+              "home_goto",
+              "home_set"
+            ],
+            "title": "Action"
+          },
+          "pan": {
+            "type": "number",
+            "maximum": 0.5,
+            "minimum": -0.5,
+            "title": "Pan",
+            "default": 0
+          },
+          "tilt": {
+            "type": "number",
+            "maximum": 0.5,
+            "minimum": -0.5,
+            "title": "Tilt",
+            "default": 0
+          },
+          "zoom": {
+            "type": "number",
+            "maximum": 0.5,
+            "minimum": -0.5,
+            "title": "Zoom",
+            "default": 0
+          },
+          "preset_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset Token"
+          },
+          "preset_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset Name"
+          },
+          "confirm": {
+            "type": "boolean",
+            "title": "Confirm",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session_id",
+          "sequence",
+          "action"
+        ],
+        "title": "PtzCommand"
+      },
+      "PtzPreset": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "name"
+        ],
+        "title": "PtzPreset"
+      },
+      "PtzResult": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PtzStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "presets": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PtzPreset"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "PtzResult"
+      },
+      "PtzState": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "title": "Expires In Seconds",
+            "default": 120
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/PtzCapabilities"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PtzStatus"
+          },
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/PtzPreset"
+            },
+            "type": "array",
+            "title": "Presets",
+            "default": []
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "capabilities",
+          "status"
+        ],
+        "title": "PtzState"
+      },
+      "PtzStatus": {
+        "properties": {
+          "pan": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pan"
+          },
+          "tilt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tilt"
+          },
+          "zoom": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zoom"
+          },
+          "pan_tilt_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pan Tilt State"
+          },
+          "zoom_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zoom State"
+          },
+          "position_valid": {
+            "type": "boolean",
+            "title": "Position Valid",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PtzStatus"
+      },
+      "RecoveryOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "fresh_status": {
+            "type": "boolean",
+            "title": "Fresh Status"
+          },
+          "new_recording": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Recording"
+          },
+          "recording_expected": {
+            "type": "boolean",
+            "title": "Recording Expected"
+          },
+          "last_status_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status At"
+          },
+          "last_segment_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Segment At"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "fresh_status",
+          "new_recording",
+          "recording_expected",
+          "last_status_at",
+          "last_segment_at",
+          "message"
+        ],
+        "title": "RecoveryOut"
       },
       "SegmentBatchIn": {
         "properties": {
@@ -4490,6 +7694,67 @@
             ],
             "title": "Codec"
           },
+          "audio_codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Codec"
+          },
+          "audio_sample_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Sample Rate"
+          },
+          "audio_channels": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Channels"
+          },
+          "config_signature": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Signature"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/SegmentOrigin",
+            "default": "NVR"
+          },
+          "backfill_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backfill Job Id"
+          },
           "file_path": {
             "type": "string",
             "title": "File Path"
@@ -4527,6 +7792,14 @@
           "parts"
         ],
         "title": "SegmentIn"
+      },
+      "SegmentOrigin": {
+        "type": "string",
+        "enum": [
+          "NVR",
+          "CAMERA_SD"
+        ],
+        "title": "SegmentOrigin"
       },
       "SegmentOut": {
         "properties": {
@@ -4575,6 +7848,55 @@
               }
             ],
             "title": "Codec"
+          },
+          "audio_codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Codec"
+          },
+          "audio_sample_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Sample Rate"
+          },
+          "audio_channels": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Channels"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/SegmentOrigin",
+            "default": "NVR"
+          },
+          "backfill_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backfill Job Id"
           },
           "status": {
             "$ref": "#/components/schemas/SegmentStatus"
@@ -4805,6 +8127,100 @@
               }
             ],
             "title": "Onvif Profile Token"
+          },
+          "audio_state": {
+            "type": "string",
+            "title": "Audio State",
+            "default": "unknown"
+          },
+          "audio_advertised": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Advertised"
+          },
+          "audio_observed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Observed"
+          },
+          "audio_codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Codec"
+          },
+          "audio_codec_raw": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Codec Raw"
+          },
+          "audio_sample_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Sample Rate"
+          },
+          "audio_channels": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Channels"
+          },
+          "audio_bitrate_kbps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Bitrate Kbps"
+          },
+          "audio_last_observed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Last Observed At"
           }
         },
         "type": "object",
@@ -4908,6 +8324,16 @@
             "type": "integer",
             "title": "Bytes Received",
             "default": 0
+          },
+          "audio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AudioTrackIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

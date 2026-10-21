@@ -1,11 +1,17 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { onvifErrorText } from "@/lib/onvif"
+import { selectedNodeAccess, useNodeAccessMap } from "@/lib/nodeAccess"
 import { useSettings } from "@/lib/settings"
 import { ApiError, centralClient, nodeClient, nodeGet, unwrap } from "./client"
 import type {
   Assignment,
   AssignmentHistory,
+  BackfillConfig,
+  BackfillConfigUpdate,
+  BackfillJob,
+  BackfillJobCreate,
+  BackfillProbe,
   Camera,
   CameraCreate,
   CameraUpdate,
@@ -25,6 +31,8 @@ import type {
   OnvifDiscovered,
   OnvifNtpIn,
   OnvifProbe,
+  OnvifServer,
+  OnvifServerUpdate,
   StreamIn,
   StorageVolume,
   StreamUpdate,
@@ -69,6 +77,15 @@ export function useNode(nodeId: number, refetchMs?: number) {
   })
 }
 
+export function useOnvifServer(nodeId: number, refetchMs = 5000) {
+  const { url, api } = useCentral()
+  return useQuery({
+    queryKey: [url, "onvif-server", nodeId],
+    queryFn: () => unwrap<OnvifServer>(api.GET("/api/v1/nodes/{node_id}/onvif-server", { params: { path: { node_id: nodeId } } })),
+    refetchInterval: refetchMs,
+  })
+}
+
 export function useCameras() {
   const { url, api, poll } = useCentral()
   return useQuery({
@@ -90,14 +107,33 @@ export function useCamera(cameraId: number) {
 
 export function useLive(cameraId: number | null) {
   const { url, api } = useCentral()
-  return useQuery({
-    queryKey: [url, "live", cameraId],
+  const { settings } = useSettings()
+  const nodes = useNodes(30_000)
+  const detected = useNodeAccessMap(nodes.data ?? [])
+  const primaryAccess = settings.nodeAccess === "lan" ? "lan" : "public"
+  const primary = useQuery({
+    queryKey: [url, "live", cameraId, primaryAccess],
     enabled: cameraId != null,
     queryFn: () =>
-      unwrap<LiveInfo>(api.GET("/api/v1/cameras/{camera_id}/live", { params: { path: { camera_id: cameraId! } } })),
+      unwrap<LiveInfo>(api.GET("/api/v1/cameras/{camera_id}/live", {
+        params: { path: { camera_id: cameraId! }, query: { access: primaryAccess } },
+      })),
     refetchInterval: 15_000, // picks up a new owner after failover
     retry: false,
   })
+  const node = nodes.data?.find((candidate) => candidate.id === primary.data?.node_id)
+  const resolvedAccess = node ? selectedNodeAccess(node, settings.nodeAccess, detected.data) : primaryAccess
+  const alternate = useQuery({
+    queryKey: [url, "live", cameraId, resolvedAccess],
+    enabled: cameraId != null && !!primary.data && resolvedAccess !== primaryAccess,
+    queryFn: () =>
+      unwrap<LiveInfo>(api.GET("/api/v1/cameras/{camera_id}/live", {
+        params: { path: { camera_id: cameraId! }, query: { access: resolvedAccess } },
+      })),
+    refetchInterval: 15_000,
+    retry: false,
+  })
+  return resolvedAccess !== primaryAccess && (alternate.data || alternate.error) ? alternate : primary
 }
 
 export function useTimeline(cameraId: number | null, profile: string, start: Date, end: Date, refetchMs = 30_000) {
@@ -116,6 +152,29 @@ export function useTimeline(cameraId: number | null, profile: string, start: Dat
         }),
       ),
     refetchInterval: refetchMs,
+  })
+}
+
+export function useBackfill(cameraId: number, enabled = true) {
+  const { url, api } = useCentral()
+  return useQuery({
+    queryKey: [url, "backfill", cameraId],
+    enabled,
+    queryFn: () => unwrap<BackfillConfig>(api.GET("/api/v1/cameras/{camera_id}/backfill", {
+      params: { path: { camera_id: cameraId } },
+    })),
+  })
+}
+
+export function useBackfillJobs(cameraId: number, enabled = true) {
+  const { url, api } = useCentral()
+  return useQuery({
+    queryKey: [url, "backfill-jobs", cameraId],
+    enabled,
+    queryFn: () => unwrap<BackfillJob[]>(api.GET("/api/v1/cameras/{camera_id}/backfill/jobs", {
+      params: { path: { camera_id: cameraId }, query: { limit: 50 } },
+    })),
+    refetchInterval: 3000,
   })
 }
 
@@ -229,6 +288,34 @@ export const useDeleteCamera = () =>
     { success: "Camera deleted" },
   )
 
+const BACKFILL_KEYS = ["backfill", "backfill-jobs", "timeline"]
+
+export const useProbeBackfill = () =>
+  useCentralMutation(
+    (api, cameraId: number) => unwrap<BackfillProbe>(api.POST("/api/v1/cameras/{camera_id}/backfill/probe", {
+      params: { path: { camera_id: cameraId } },
+    })),
+    { success: "Camera edge storage tested", invalidate: BACKFILL_KEYS, errorText: onvifErrorText },
+  )
+
+export const useUpdateBackfill = () =>
+  useCentralMutation(
+    (api, { cameraId, body }: { cameraId: number; body: BackfillConfigUpdate }) =>
+      unwrap<BackfillConfig>(api.PATCH("/api/v1/cameras/{camera_id}/backfill", {
+        params: { path: { camera_id: cameraId } }, body,
+      })),
+    { success: "Edge-storage settings saved", invalidate: BACKFILL_KEYS },
+  )
+
+export const useCreateBackfillJob = () =>
+  useCentralMutation(
+    (api, { cameraId, body }: { cameraId: number; body: BackfillJobCreate }) =>
+      unwrap<BackfillJob>(api.POST("/api/v1/cameras/{camera_id}/backfill/jobs", {
+        params: { path: { camera_id: cameraId } }, body,
+      })),
+    { success: "Backfill job queued", invalidate: BACKFILL_KEYS },
+  )
+
 /** Apply stream changes for an existing camera (add / update / remove profiles). */
 export const useSyncStreams = () =>
   useCentralMutation(
@@ -256,7 +343,14 @@ export const useUpdateNode = () =>
   useCentralMutation(
     (api, { id, body }: { id: number; body: NodeUpdate }) =>
       unwrap<MediaNode>(api.PATCH("/api/v1/nodes/{node_id}", { params: { path: { node_id: id } }, body })),
-    { success: (n) => `Limits saved for ${n.name}` },
+    { success: (n) => `Node settings saved for ${n.name}` },
+  )
+
+export const useUpdateOnvifServer = () =>
+  useCentralMutation(
+    (api, { id, body }: { id: number; body: OnvifServerUpdate }) =>
+      unwrap<OnvifServer>(api.PATCH("/api/v1/nodes/{node_id}/onvif-server", { params: { path: { node_id: id } }, body })),
+    { success: "ONVIF server configuration saved", invalidate: ["nodes", "onvif-server"] },
   )
 
 export type NodeAction = "drain" | "cordon" | "activate"

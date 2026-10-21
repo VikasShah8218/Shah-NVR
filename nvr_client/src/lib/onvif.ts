@@ -30,7 +30,9 @@ export const profileLabels = (profiles: string[]) =>
 
 export const profileSummary = (p: OnvifProfile) =>
   [p.encoding, p.width && p.height ? `${p.width}×${p.height}` : null, p.fps ? `${p.fps} fps` : null,
-    p.bitrate_kbps ? `${p.bitrate_kbps} kbps` : null].filter(Boolean).join(" · ")
+    p.bitrate_kbps ? `${p.bitrate_kbps} kbps` : null,
+    p.has_audio ? `Audio ${p.audio_codec?.toUpperCase() ?? p.audio_encoding ?? "detected"}` : "No audio"]
+    .filter(Boolean).join(" · ")
 
 export const isVideoProfile = (p: OnvifProfile) => (p.encoding === "H264" || p.encoding === "H265") && !!p.rtsp
 

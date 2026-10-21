@@ -27,12 +27,25 @@ class MediaNode(Model):
     rtsp_port = fields.IntField(default=8554)
     hls_port = fields.IntField(default=8888)
     webrtc_port = fields.IntField(default=8889)
+    # Optional browser-facing endpoints.  The node continues to use api_url/media_host for
+    # central-to-node traffic; these are only used in URLs returned to remote clients.
+    public_enabled = fields.BooleanField(default=False)
+    public_api_url = fields.CharField(max_length=256, null=True)
+    public_media_host = fields.CharField(max_length=256, null=True)
+    public_rtsp_port = fields.IntField(null=True)
+    public_hls_port = fields.IntField(null=True)
+    public_webrtc_port = fields.IntField(null=True)
+    public_media_tls = fields.BooleanField(default=False)
     capacity_cameras = fields.IntField(default=100)
     # Deprecated: the cap now lives on each StorageVolume. Kept only to seed the node's default volume
     # (first heartbeat after the upgrade) and for old clients; drop in a later migration.
     storage_quota_bytes = fields.BigIntField(null=True)
     version = fields.CharField(max_length=64, null=True)
     mediamtx_version = fields.CharField(max_length=64, null=True)
+    # H5 desired state. Credentials remain node-local and are never stored in central.
+    onvif_server_enabled = fields.BooleanField(default=False)
+    onvif_server_name = fields.CharField(max_length=128, default="Shah-NVR")
+    onvif_server_location = fields.CharField(max_length=256, null=True)
     state = fields.CharEnumField(NodeState, max_length=16, default=NodeState.READY)
     last_heartbeat_at = fields.DatetimeField(null=True)
     metrics = fields.JSONField(null=True)
@@ -42,6 +55,27 @@ class MediaNode(Model):
     class Meta:
         table = "media_nodes"
         ordering = ["id"]
+
+    def use_public(self, access: str) -> bool:
+        return access == "public" and self.public_enabled and bool(self.public_api_url and self.public_media_host)
+
+    def api_url_for(self, access: str) -> str:
+        return self.public_api_url if self.use_public(access) else self.api_url  # type: ignore[return-value]
+
+    def media_host_for(self, access: str) -> str:
+        return self.public_media_host if self.use_public(access) else self.media_host  # type: ignore[return-value]
+
+    def rtsp_port_for(self, access: str) -> int:
+        return (self.public_rtsp_port or self.rtsp_port) if self.use_public(access) else self.rtsp_port
+
+    def hls_port_for(self, access: str) -> int:
+        return (self.public_hls_port or self.hls_port) if self.use_public(access) else self.hls_port
+
+    def webrtc_port_for(self, access: str) -> int:
+        return (self.public_webrtc_port or self.webrtc_port) if self.use_public(access) else self.webrtc_port
+
+    def media_scheme_for(self, access: str) -> str:
+        return "https" if self.use_public(access) and self.public_media_tls else "http"
 
 
 class VolumeState(str, Enum):

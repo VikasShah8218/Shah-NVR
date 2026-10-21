@@ -93,6 +93,7 @@ class HeartbeatIn(BaseModel):
     drives: list[DriveInfo] = []
     volumes: list[VolumeReport] = []
     onvif: list[OnvifHealthIn] = []  # fresh ONVIF checks of this node's cameras
+    onvif_server: dict[str, Any] | None = None
     extra: dict[str, Any] | None = None
 
 
@@ -114,6 +115,8 @@ class HeartbeatOut(BaseModel):
     assignments: int
     storage_quota_bytes: int | None = None  # deprecated: for nodes older than storage volumes
     volumes: list[VolumeConfig] = []
+    onvif_server: dict[str, Any] = {}
+    webrtc_additional_hosts: list[str] = []
 
 
 class StreamAssignment(BaseModel):
@@ -131,6 +134,7 @@ class CameraAssignmentOut(BaseModel):
     streams: list[StreamAssignment]
     onvif_host: str | None = None  # the node checks reachability + clock (no login) when set
     onvif_port: int | None = None
+    expose_via_onvif: bool = True
 
 
 class AssignmentsOut(BaseModel):
@@ -139,12 +143,21 @@ class AssignmentsOut(BaseModel):
     cameras: list[CameraAssignmentOut]
 
 
+class AudioTrackIn(BaseModel):
+    observed: bool
+    codec: str | None = Field(default=None, max_length=32)
+    codec_raw: str | None = Field(default=None, max_length=64)
+    sample_rate: int | None = Field(default=None, gt=0, le=384000)
+    channels: int | None = Field(default=None, gt=0, le=32)
+
+
 class StreamStatusIn(BaseModel):
     camera_id: int
     profile: str
     status: StreamStatus
     detail: str | None = None
     bytes_received: int = 0
+    audio: AudioTrackIn | None = None
 
 
 class StreamStatusBatchIn(BaseModel):
@@ -203,6 +216,13 @@ class NodeOut(BaseModel):
     rtsp_port: int
     hls_port: int
     webrtc_port: int
+    public_enabled: bool
+    public_api_url: str | None
+    public_media_host: str | None
+    public_rtsp_port: int | None
+    public_hls_port: int | None
+    public_webrtc_port: int | None
+    public_media_tls: bool
     capacity_cameras: int
     storage_quota_bytes: int | None  # total cap of all volumes (None if any volume is uncapped)
     volumes: list[VolumeOut] = []
@@ -218,3 +238,46 @@ class NodeUpdate(BaseModel):
     capacity_cameras: int | None = Field(default=None, ge=1)
     # Deprecated (use the volumes API): sets the cap of the node's default volume. null = whole disk.
     storage_quota_gb: float | None = Field(default=None, gt=0)
+    public_enabled: bool | None = None
+    public_api_url: str | None = Field(default=None, max_length=256)
+    public_media_host: str | None = Field(default=None, max_length=256)
+    public_rtsp_port: int | None = Field(default=None, ge=1, le=65535)
+    public_hls_port: int | None = Field(default=None, ge=1, le=65535)
+    public_webrtc_port: int | None = Field(default=None, ge=1, le=65535)
+    public_media_tls: bool | None = None
+
+    @field_validator("public_api_url")
+    @classmethod
+    def _public_api_url(cls, value: str | None) -> str | None:
+        value = value.strip().rstrip("/") if value else None
+        if value and not (value.startswith("http://") or value.startswith("https://")):
+            raise ValueError("Public Node API URL must start with http:// or https://")
+        return value
+
+    @field_validator("public_media_host")
+    @classmethod
+    def _public_media_host(cls, value: str | None) -> str | None:
+        value = value.strip() if value else None
+        if value and ("://" in value or "/" in value):
+            raise ValueError("Public media host must be a hostname or IP address without a scheme or path")
+        return value
+
+
+class OnvifServerUpdate(BaseModel):
+    enabled: bool | None = None
+    discovery_name: str | None = Field(default=None, min_length=1, max_length=128)
+    location: str | None = Field(default=None, max_length=256)
+
+
+class OnvifServerOut(BaseModel):
+    node_id: int
+    enabled: bool
+    discovery_name: str
+    location: str | None
+    status: str
+    credentials_configured: bool
+    xaddr: str | None = None
+    rtsp_address: str | None = None
+    exposed_cameras: int = 0
+    exposed_profiles: int = 0
+    last_error: str | None = None

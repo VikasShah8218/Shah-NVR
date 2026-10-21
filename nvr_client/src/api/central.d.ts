@@ -130,6 +130,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/playback/{camera_id}/audio.m3u8": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Browser-compatible AAC audio playlist for a recorded time range */
+        get: operations["audio_playlist_api_v1_playback__camera_id__audio_m3u8_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nodes": {
         parameters: {
             query?: never;
@@ -169,6 +186,24 @@ export interface paths {
         head?: never;
         /** Update Node */
         patch: operations["update_node_api_v1_nodes__node_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/nodes/{node_id}/onvif-server": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Onvif Server */
+        get: operations["get_onvif_server_api_v1_nodes__node_id__onvif_server_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Onvif Server */
+        patch: operations["update_onvif_server_api_v1_nodes__node_id__onvif_server_patch"];
         trace?: never;
     };
     "/api/v1/nodes/{node_id}/volumes": {
@@ -505,6 +540,196 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Encoder */
+        get: operations["get_encoder_api_v1_cameras__camera_id__streams__profile__encoder_get"];
+        /** Put Encoder */
+        put: operations["put_encoder_api_v1_cameras__camera_id__streams__profile__encoder_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/mapping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Map Encoder */
+        put: operations["map_encoder_api_v1_cameras__camera_id__streams__profile__encoder_mapping_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Encoder */
+        post: operations["check_encoder_api_v1_cameras__camera_id__streams__profile__encoder_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Encoder History */
+        get: operations["encoder_history_api_v1_cameras__camera_id__streams__profile__encoder_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Encoder */
+        post: operations["resolve_encoder_api_v1_cameras__camera_id__streams__profile__encoder_resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Encoder Recovery */
+        get: operations["encoder_recovery_api_v1_cameras__camera_id__streams__profile__encoder_recovery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/ptz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open Ptz */
+        post: operations["open_ptz_api_v1_cameras__camera_id__streams__profile__ptz_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/ptz/command": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ptz Command */
+        post: operations["ptz_command_api_v1_cameras__camera_id__streams__profile__ptz_command_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Backfill */
+        get: operations["get_backfill_api_v1_cameras__camera_id__backfill_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Backfill */
+        patch: operations["update_backfill_api_v1_cameras__camera_id__backfill_patch"];
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/backfill/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Probe Backfill */
+        post: operations["probe_backfill_api_v1_cameras__camera_id__backfill_probe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/{camera_id}/backfill/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Backfill Jobs */
+        get: operations["list_backfill_jobs_api_v1_cameras__camera_id__backfill_jobs_get"];
+        put?: never;
+        /** Create Backfill Job */
+        post: operations["create_backfill_job_api_v1_cameras__camera_id__backfill_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/nodes/register": {
         parameters: {
             query?: never;
@@ -636,6 +861,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/backfill/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Claim Job */
+        post: operations["claim_job_internal_v1_backfill_claim_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/backfill/{job_id}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Job Progress */
+        post: operations["job_progress_internal_v1_backfill__job_id__progress_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/backfill/{job_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Job Complete */
+        post: operations["job_complete_internal_v1_backfill__job_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/backfill/{job_id}/fail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Job Fail */
+        post: operations["job_fail_internal_v1_backfill__job_id__fail_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -716,6 +1009,159 @@ export interface components {
             /** Cameras */
             cameras: components["schemas"]["CameraAssignmentOut"][];
         };
+        /** AudioTrackIn */
+        AudioTrackIn: {
+            /** Observed */
+            observed: boolean;
+            /** Codec */
+            codec?: string | null;
+            /** Codec Raw */
+            codec_raw?: string | null;
+            /** Sample Rate */
+            sample_rate?: number | null;
+            /** Channels */
+            channels?: number | null;
+        };
+        /** BackfillConfigOut */
+        BackfillConfigOut: {
+            /** Camera Id */
+            camera_id: number;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "off" | "manual" | "automatic";
+            /** Profile */
+            profile: string;
+            /**
+             * Capability
+             * @enum {string}
+             */
+            capability: "unknown" | "supported" | "unsupported" | "degraded";
+            /** Recording Token */
+            recording_token: string | null;
+            /** Earliest */
+            earliest: string | null;
+            /** Latest */
+            latest: string | null;
+            /** Checked At */
+            checked_at: string | null;
+            /** Error */
+            error: string | null;
+        };
+        /** BackfillConfigUpdate */
+        BackfillConfigUpdate: {
+            /** Mode */
+            mode?: ("off" | "manual" | "automatic") | null;
+            /** Profile */
+            profile?: string | null;
+            /** Recording Token */
+            recording_token?: string | null;
+        };
+        /** BackfillJobCreate */
+        BackfillJobCreate: {
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: date-time
+             */
+            end_time: string;
+            /** Profile */
+            profile?: string | null;
+        };
+        /** BackfillJobOut */
+        BackfillJobOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Camera Id */
+            camera_id: number;
+            /** Node Id */
+            node_id: number | null;
+            /** Profile */
+            profile: string;
+            /** Recording Token */
+            recording_token: string;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: date-time
+             */
+            end_time: string;
+            state: components["schemas"]["BackfillState"];
+            /** Requested By */
+            requested_by: string;
+            /** Attempt Count */
+            attempt_count: number;
+            /** Progress Percent */
+            progress_percent: number;
+            /** Imported Seconds */
+            imported_seconds: number;
+            /** Imported Bytes */
+            imported_bytes: number;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** BackfillProbeOut */
+        BackfillProbeOut: {
+            /** Camera Id */
+            camera_id: number;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "off" | "manual" | "automatic";
+            /** Profile */
+            profile: string;
+            /**
+             * Capability
+             * @enum {string}
+             */
+            capability: "unknown" | "supported" | "unsupported" | "degraded";
+            /** Recording Token */
+            recording_token: string | null;
+            /** Earliest */
+            earliest: string | null;
+            /** Latest */
+            latest: string | null;
+            /** Checked At */
+            checked_at: string | null;
+            /** Error */
+            error: string | null;
+            /** Recordings */
+            recordings: components["schemas"]["EdgeRecordingOut"][];
+        };
+        /**
+         * BackfillState
+         * @enum {string}
+         */
+        BackfillState: "QUEUED" | "CLAIMED" | "DOWNLOADING" | "INDEXING" | "COMPLETED" | "PARTIAL" | "FAILED" | "CANCELLED";
         /** CameraAssignmentOut */
         CameraAssignmentOut: {
             /** Camera Id */
@@ -730,6 +1176,11 @@ export interface components {
             onvif_host?: string | null;
             /** Onvif Port */
             onvif_port?: number | null;
+            /**
+             * Expose Via Onvif
+             * @default true
+             */
+            expose_via_onvif: boolean;
         };
         /** CameraCreate */
         CameraCreate: {
@@ -765,6 +1216,8 @@ export interface components {
             has_password: boolean;
             /** Enabled */
             enabled: boolean;
+            /** Expose Via Onvif */
+            expose_via_onvif: boolean;
             /** Retention Days */
             retention_days: number | null;
             /** Onvif Host */
@@ -815,8 +1268,76 @@ export interface components {
             password?: string | null;
             /** Enabled */
             enabled?: boolean | null;
+            /** Expose Via Onvif */
+            expose_via_onvif?: boolean | null;
             /** Retention Days */
             retention_days?: number | null;
+        };
+        /** ChangeOut */
+        ChangeOut: {
+            /** Id */
+            id: string;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            before?: components["schemas"]["EncoderState"] | null;
+            result?: components["schemas"]["ChangeResult"] | null;
+        };
+        /** ChangeResult */
+        ChangeResult: {
+            after?: components["schemas"]["EncoderState"] | null;
+            /** Message */
+            message: string;
+            /**
+             * Recovery
+             * @default {}
+             */
+            recovery: {
+                [key: string]: string;
+            };
+        };
+        /** ClaimIn */
+        ClaimIn: {
+            /** Node Id */
+            node_id: number;
+        };
+        /** ClaimedJobOut */
+        ClaimedJobOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Camera Id */
+            camera_id: number;
+            /** Profile */
+            profile: string;
+            /** Recording Token */
+            recording_token: string;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: date-time
+             */
+            end_time: string;
+            /** Assignment Generation */
+            assignment_generation: number;
+            /** Host */
+            host: string;
+            /** Port */
+            port: number;
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
         };
         /** ClockOut */
         ClockOut: {
@@ -992,6 +1513,137 @@ export interface components {
             /** Free Bytes */
             free_bytes: number;
         };
+        /** EdgeRecordingOut */
+        EdgeRecordingOut: {
+            /** Token */
+            token: string;
+            /** Source Id */
+            source_id?: string | null;
+            /** Earliest */
+            earliest?: string | null;
+            /** Latest */
+            latest?: string | null;
+            /**
+             * Replay Available
+             * @default false
+             */
+            replay_available: boolean;
+        };
+        /** EncoderOption */
+        EncoderOption: {
+            /** Encoding */
+            encoding: string;
+            /**
+             * Resolutions
+             * @default []
+             */
+            resolutions: number[][];
+            /** Fps Range */
+            fps_range?: number[] | null;
+            /**
+             * Frame Rates
+             * @default []
+             */
+            frame_rates: number[];
+            /** Bitrate Range */
+            bitrate_range?: number[] | null;
+            /** Gop Range */
+            gop_range?: number[] | null;
+            /** Quality Range */
+            quality_range?: number[] | null;
+            /**
+             * Codec Profiles
+             * @default []
+             */
+            codec_profiles: string[];
+            /**
+             * Rate Controls
+             * @default []
+             */
+            rate_controls: string[];
+        };
+        /** EncoderProfile */
+        EncoderProfile: {
+            /** Token */
+            token: string;
+            /** Name */
+            name?: string | null;
+            /** Encoder Token */
+            encoder_token?: string | null;
+        };
+        /** EncoderState */
+        EncoderState: {
+            /** Api */
+            api: string;
+            /** Profile Token */
+            profile_token: string | null;
+            /** Encoder Token */
+            encoder_token?: string | null;
+            /** Revision */
+            revision?: string | null;
+            current?: components["schemas"]["EncoderValues"] | null;
+            /**
+             * Options
+             * @default []
+             */
+            options: components["schemas"]["EncoderOption"][];
+            /**
+             * Profiles
+             * @default []
+             */
+            profiles: components["schemas"]["EncoderProfile"][];
+            /**
+             * Shared Profiles
+             * @default []
+             */
+            shared_profiles: string[];
+            /**
+             * Use Count
+             * @default 0
+             */
+            use_count: number;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
+        /** EncoderValues */
+        EncoderValues: {
+            /** Encoding */
+            encoding?: ("H264" | "H265") | null;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Fps */
+            fps?: number | null;
+            /** Bitrate Kbps */
+            bitrate_kbps?: number | null;
+            /** Gop */
+            gop?: number | null;
+            /** Quality */
+            quality?: number | null;
+            /** Rate Control */
+            rate_control?: ("CBR" | "VBR") | null;
+            /** Codec Profile */
+            codec_profile?: string | null;
+        };
+        /** EncoderWrite */
+        EncoderWrite: {
+            /** Operation Id */
+            operation_id: string;
+            /** Revision */
+            revision: string;
+            values: components["schemas"]["EncoderValues"];
+            /**
+             * Acknowledge Shared
+             * @default false
+             */
+            acknowledge_shared: boolean;
+            /** Restore From */
+            restore_from?: string | null;
+        };
         /** GapOut */
         GapOut: {
             /**
@@ -1091,6 +1743,10 @@ export interface components {
              * @default []
              */
             onvif: components["schemas"]["OnvifHealthIn"][];
+            /** Onvif Server */
+            onvif_server?: {
+                [key: string]: unknown;
+            } | null;
             /** Extra */
             extra?: {
                 [key: string]: unknown;
@@ -1115,6 +1771,59 @@ export interface components {
              * @default []
              */
             volumes: components["schemas"]["VolumeConfig"][];
+            /**
+             * Onvif Server
+             * @default {}
+             */
+            onvif_server: {
+                [key: string]: unknown;
+            };
+            /**
+             * Webrtc Additional Hosts
+             * @default []
+             */
+            webrtc_additional_hosts: string[];
+        };
+        /** HistoryOut */
+        HistoryOut: {
+            /** Changes */
+            changes: components["schemas"]["ChangeOut"][];
+            pending: components["schemas"]["ChangeOut"] | null;
+        };
+        /** JobCompleteIn */
+        JobCompleteIn: {
+            /** Node Id */
+            node_id: number;
+            /** Imported Seconds */
+            imported_seconds: number;
+            /** Imported Bytes */
+            imported_bytes: number;
+            /**
+             * Partial
+             * @default false
+             */
+            partial: boolean;
+        };
+        /** JobFailIn */
+        JobFailIn: {
+            /** Node Id */
+            node_id: number;
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
+        /** JobProgressIn */
+        JobProgressIn: {
+            /** Node Id */
+            node_id: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "DOWNLOADING" | "INDEXING";
+            /** Progress Percent */
+            progress_percent: number;
         };
         /** LiveOut */
         LiveOut: {
@@ -1144,11 +1853,27 @@ export interface components {
             hls: string;
             /** Webrtc */
             webrtc: string;
+            /**
+             * Audio State
+             * @default unknown
+             */
+            audio_state: string;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Audio Sample Rate */
+            audio_sample_rate?: number | null;
+            /** Audio Channels */
+            audio_channels?: number | null;
         };
         /** ManualAssignIn */
         ManualAssignIn: {
             /** Node Id */
             node_id: number;
+        };
+        /** MappingIn */
+        MappingIn: {
+            /** Profile Token */
+            profile_token: string;
         };
         /** MessageOut */
         MessageOut: {
@@ -1182,6 +1907,20 @@ export interface components {
             hls_port: number;
             /** Webrtc Port */
             webrtc_port: number;
+            /** Public Enabled */
+            public_enabled: boolean;
+            /** Public Api Url */
+            public_api_url: string | null;
+            /** Public Media Host */
+            public_media_host: string | null;
+            /** Public Rtsp Port */
+            public_rtsp_port: number | null;
+            /** Public Hls Port */
+            public_hls_port: number | null;
+            /** Public Webrtc Port */
+            public_webrtc_port: number | null;
+            /** Public Media Tls */
+            public_media_tls: boolean;
             /** Capacity Cameras */
             capacity_cameras: number;
             /** Storage Quota Bytes */
@@ -1260,6 +1999,20 @@ export interface components {
             capacity_cameras?: number | null;
             /** Storage Quota Gb */
             storage_quota_gb?: number | null;
+            /** Public Enabled */
+            public_enabled?: boolean | null;
+            /** Public Api Url */
+            public_api_url?: string | null;
+            /** Public Media Host */
+            public_media_host?: string | null;
+            /** Public Rtsp Port */
+            public_rtsp_port?: number | null;
+            /** Public Hls Port */
+            public_hls_port?: number | null;
+            /** Public Webrtc Port */
+            public_webrtc_port?: number | null;
+            /** Public Media Tls */
+            public_media_tls?: boolean | null;
         };
         /** NtpIn */
         NtpIn: {
@@ -1337,6 +2090,46 @@ export interface components {
              */
             checked_at: string;
         };
+        /** OnvifServerOut */
+        OnvifServerOut: {
+            /** Node Id */
+            node_id: number;
+            /** Enabled */
+            enabled: boolean;
+            /** Discovery Name */
+            discovery_name: string;
+            /** Location */
+            location: string | null;
+            /** Status */
+            status: string;
+            /** Credentials Configured */
+            credentials_configured: boolean;
+            /** Xaddr */
+            xaddr?: string | null;
+            /** Rtsp Address */
+            rtsp_address?: string | null;
+            /**
+             * Exposed Cameras
+             * @default 0
+             */
+            exposed_cameras: number;
+            /**
+             * Exposed Profiles
+             * @default 0
+             */
+            exposed_profiles: number;
+            /** Last Error */
+            last_error?: string | null;
+        };
+        /** OnvifServerUpdate */
+        OnvifServerUpdate: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Discovery Name */
+            discovery_name?: string | null;
+            /** Location */
+            location?: string | null;
+        };
         /** ProbeOut */
         ProbeOut: {
             /** Node Id */
@@ -1377,12 +2170,162 @@ export interface components {
             bitrate_kbps: number | null;
             /** Has Audio */
             has_audio: boolean;
+            /** Audio Encoder Token */
+            audio_encoder_token?: string | null;
+            /** Audio Encoding */
+            audio_encoding?: string | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Audio Bitrate Kbps */
+            audio_bitrate_kbps?: number | null;
+            /** Audio Sample Rate */
+            audio_sample_rate?: number | null;
+            /** Audio Channels */
+            audio_channels?: number | null;
             /** Has Ptz */
             has_ptz: boolean;
             /** Rtsp */
             rtsp: string | null;
             /** Snapshot */
             snapshot: string | null;
+        };
+        /** PtzCapabilities */
+        PtzCapabilities: {
+            /**
+             * Pan Tilt
+             * @default false
+             */
+            pan_tilt: boolean;
+            /**
+             * Zoom
+             * @default false
+             */
+            zoom: boolean;
+            /**
+             * Presets
+             * @default false
+             */
+            presets: boolean;
+            /**
+             * Home
+             * @default false
+             */
+            home: boolean;
+            /**
+             * Home Set
+             * @default false
+             */
+            home_set: boolean;
+            /** Camera Timeout Seconds */
+            camera_timeout_seconds?: number | null;
+        };
+        /** PtzCommand */
+        PtzCommand: {
+            /** Session Id */
+            session_id: string;
+            /** Sequence */
+            sequence: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "move" | "stop" | "refresh" | "preset_save" | "preset_goto" | "preset_remove" | "home_goto" | "home_set";
+            /**
+             * Pan
+             * @default 0
+             */
+            pan: number;
+            /**
+             * Tilt
+             * @default 0
+             */
+            tilt: number;
+            /**
+             * Zoom
+             * @default 0
+             */
+            zoom: number;
+            /** Preset Token */
+            preset_token?: string | null;
+            /** Preset Name */
+            preset_name?: string | null;
+            /**
+             * Confirm
+             * @default false
+             */
+            confirm: boolean;
+        };
+        /** PtzPreset */
+        PtzPreset: {
+            /** Token */
+            token: string;
+            /** Name */
+            name: string;
+        };
+        /** PtzResult */
+        PtzResult: {
+            /** Message */
+            message: string;
+            status?: components["schemas"]["PtzStatus"] | null;
+            /** Presets */
+            presets?: components["schemas"]["PtzPreset"][] | null;
+        };
+        /** PtzState */
+        PtzState: {
+            /** Session Id */
+            session_id: string;
+            /**
+             * Expires In Seconds
+             * @default 120
+             */
+            expires_in_seconds: number;
+            capabilities: components["schemas"]["PtzCapabilities"];
+            status: components["schemas"]["PtzStatus"];
+            /**
+             * Presets
+             * @default []
+             */
+            presets: components["schemas"]["PtzPreset"][];
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
+        /** PtzStatus */
+        PtzStatus: {
+            /** Pan */
+            pan?: number | null;
+            /** Tilt */
+            tilt?: number | null;
+            /** Zoom */
+            zoom?: number | null;
+            /** Pan Tilt State */
+            pan_tilt_state?: string | null;
+            /** Zoom State */
+            zoom_state?: string | null;
+            /**
+             * Position Valid
+             * @default false
+             */
+            position_valid: boolean;
+        };
+        /** RecoveryOut */
+        RecoveryOut: {
+            /** Status */
+            status: string;
+            /** Fresh Status */
+            fresh_status: boolean;
+            /** New Recording */
+            new_recording: boolean | null;
+            /** Recording Expected */
+            recording_expected: boolean;
+            /** Last Status At */
+            last_status_at: string | null;
+            /** Last Segment At */
+            last_segment_at: string | null;
+            /** Message */
+            message: string;
         };
         /** SegmentBatchIn */
         SegmentBatchIn: {
@@ -1432,6 +2375,18 @@ export interface components {
             size_bytes: number;
             /** Codec */
             codec?: string | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Audio Sample Rate */
+            audio_sample_rate?: number | null;
+            /** Audio Channels */
+            audio_channels?: number | null;
+            /** Config Signature */
+            config_signature?: string | null;
+            /** @default NVR */
+            origin: components["schemas"]["SegmentOrigin"];
+            /** Backfill Job Id */
+            backfill_job_id?: string | null;
             /** File Path */
             file_path: string;
             /** Volume Id */
@@ -1439,6 +2394,11 @@ export interface components {
             /** Parts */
             parts: number[];
         };
+        /**
+         * SegmentOrigin
+         * @enum {string}
+         */
+        SegmentOrigin: "NVR" | "CAMERA_SD";
         /** SegmentOut */
         SegmentOut: {
             /**
@@ -1468,6 +2428,16 @@ export interface components {
             size_bytes: number;
             /** Codec */
             codec: string | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Audio Sample Rate */
+            audio_sample_rate?: number | null;
+            /** Audio Channels */
+            audio_channels?: number | null;
+            /** @default NVR */
+            origin: components["schemas"]["SegmentOrigin"];
+            /** Backfill Job Id */
+            backfill_job_id?: string | null;
             status: components["schemas"]["SegmentStatus"];
         };
         /**
@@ -1561,6 +2531,27 @@ export interface components {
             last_segment_at: string | null;
             /** Onvif Profile Token */
             onvif_profile_token?: string | null;
+            /**
+             * Audio State
+             * @default unknown
+             */
+            audio_state: string;
+            /** Audio Advertised */
+            audio_advertised?: boolean | null;
+            /** Audio Observed */
+            audio_observed?: boolean | null;
+            /** Audio Codec */
+            audio_codec?: string | null;
+            /** Audio Codec Raw */
+            audio_codec_raw?: string | null;
+            /** Audio Sample Rate */
+            audio_sample_rate?: number | null;
+            /** Audio Channels */
+            audio_channels?: number | null;
+            /** Audio Bitrate Kbps */
+            audio_bitrate_kbps?: number | null;
+            /** Audio Last Observed At */
+            audio_last_observed_at?: string | null;
         };
         /** StreamPick */
         StreamPick: {
@@ -1601,6 +2592,7 @@ export interface components {
              * @default 0
              */
             bytes_received: number;
+            audio?: components["schemas"]["AudioTrackIn"] | null;
         };
         /** StreamUpdate */
         StreamUpdate: {
@@ -2042,6 +3034,7 @@ export interface operations {
         parameters: {
             query?: {
                 profile?: string | null;
+                access?: "lan" | "public";
             };
             header?: never;
             path: {
@@ -2116,6 +3109,46 @@ export interface operations {
                 end?: string | null;
                 /** @description Shortcut: the last N minutes */
                 minutes?: number | null;
+                /** @description Node addresses embedded in the playlist */
+                access?: "lan" | "public";
+            };
+            header?: never;
+            path: {
+                camera_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audio_playlist_api_v1_playback__camera_id__audio_m3u8_get: {
+        parameters: {
+            query?: {
+                profile?: string;
+                start?: string | null;
+                end?: string | null;
+                minutes?: number | null;
+                /** @description Node addresses embedded in the playlist */
+                access?: "lan" | "public";
             };
             header?: never;
             path: {
@@ -2249,6 +3282,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NodeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_onvif_server_api_v1_nodes__node_id__onvif_server_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnvifServerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_onvif_server_api_v1_nodes__node_id__onvif_server_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnvifServerUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnvifServerOut"];
                 };
             };
             /** @description Validation Error */
@@ -2921,6 +4020,475 @@ export interface operations {
             };
         };
     };
+    get_encoder_api_v1_cameras__camera_id__streams__profile__encoder_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncoderState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_encoder_api_v1_cameras__camera_id__streams__profile__encoder_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncoderWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    map_encoder_api_v1_cameras__camera_id__streams__profile__encoder_mapping_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MappingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncoderState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_encoder_api_v1_cameras__camera_id__streams__profile__encoder_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncoderWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncoderState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    encoder_history_api_v1_cameras__camera_id__streams__profile__encoder_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_encoder_api_v1_cameras__camera_id__streams__profile__encoder_resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    encoder_recovery_api_v1_cameras__camera_id__streams__profile__encoder_recovery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_ptz_api_v1_cameras__camera_id__streams__profile__ptz_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PtzState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ptz_command_api_v1_cameras__camera_id__streams__profile__ptz_command_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PtzCommand"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PtzResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_backfill_api_v1_cameras__camera_id__backfill_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackfillConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_backfill_api_v1_cameras__camera_id__backfill_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BackfillConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackfillConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    probe_backfill_api_v1_cameras__camera_id__backfill_probe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackfillProbeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_backfill_jobs_api_v1_cameras__camera_id__backfill_jobs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                camera_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackfillJobOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_backfill_job_api_v1_cameras__camera_id__backfill_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BackfillJobCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackfillJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     register_node_internal_v1_nodes_register_post: {
         parameters: {
             query?: never;
@@ -3131,6 +4699,138 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DeletedIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_job_internal_v1_backfill_claim_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimedJobOut"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_progress_internal_v1_backfill__job_id__progress_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobProgressIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_complete_internal_v1_backfill__job_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobCompleteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_fail_internal_v1_backfill__job_id__fail_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobFailIn"];
             };
         };
         responses: {

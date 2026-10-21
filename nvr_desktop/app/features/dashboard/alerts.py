@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.core.format import format_bytes, format_percent, time_ago
 from app.core.status import tone_of
 from app.features.nodes.resources import node_resources
+from app.features.onvif.helpers import CLOCK_DRIFT_ALERT_SECONDS, format_offset
 
 
 def build_alerts(cameras: list[dict], nodes: list[dict]) -> list[dict]:
@@ -39,6 +40,15 @@ def build_alerts(cameras: list[dict], nodes: list[dict]) -> list[dict]:
             alerts.append({"level": "danger", "title": f"{c['name']} is not assigned to any node",
                            "detail": "No node with free capacity", **link})
             continue
+        if c.get("onvif_reachable") is False:
+            alerts.append({"level": "danger", "title": f"{c['name']}: ONVIF is not answering",
+                           "detail": "Open Device to check the camera address and connection.",
+                           "page": "camera", "id": c["id"], "tab": "device"})
+        offset = c.get("clock_offset_seconds")
+        if offset is not None and abs(offset) > CLOCK_DRIFT_ALERT_SECONDS:
+            alerts.append({"level": "warning", "title": f"{c['name']}: camera clock is off",
+                           "detail": f"Offset from its media node: {format_offset(offset)}",
+                           "page": "camera", "id": c["id"], "tab": "device"})
         for s in c.get("streams", []):
             if s.get("record") and s.get("status") not in ("RECORDING", "ASSIGNED"):
                 status = s.get("status") or "UNKNOWN"
@@ -48,4 +58,5 @@ def build_alerts(cameras: list[dict], nodes: list[dict]) -> list[dict]:
     alerts.sort(key=lambda a: 0 if a["level"] == "danger" else 1)
     for i, a in enumerate(alerts):
         a["key"] = i
+        a.setdefault("tab", "")
     return alerts

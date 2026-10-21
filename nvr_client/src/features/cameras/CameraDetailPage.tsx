@@ -20,6 +20,8 @@ import { LivePlayer } from "../live/LivePlayer"
 import { Timeline } from "../playback/Timeline"
 import { CameraFormSheet } from "./CameraFormSheet"
 import { DeviceTab } from "./DeviceTab"
+import { VideoTab } from "./VideoTab"
+import { BackfillTab } from "./BackfillTab"
 
 export function CameraDetailPage() {
   const id = Number(useParams().id)
@@ -59,6 +61,8 @@ export function CameraDetailPage() {
           <TabsTrigger value="recordings">Recordings</TabsTrigger>
           <TabsTrigger value="assignment">Assignment</TabsTrigger>
           <TabsTrigger value="device">Device</TabsTrigger>
+          <TabsTrigger value="video">Video</TabsTrigger>
+          <TabsTrigger value="backfill">Edge storage</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
           <Overview camera={c} />
@@ -71,6 +75,12 @@ export function CameraDetailPage() {
         </TabsContent>
         <TabsContent value="device">
           <DeviceTab camera={c} active={tab === "device"} />
+        </TabsContent>
+        <TabsContent value="video">
+          <VideoTab key={c.id} camera={c} active={tab === "video"} />
+        </TabsContent>
+        <TabsContent value="backfill">
+          <BackfillTab camera={c} active={tab === "backfill"} />
         </TabsContent>
       </Tabs>
       {editing && <CameraFormSheet camera={c} open onOpenChange={setEditing} />}
@@ -162,6 +172,7 @@ function Overview({ camera: c }: { camera: Camera }) {
               <TableHead>Source URL</TableHead>
               <TableHead>Record</TableHead>
               <TableHead>Transport</TableHead>
+              <TableHead>Audio</TableHead>
               <TableHead>Received</TableHead>
               <TableHead>Last chunk</TableHead>
               <TableHead>Last report</TableHead>
@@ -180,6 +191,20 @@ function Overview({ camera: c }: { camera: Camera }) {
                 </TableCell>
                 <TableCell>{s.record ? "Yes" : "Live only"}</TableCell>
                 <TableCell className="uppercase">{s.rtsp_transport}</TableCell>
+                <TableCell className="text-xs">
+                  {s.audio_state === "available" ? (
+                    <span title={s.audio_codec_raw ?? undefined}>
+                      {(s.audio_codec ?? "audio").toUpperCase()}
+                      {s.audio_sample_rate ? ` · ${s.audio_sample_rate / 1000} kHz` : ""}
+                      {s.audio_channels ? ` · ${s.audio_channels === 1 ? "mono" : `${s.audio_channels} ch`}` : ""}
+                      {s.audio_bitrate_kbps ? ` · ${s.audio_bitrate_kbps} kbps` : ""}
+                    </span>
+                  ) : s.audio_state === "advertised_not_observed" ? (
+                    <span className="text-warning">Advertised, not received</span>
+                  ) : s.audio_state === "unsupported" ? (
+                    <span className="text-warning" title={s.audio_codec_raw ?? undefined}>Unsupported {s.audio_codec_raw ?? "audio"}</span>
+                  ) : s.audio_state === "none" ? "None" : <span className="text-muted-foreground">Unknown</span>}
+                </TableCell>
                 <TableCell className="tabular-nums">{formatBytes(s.bytes_received)}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{s.last_segment_at ? timeAgo(s.last_segment_at) : "—"}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{s.last_status_at ? timeAgo(s.last_status_at) : "—"}</TableCell>

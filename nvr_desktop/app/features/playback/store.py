@@ -46,6 +46,8 @@ class PlaybackStore(BaseStore):
         self._playhead = 0.0
         self._timeline: dict = {}
         self._ranges: list[dict] = []
+        self._backfill_ranges: list[dict] = []
+        self._access = "lan"
         self._poller = Poller(self.refresh, 20, self)
         cameras.camerasChanged.connect(self._ensure_camera)
         self._poller.start(immediately=False)
@@ -129,16 +131,26 @@ class PlaybackStore(BaseStore):
         if not self._is_today() and self._timeline.get("_key") == (cid, profile, day):
             return  # past days do not change
 
-        def apply(timeline: dict):
+        def load():
+            timeline = self.api.timeline(cid, profile, _utc(day), _utc(day + DAY)).to_qml()
+            node_ids = {s.get("node_id") for s in timeline.get("segments", []) if s.get("node_id")}
+            access = "public" if any(self._nodes.access(node_id) == "public" for node_id in node_ids) else "lan"
+            return timeline, access
+
+        def apply(result):
+            timeline, access = result
             if (cid, profile, day) != (self._camera_id, self._profile, self._day):
                 return
+            self._access = access
             timeline["_key"] = (cid, profile, day)
             self._timeline = timeline
             self._ranges = [{"a": a, "b": b} for a, b in merge_ranges(timeline["segments"])]
+            backfilled = [s for s in timeline["segments"] if s.get("origin") == "CAMERA_SD"]
+            self._backfill_ranges = [{"a": a, "b": b} for a, b in merge_ranges(backfilled)]
             self.timelineChanged.emit()
             self.viewChanged.emit()  # the chunk list depends on the data too
 
-        self.fetch("timeline", lambda: self.api.timeline(cid, profile, _utc(day), _utc(day + DAY)).to_qml(), apply)
+        self.fetch("timeline", load, apply)
 
     def _chunks_in_view(self) -> list[dict]:
         start, end = self._view_start, self._view_start + self._zoom
@@ -146,10 +158,13 @@ class PlaybackStore(BaseStore):
         return [{**s, "startMs": to_ms(s["start_time"]), "endMs": to_ms(s["end_time"])} for s in reversed(rows)]
 
     ranges = Property("QVariantList", lambda self: self._ranges, notify=timelineChanged)
+    backfillRanges = Property("QVariantList", lambda self: self._backfill_ranges, notify=timelineChanged)
     coverage = Property(float, lambda self: self._timeline.get("coverage_percent", 0.0), notify=timelineChanged)
     totalSize = Property(str, lambda self: format_bytes(self._timeline.get("total_size_bytes")), notify=timelineChanged)
     hasTimeline = Property(bool, lambda self: bool(self._timeline), notify=timelineChanged)
     chunks = Property("QVariantList", _chunks_in_view, notify=viewChanged)
+    hasAudio = Property(bool, lambda self: any(bool(s.get("audio_codec")) for s in self._timeline.get("segments", [])),
+                        notify=timelineChanged)
 
     # ------------------------------------------------------------------ view (zoom / pan)
     @Slot(float)
@@ -200,14 +215,14 @@ class PlaybackStore(BaseStore):
 
     def _stop_playback(self) -> None:
         self._play_from = self._playhead = 0.0
-        self._timeline, self._ranges = {}, []
+        self._timeline, self._ranges, self._backfill_ranges = {}, [], []
         self.playChanged.emit()
         self.timelineChanged.emit()
 
     def _playlist_url(self) -> str:
         if not (self._camera_id and self._play_from):
             return ""
-        return self.api.playlist_url(self._camera_id, self._profile, _utc(self._play_from), _utc(self._play_to))
+        return self.api.playlist_url(self._camera_id, self._profile, _utc(self._play_from), _utc(self._play_to), self._access)
 
     playlistUrl = Property(str, _playlist_url, notify=playChanged)
     playhead = Property(float, lambda self: self._playhead, notify=playChanged)

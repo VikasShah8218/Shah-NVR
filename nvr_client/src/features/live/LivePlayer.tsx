@@ -1,6 +1,6 @@
 import Hls from "hls.js"
-import { Loader2, VideoOff } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { Loader2, VideoOff, Volume2, VolumeX } from "lucide-react"
+import { useEffect, useId, useRef, useState } from "react"
 import { useLive } from "@/api/queries"
 import type { LiveInfo } from "@/api/types"
 import type { LiveProtocol } from "@/lib/settings"
@@ -19,6 +19,7 @@ export interface PlayerInfo {
 }
 
 const EMPTY: PlayerInfo = { protocol: null, phase: "loading", width: 0, height: 0, delayMs: null, error: null }
+const AUDIO_FOCUS_EVENT = "shah-nvr:live-audio-focus"
 
 /** Pick the stream URLs for `profile`, falling back to the camera's first stream. */
 export function pickStream(live: LiveInfo | undefined, profile: string) {
@@ -50,6 +51,31 @@ export function LivePlayer({
   const [info, setInfo] = useState<PlayerInfo>(EMPTY)
   const [attempt, setAttempt] = useState(0) // bumping it reconnects
   const failures = useRef(0)
+  const audioId = useId()
+  const [muted, setMuted] = useState(true)
+  const [volume, setVolume] = useState(() => Number(localStorage.getItem("shah-nvr.live-volume") ?? 0.8))
+  const mutedRef = useRef(muted)
+  const volumeRef = useRef(volume)
+  const webrtcUrl = stream?.webrtc
+  const hlsUrl = stream?.hls
+
+  useEffect(() => {
+    const takeFocus = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== audioId) setMuted(true)
+    }
+    window.addEventListener(AUDIO_FOCUS_EVENT, takeFocus)
+    return () => window.removeEventListener(AUDIO_FOCUS_EVENT, takeFocus)
+  }, [audioId])
+
+  useEffect(() => {
+    mutedRef.current = muted
+    volumeRef.current = volume
+    const video = videoRef.current
+    if (video) {
+      video.muted = muted
+      video.volume = volume
+    }
+  }, [muted, volume])
 
   useEffect(() => {
     onVideo?.(videoRef.current)
@@ -58,7 +84,7 @@ export function LivePlayer({
 
   useEffect(() => {
     const video = videoRef.current
-    if (!video || !stream) return
+    if (!video || !webrtcUrl || !hlsUrl) return
     let cancelled = false
     let whep: WhepSession | null = null
     let hls: Hls | null = null
@@ -83,14 +109,14 @@ export function LivePlayer({
             retry(`HLS: ${data.details}`)
           }
         })
-        hls.loadSource(stream.hls)
+        hls.loadSource(hlsUrl)
         hls.attachMedia(video)
         statsTimer = setInterval(() => {
           const latency = hls?.latency
           if (latency != null && Number.isFinite(latency)) setInfo((i) => ({ ...i, delayMs: Math.round(latency * 1000) }))
         }, 2000)
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = stream.hls // Safari: native HLS
+        video.src = hlsUrl // Safari: native HLS
       } else {
         retry("HLS is not supported by this browser")
       }
@@ -100,7 +126,7 @@ export function LivePlayer({
     const playWebrtc = async () => {
       setInfo((i) => ({ ...i, protocol: "WebRTC", phase: "loading", error: null }))
       try {
-        const session = await startWhep(`${stream.webrtc}/whep`, video)
+        const session = await startWhep(`${webrtcUrl}/whep`, video)
         if (cancelled) {
           session.close()
           return
@@ -122,7 +148,8 @@ export function LivePlayer({
       }
     }
 
-    video.muted = true
+    video.muted = mutedRef.current
+    video.volume = volumeRef.current
     if (protocol === "hls") playHls()
     else void playWebrtc()
 
@@ -136,7 +163,17 @@ export function LivePlayer({
       video.srcObject = null
     }
     // `attempt` re-runs the effect for reconnects; URLs change when the camera moves node.
-  }, [stream?.webrtc, stream?.hls, protocol, attempt])
+  }, [webrtcUrl, hlsUrl, protocol, attempt])
+
+  const showAudio = stream?.audio_state === "available" || stream?.audio_state === "advertised_not_observed" || stream?.audio_state === "unsupported"
+  const audioPlayable = showAudio && stream?.audio_state !== "unsupported" && (info.protocol !== "HLS" || stream.audio_codec === "aac")
+  const toggleAudio = () => {
+    if (!audioPlayable) return
+    const next = !muted
+    if (!next) window.dispatchEvent(new CustomEvent(AUDIO_FOCUS_EVENT, { detail: audioId }))
+    setMuted(next)
+    if (!next) videoRef.current?.play().catch(() => {})
+  }
 
   const onPlaying = () => {
     failures.current = 0
@@ -155,7 +192,7 @@ export function LivePlayer({
         ref={videoRef}
         className="size-full object-contain"
         playsInline
-        muted
+        muted={muted}
         autoPlay
         onPlaying={onPlaying}
         onResize={onResize}
@@ -180,6 +217,37 @@ export function LivePlayer({
         <div className="pointer-events-none absolute bottom-1.5 left-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white/85 tabular-nums">
           {info.width}×{info.height} · {info.protocol}
           {info.delayMs != null && ` · ${info.delayMs} ms`}
+        </div>
+      )}
+      {showAudio && (
+        <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded bg-black/60 p-1 text-white">
+          <button
+            type="button"
+            className="grid size-7 place-items-center rounded hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45"
+            onClick={(e) => { e.stopPropagation(); toggleAudio() }}
+            disabled={!audioPlayable}
+            aria-label={muted ? "Unmute camera audio" : "Mute camera audio"}
+            title={!audioPlayable ? "This codec requires WebRTC for live audio" : muted ? "Listen to camera audio" : "Mute camera audio"}
+          >
+            {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+          </button>
+          {!muted && (
+            <input
+              aria-label="Camera audio volume"
+              className="w-20 accent-primary"
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={volume}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                const next = Number(e.target.value)
+                setVolume(next)
+                localStorage.setItem("shah-nvr.live-volume", String(next))
+              }}
+            />
+          )}
         </div>
       )}
     </div>

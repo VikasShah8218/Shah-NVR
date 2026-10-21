@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -54,6 +56,12 @@ class ProfileOut(BaseModel):
     fps: int | None
     bitrate_kbps: int | None
     has_audio: bool
+    audio_encoder_token: str | None = None
+    audio_encoding: str | None = None
+    audio_codec: str | None = None
+    audio_bitrate_kbps: int | None = None
+    audio_sample_rate: int | None = None
+    audio_channels: int | None = None
     has_ptz: bool
     rtsp: str | None  # without credentials
     snapshot: str | None
@@ -100,3 +108,21 @@ class DeviceStateOut(BaseModel):
 
 class RebootOut(BaseModel):
     message: str
+
+
+class ProfileGRecordingOut(BaseModel):
+    token: str
+    source_id: str | None = None
+    earliest: datetime | None = None
+    latest: datetime | None = None
+    replay_available: bool = False
+
+
+class ProfileGProbeOut(BaseModel):
+    supported: bool
+    recording_service: bool
+    search_service: bool
+    replay_service: bool
+    earliest: datetime | None = None
+    latest: datetime | None = None
+    recordings: list[ProfileGRecordingOut]

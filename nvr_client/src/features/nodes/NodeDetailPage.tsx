@@ -13,20 +13,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UsageMeter } from "@/components/UsageBar"
 import { formatBytes, formatDuration, formatMbps, formatPercent, timeAgo } from "@/lib/format"
 import { fmtDateTime } from "@/lib/time"
+import { nodeApiUrl, selectedNodeAccess, type NodeAccess, useNodeAccessMap } from "@/lib/nodeAccess"
+import { useSettings } from "@/lib/settings"
 import { LogViewer } from "./LogViewer"
 import { NodeActions } from "./NodeActions"
 import { nodeResources } from "./nodeUtils"
 import { ResourceCharts, useNodeHistory } from "./ResourceCharts"
 import { StorageTab } from "./StorageTab"
+import { OnvifServerTab } from "./OnvifServerTab"
+import { ConnectivityTab } from "./ConnectivityTab"
 
 export function NodeDetailPage() {
   const nodeId = Number(useParams().id)
   const node = useNode(nodeId, 3000)
+  const { settings } = useSettings()
+  const detected = useNodeAccessMap(node.data ? [node.data] : [])
   const points = useNodeHistory(node.data, node.dataUpdatedAt)
 
   if (node.isLoading) return <Loading />
   if (node.error || !node.data) return <ErrorState error={node.error ?? "Node not found"} />
   const n = node.data
+  const access = selectedNodeAccess(n, settings.nodeAccess, detected.data)
+  const apiUrl = nodeApiUrl(n, access)
 
   return (
     <div className="space-y-4">
@@ -35,7 +43,7 @@ export function NodeDetailPage() {
       </Link>
       <PageHeader
         title={n.name}
-        description={`${n.api_url} · heartbeat ${timeAgo(n.last_heartbeat_at)}`}
+        description={`${apiUrl} · heartbeat ${timeAgo(n.last_heartbeat_at)}`}
         actions={
           <>
             <StatusBadge status={n.state} />
@@ -43,8 +51,8 @@ export function NodeDetailPage() {
           </>
         }
       />
-      <ClientAddress node={n} />
-      <ResourceSummary node={n} />
+      <ClientAddress node={n} access={access} />
+      <ResourceSummary node={n} apiUrl={apiUrl} />
       <ResourceCharts points={points} />
       <Tabs defaultValue="cameras">
         <TabsList>
@@ -53,34 +61,42 @@ export function NodeDetailPage() {
           <TabsTrigger value="paths">MediaMTX paths</TabsTrigger>
           <TabsTrigger value="chunks">Recorded chunks</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
+          <TabsTrigger value="connectivity">Connectivity</TabsTrigger>
+          <TabsTrigger value="onvif">ONVIF server</TabsTrigger>
         </TabsList>
         <TabsContent value="cameras">
-          <NodeCameras apiUrl={n.api_url} />
+          <NodeCameras apiUrl={apiUrl} />
         </TabsContent>
         <TabsContent value="storage">
           <StorageTab node={n} />
         </TabsContent>
         <TabsContent value="paths">
-          <NodePaths apiUrl={n.api_url} />
+          <NodePaths apiUrl={apiUrl} />
         </TabsContent>
         <TabsContent value="chunks">
-          <NodeChunks apiUrl={n.api_url} />
+          <NodeChunks apiUrl={apiUrl} />
         </TabsContent>
         <TabsContent value="logs">
           <Card>
             <CardContent>
-              <LogViewer apiUrl={n.api_url} />
+              <LogViewer apiUrl={apiUrl} />
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="connectivity">
+          <ConnectivityTab node={n} />
+        </TabsContent>
+        <TabsContent value="onvif">
+          <OnvifServerTab node={n} />
         </TabsContent>
       </Tabs>
     </div>
   )
 }
 
-function ResourceSummary({ node }: { node: MediaNode }) {
+function ResourceSummary({ node, apiUrl }: { node: MediaNode; apiUrl: string }) {
   const r = nodeResources(node)
-  const status = useNodeStatus(node.api_url)
+  const status = useNodeStatus(apiUrl)
   const s = status.data
   const gpu = r.gpus[0]
   return (
@@ -308,13 +324,14 @@ function NodeChunks({ apiUrl }: { apiUrl: string }) {
 }
 
 /** Which address clients get in every live/playback link, and the node's other LAN addresses. */
-function ClientAddress({ node }: { node: MediaNode }) {
+function ClientAddress({ node, access }: { node: MediaNode; access: NodeAccess }) {
   const others = (nodeMetrics(node).addresses ?? []).filter((a) => a.usable && a.ip !== node.media_host)
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border bg-card px-4 py-2.5 text-sm">
       <span>
-        Clients connect to <b className="font-mono">{node.media_host}</b>
+        This browser uses <b className="font-mono">{access === "public" ? node.public_media_host : node.media_host}</b>
         <span className="text-muted-foreground"> (live, playback, downloads and VLC links)</span>
+        <span className="ml-2 text-success">{access === "public" ? "Public" : "LAN"}</span>
       </span>
       {others.length > 0 && (
         <span className="text-xs text-muted-foreground">

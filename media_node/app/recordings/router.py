@@ -7,6 +7,7 @@
 """
 
 import asyncio
+import logging
 from pathlib import Path
 from uuid import UUID
 
@@ -18,8 +19,11 @@ from app.recordings.schemas import LocalSegmentOut
 from app.recordings.services import file_exists, read_slice
 from app.recordings.utils import rebase_timestamps
 from app.storage.services import storage
+from settings.settings import settings
 
 router = APIRouter(prefix="/api/v1", tags=["Recorded media"])
+logger = logging.getLogger("node.recordings")
+_audio_jobs = asyncio.Semaphore(4)
 
 CACHE_HEADERS = {"Cache-Control": "public, max-age=86400, immutable"}
 
@@ -63,6 +67,44 @@ async def media_file(segment_id: UUID):
     seg, root = await _segment(segment_id)
     filename = f"cam{seg.camera_id}_{seg.profile}_{seg.start_time:%Y%m%dT%H%M%SZ}.mp4"
     return FileResponse(root / seg.rel_path, media_type="video/mp4", filename=filename)
+
+
+@router.get("/media/{segment_id}/audio.aac", summary="AAC rendition of a recording's first audio track")
+async def media_audio(segment_id: UUID, start_ms: int = 0, duration_ms: int | None = None):
+    """Transcode audio only; the original recording and video track are never modified or decoded."""
+    seg, root = await _segment(segment_id)
+    if start_ms < 0 or start_ms >= max(seg.duration_ms, 1):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "start_ms is outside the recording")
+    remaining = max(seg.duration_ms - start_ms, 1)
+    duration_ms = remaining if duration_ms is None else min(max(duration_ms, 1), remaining)
+    command = [
+        settings.FFMPEG_BIN, "-hide_banner", "-loglevel", "error",
+        "-ss", f"{start_ms / 1000:.3f}", "-i", str(root / seg.rel_path),
+        "-t", f"{duration_ms / 1000:.3f}", "-map", "0:a:0", "-vn",
+        "-c:a", "aac", "-b:a", "128k", "-f", "adts", "pipe:1",
+    ]
+    try:
+        async with _audio_jobs:
+            process = await asyncio.create_subprocess_exec(
+                *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=45)
+    except FileNotFoundError as exc:
+        logger.error("FFmpeg is unavailable at %s", settings.FFMPEG_BIN)
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Recorded audio converter is not installed") from exc
+    except asyncio.TimeoutError as exc:
+        process.kill()
+        await process.wait()
+        raise HTTPException(status.HTTP_504_GATEWAY_TIMEOUT, "Recorded audio conversion timed out") from exc
+    if process.returncode or not stdout:
+        detail = stderr.decode("utf-8", "replace")[-300:]
+        logger.warning("No playable audio for segment %s: %s", segment_id, detail)
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This recording has no playable audio track")
+    return Response(
+        stdout,
+        media_type="audio/aac",
+        headers={"Cache-Control": "public, max-age=86400, immutable"},
+    )
 
 
 @router.get("/segments", response_model=list[LocalSegmentOut], summary="Chunks stored on this node (debug)")

@@ -23,6 +23,8 @@ class Camera(Model):
     username = fields.CharField(max_length=128, null=True)
     password = fields.CharField(max_length=256, null=True)
     enabled = fields.BooleanField(default=True)
+    # Whether the owning media node may expose this camera through its H5 virtual ONVIF NVR.
+    expose_via_onvif = fields.BooleanField(default=True)
     # Max days of recordings, counted back from the camera's latest recording (app/recordings/services.py).
     # None = keep until storage is full (only space-based cleanup on the node removes recordings).
     retention_days = fields.IntField(default=7, null=True)
@@ -40,6 +42,15 @@ class Camera(Model):
     onvif_reachable = fields.BooleanField(null=True)  # last ONVIF check (no login) answered
     clock_offset_seconds = fields.FloatField(null=True)  # camera clock minus node clock
     onvif_checked_at = fields.DatetimeField(null=True)
+    # L3 edge-storage recovery. Automatic mode is intentionally opt-in.
+    backfill_mode = fields.CharField(max_length=16, default="off")  # off | manual | automatic
+    backfill_profile = fields.CharField(max_length=32, default="main")
+    backfill_recording_token = fields.CharField(max_length=256, null=True)
+    backfill_capability = fields.CharField(max_length=16, default="unknown")
+    backfill_earliest = fields.DatetimeField(null=True)
+    backfill_latest = fields.DatetimeField(null=True)
+    backfill_checked_at = fields.DatetimeField(null=True)
+    backfill_error = fields.CharField(max_length=512, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
@@ -63,6 +74,17 @@ class CameraStream(Model):
     rtsp_transport = fields.CharField(max_length=16, default="tcp")
     onvif_profile_token = fields.CharField(max_length=128, null=True)  # ONVIF media profile behind source_url
 
+    # H6 audio metadata. ONVIF values are provisional; the owning node replaces codec/properties with the
+    # actual MediaMTX track whenever the RTSP path is online. None means that the stream has not been checked.
+    audio_advertised = fields.BooleanField(null=True)
+    audio_observed = fields.BooleanField(null=True)
+    audio_codec = fields.CharField(max_length=32, null=True)
+    audio_codec_raw = fields.CharField(max_length=64, null=True)
+    audio_sample_rate = fields.IntField(null=True)
+    audio_channels = fields.IntField(null=True)
+    audio_bitrate_kbps = fields.IntField(null=True)
+    audio_last_observed_at = fields.DatetimeField(null=True)
+
     # Runtime state reported by the owning media node.
     status = fields.CharEnumField(StreamStatus, max_length=32, default=StreamStatus.UNASSIGNED)
     status_detail = fields.CharField(max_length=512, null=True)
@@ -78,3 +100,36 @@ class CameraStream(Model):
     def path_name(self) -> str:
         """MediaMTX path name, shared by live URLs and recording folders."""
         return f"cam-{self.camera_id}/{self.profile}"  # type: ignore[attr-defined]
+
+    @property
+    def audio_state(self) -> str:
+        if self.audio_observed is True:
+            return "unsupported" if self.audio_codec == "unsupported" else "available"
+        if self.audio_observed is False:
+            return "advertised_not_observed" if self.audio_advertised else "none"
+        if self.audio_advertised is True:
+            return "advertised_not_observed"
+        if self.audio_advertised is False:
+            return "none"
+        return "unknown"
+
+
+class EncoderChange(Model):
+    """Durable H2 journal and cross-worker device mutex. Contains no credentials or raw XML."""
+    id = fields.CharField(max_length=64, primary_key=True)
+    camera_id = fields.IntField(db_index=True)
+    profile = fields.CharField(max_length=32)
+    profile_token = fields.CharField(max_length=128)
+    device_key = fields.CharField(max_length=300)
+    active_key = fields.CharField(max_length=300, null=True, unique=True)
+    node_id = fields.IntField()
+    request = fields.JSONField()
+    before = fields.JSONField(null=True)
+    result = fields.JSONField(null=True)
+    status = fields.CharField(max_length=32, default="pending")
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "encoder_changes"
+        ordering = ["-created_at"]

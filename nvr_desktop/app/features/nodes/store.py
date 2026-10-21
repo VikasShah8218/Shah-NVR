@@ -16,6 +16,8 @@ GB = 1024**3
 NODE_ROLES = [
     "id", "name", "api_url", "media_host", "state", "capacity_cameras", "storage_quota_bytes", "version",
     "mediamtx_version", "last_heartbeat_at", "assigned_cameras", "metrics", "res",
+    "public_enabled", "public_api_url", "public_media_host", "public_rtsp_port", "public_hls_port",
+    "public_webrtc_port", "public_media_tls",
 ]
 
 
@@ -48,7 +50,12 @@ class NodesStore(BaseStore):
         return self._nodes
 
     def api_url(self, node_id: int) -> str | None:
-        return next((n["api_url"] for n in self._nodes if n["id"] == node_id), None)
+        node = next((n for n in self._nodes if n["id"] == node_id), None)
+        return self.ctx.node_access.api_url(node, self.ctx.prefs.nodeAccess) or None
+
+    def access(self, node_id: int) -> str:
+        node = next((n for n in self._nodes if n["id"] == node_id), None)
+        return self.ctx.node_access.resolve(node, self.ctx.prefs.nodeAccess)
 
     @Slot(int, result="QVariant")
     def byId(self, node_id: int):

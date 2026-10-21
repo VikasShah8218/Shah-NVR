@@ -2,7 +2,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Copy, Crosshair, Download, Fil
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router"
 import { toast } from "sonner"
-import { mediaFileUrl, playbackUrl } from "@/api/client"
+import { mediaFileUrl, playbackAudioUrl, playbackUrl } from "@/api/client"
 import { useCameras, useNodes, useTimeline } from "@/api/queries"
 import type { Segment } from "@/api/types"
 import { EmptyState, ErrorState, PageHeader } from "@/components/common"
@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { formatBytes, formatDuration } from "@/lib/format"
 import { useSettings } from "@/lib/settings"
+import { nodeApiUrl, playbackAccess, selectedNodeAccess, useNodeAccessMap } from "@/lib/nodeAccess"
 import { DAY, HOUR, fmtDay, fmtTime, startOfLocalDay } from "@/lib/time"
 import { Timeline } from "./Timeline"
 import { VodPlayer } from "./VodPlayer"
@@ -32,6 +33,7 @@ export function PlaybackPage() {
   const { settings } = useSettings()
   const cameras = useCameras()
   const nodes = useNodes(30_000)
+  const detected = useNodeAccessMap(nodes.data ?? [])
 
   const initialT = params.get("t") ? new Date(params.get("t")!) : null
   const [cameraId, setCameraId] = useState<number | null>(params.get("camera") ? Number(params.get("camera")) : null)
@@ -61,12 +63,25 @@ export function PlaybackPage() {
   const isToday = startOfLocalDay(new Date()).getTime() === dayStart
   const timeline = useTimeline(cameraId, profile, new Date(dayStart), new Date(dayEnd), isToday ? 20_000 : 0)
   const segments: Segment[] = timeline.data?.segments ?? []
-  const nodeUrl = useMemo(() => new Map((nodes.data ?? []).map((n) => [n.id, n.api_url])), [nodes.data])
+  const access = playbackAccess(
+    nodes.data ?? [], [...new Set(segments.map((segment) => segment.node_id))], settings.nodeAccess, detected.data,
+  )
+  const nodeUrl = useMemo(
+    () => new Map((nodes.data ?? []).map((n) => [n.id, nodeApiUrl(n, selectedNodeAccess(n, settings.nodeAccess, detected.data))])),
+    [nodes.data, settings.nodeAccess, detected.data],
+  )
 
   const viewEnd = viewStart + zoom
   const src = useMemo(
-    () => (cameraId != null && playFrom ? playbackUrl(settings.centralUrl, cameraId, profile, playFrom, playTo) : null),
-    [settings.centralUrl, cameraId, profile, playFrom, playTo],
+    () => (cameraId != null && playFrom ? playbackUrl(settings.centralUrl, cameraId, profile, playFrom, playTo, access) : null),
+    [settings.centralUrl, cameraId, profile, playFrom, playTo, access],
+  )
+  const hasRecordedAudio = segments.some((segment) =>
+    !!segment.audio_codec || /(^|\+)(aac|opus|g711|g711a|g711u|g722|lpcm|g726)(\+|$)/i.test(segment.codec ?? ""),
+  )
+  const audioSrc = useMemo(
+    () => (cameraId != null && playFrom && hasRecordedAudio ? playbackAudioUrl(settings.centralUrl, cameraId, profile, playFrom, playTo, access) : null),
+    [settings.centralUrl, cameraId, profile, playFrom, playTo, hasRecordedAudio, access],
   )
 
   // Keep the URL shareable / reload-safe.
@@ -188,7 +203,7 @@ export function PlaybackPage() {
         </div>
       </div>
 
-      <VodPlayer src={src} onTime={setPlayhead} />
+      <VodPlayer src={src} audioSrc={audioSrc} onTime={setPlayhead} />
 
       <Card className="gap-3 py-4">
         <CardContent className="space-y-3 px-4">
@@ -253,6 +268,7 @@ export function PlaybackPage() {
                   <TableHead>End</TableHead>
                   <TableHead>Length</TableHead>
                   <TableHead>Size</TableHead>
+                  <TableHead>Audio</TableHead>
                   <TableHead>Node</TableHead>
                   <TableHead />
                 </TableRow>
@@ -267,6 +283,7 @@ export function PlaybackPage() {
                       <TableCell className="tabular-nums">{fmtTime(new Date(s.end_time))}</TableCell>
                       <TableCell className="tabular-nums">{formatDuration(s.duration_ms)}</TableCell>
                       <TableCell className="tabular-nums">{formatBytes(s.size_bytes)}</TableCell>
+                      <TableCell className="text-xs">{s.audio_codec ? s.audio_codec.toUpperCase() : "—"}</TableCell>
                       <TableCell className="text-muted-foreground">node {s.node_id}</TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         {apiUrl && (

@@ -9,6 +9,51 @@ class SegmentStatus(str, Enum):
     DELETING = "DELETING"  # retention selected it; waiting for the node to delete the file
 
 
+class SegmentOrigin(str, Enum):
+    NVR = "NVR"
+    CAMERA_SD = "CAMERA_SD"
+
+
+class BackfillState(str, Enum):
+    QUEUED = "QUEUED"
+    CLAIMED = "CLAIMED"
+    DOWNLOADING = "DOWNLOADING"
+    INDEXING = "INDEXING"
+    COMPLETED = "COMPLETED"
+    PARTIAL = "PARTIAL"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class BackfillJob(Model):
+    id = fields.UUIDField(primary_key=True)
+    camera = fields.ForeignKeyField("models.Camera", related_name="backfill_jobs", on_delete=fields.CASCADE)
+    node = fields.ForeignKeyField("models.MediaNode", related_name="backfill_jobs", null=True, on_delete=fields.SET_NULL)
+    profile = fields.CharField(max_length=32, default="main")
+    recording_token = fields.CharField(max_length=256)
+    start_time = fields.DatetimeField()
+    end_time = fields.DatetimeField()
+    state = fields.CharEnumField(BackfillState, max_length=16, default=BackfillState.QUEUED)
+    requested_by = fields.CharField(max_length=16, default="manual")
+    assignment_generation = fields.BigIntField(default=0)
+    lease_expires_at = fields.DatetimeField(null=True)
+    attempt_count = fields.IntField(default=0)
+    progress_percent = fields.FloatField(default=0)
+    imported_seconds = fields.FloatField(default=0)
+    imported_bytes = fields.BigIntField(default=0)
+    error_code = fields.CharField(max_length=64, null=True)
+    error_message = fields.CharField(max_length=512, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    started_at = fields.DatetimeField(null=True)
+    finished_at = fields.DatetimeField(null=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "backfill_jobs"
+        indexes = (("camera_id", "profile", "start_time"), ("state", "created_at"))
+        ordering = ["-created_at"]
+
+
 class RecordingSegment(Model):
     """Index of one recorded chunk (fMP4 file) stored on a media node. Video bytes are never stored here."""
 
@@ -26,6 +71,12 @@ class RecordingSegment(Model):
     duration_ms = fields.IntField()
     size_bytes = fields.BigIntField()
     codec = fields.CharField(max_length=32, null=True)
+    audio_codec = fields.CharField(max_length=32, null=True)
+    audio_sample_rate = fields.IntField(null=True)
+    audio_channels = fields.IntField(null=True)
+    config_signature = fields.CharField(max_length=64, null=True)
+    origin = fields.CharEnumField(SegmentOrigin, max_length=16, default=SegmentOrigin.NVR)
+    backfill_job_id = fields.UUIDField(null=True)
     file_path = fields.CharField(max_length=512)  # relative to the volume's folder
     parts = fields.JSONField()  # HLS part durations in ms; part N is served at .../part/N.m4s
     status = fields.CharEnumField(SegmentStatus, max_length=16, default=SegmentStatus.AVAILABLE)

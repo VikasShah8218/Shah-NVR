@@ -253,6 +253,74 @@
         }
       }
     },
+    "/api/v1/media/{segment_id}/audio.aac": {
+      "get": {
+        "tags": [
+          "Recorded media"
+        ],
+        "summary": "AAC rendition of a recording's first audio track",
+        "description": "Transcode audio only; the original recording and video track are never modified or decoded.",
+        "operationId": "media_audio_api_v1_media__segment_id__audio_aac_get",
+        "parameters": [
+          {
+            "name": "segment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Segment Id"
+            }
+          },
+          {
+            "name": "start_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Start Ms"
+            }
+          },
+          {
+            "name": "duration_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Duration Ms"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/segments": {
       "get": {
         "tags": [
@@ -392,6 +460,47 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProbeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/profile-g/probe": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Read-only camera edge-storage capability and recording ranges",
+        "operationId": "profile_g_probe_api_v1_onvif_profile_g_probe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileGProbeOut"
                 }
               }
             }
@@ -634,6 +743,211 @@
             "description": "Successful Response",
             "content": {
               "image/jpeg": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/encoder/read": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Encoder Read",
+        "operationId": "encoder_read_api_v1_onvif_encoder_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncoderReadIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncoderState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/encoder/check": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Encoder Check",
+        "operationId": "encoder_check_api_v1_onvif_encoder_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncoderApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncoderState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/encoder/apply": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Encoder Apply",
+        "operationId": "encoder_apply_api_v1_onvif_encoder_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncoderApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncoderResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/ptz/open": {
+      "post": {
+        "tags": [
+          "PTZ"
+        ],
+        "summary": "Open Ptz",
+        "operationId": "open_ptz_api_v1_onvif_ptz_open_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PtzOpenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PtzState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/ptz/command": {
+      "post": {
+        "tags": [
+          "PTZ"
+        ],
+        "summary": "Ptz Command",
+        "operationId": "ptz_command_api_v1_onvif_ptz_command_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PtzCommandIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PtzResult"
+                }
+              }
             }
           },
           "422": {
@@ -930,6 +1244,536 @@
         ],
         "title": "DiscoveredDevice"
       },
+      "EncoderApplyIn": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "default": 80
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "default": ""
+          },
+          "xaddr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xaddr"
+          },
+          "profile_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Token"
+          },
+          "revision": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Revision"
+          },
+          "values": {
+            "$ref": "#/components/schemas/EncoderValues"
+          },
+          "acknowledge_shared": {
+            "type": "boolean",
+            "title": "Acknowledge Shared",
+            "default": false
+          },
+          "camera_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Camera Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host",
+          "revision",
+          "values"
+        ],
+        "title": "EncoderApplyIn"
+      },
+      "EncoderOption": {
+        "properties": {
+          "encoding": {
+            "type": "string",
+            "title": "Encoding"
+          },
+          "resolutions": {
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Resolutions",
+            "default": []
+          },
+          "fps_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps Range"
+          },
+          "frame_rates": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Frame Rates",
+            "default": []
+          },
+          "bitrate_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bitrate Range"
+          },
+          "gop_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gop Range"
+          },
+          "quality_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Range"
+          },
+          "codec_profiles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Codec Profiles",
+            "default": []
+          },
+          "rate_controls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rate Controls",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "encoding"
+        ],
+        "title": "EncoderOption"
+      },
+      "EncoderProfile": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "encoder_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoder Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "EncoderProfile"
+      },
+      "EncoderReadIn": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "default": 80
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "default": ""
+          },
+          "xaddr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xaddr"
+          },
+          "profile_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host"
+        ],
+        "title": "EncoderReadIn"
+      },
+      "EncoderResult": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "mismatch",
+              "unknown"
+            ],
+            "title": "Outcome"
+          },
+          "before": {
+            "$ref": "#/components/schemas/EncoderState"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EncoderState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "recovery": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Recovery",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome",
+          "before",
+          "message"
+        ],
+        "title": "EncoderResult"
+      },
+      "EncoderState": {
+        "properties": {
+          "api": {
+            "type": "string",
+            "title": "Api"
+          },
+          "profile_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Token"
+          },
+          "encoder_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoder Token"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EncoderValues"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/EncoderOption"
+            },
+            "type": "array",
+            "title": "Options",
+            "default": []
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/EncoderProfile"
+            },
+            "type": "array",
+            "title": "Profiles",
+            "default": []
+          },
+          "shared_profiles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Shared Profiles",
+            "default": []
+          },
+          "use_count": {
+            "type": "integer",
+            "title": "Use Count",
+            "default": 0
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "api",
+          "profile_token"
+        ],
+        "title": "EncoderState"
+      },
+      "EncoderValues": {
+        "properties": {
+          "encoding": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "H264",
+                  "H265"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoding"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "fps": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps"
+          },
+          "bitrate_kbps": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bitrate Kbps"
+          },
+          "gop": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gop"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality"
+          },
+          "rate_control": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "CBR",
+                  "VBR"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Control"
+          },
+          "codec_profile": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codec Profile"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EncoderValues"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -994,6 +1838,55 @@
               }
             ],
             "title": "Codec"
+          },
+          "audio_codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Codec"
+          },
+          "audio_sample_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Sample Rate"
+          },
+          "audio_channels": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Channels"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/SegmentOrigin",
+            "default": "NVR"
+          },
+          "backfill_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backfill Job Id"
           },
           "part_count": {
             "type": "integer",
@@ -1313,6 +2206,119 @@
         ],
         "title": "ProbeOut"
       },
+      "ProfileGProbeOut": {
+        "properties": {
+          "supported": {
+            "type": "boolean",
+            "title": "Supported"
+          },
+          "recording_service": {
+            "type": "boolean",
+            "title": "Recording Service"
+          },
+          "search_service": {
+            "type": "boolean",
+            "title": "Search Service"
+          },
+          "replay_service": {
+            "type": "boolean",
+            "title": "Replay Service"
+          },
+          "earliest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "recordings": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileGRecordingOut"
+            },
+            "type": "array",
+            "title": "Recordings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "supported",
+          "recording_service",
+          "search_service",
+          "replay_service",
+          "recordings"
+        ],
+        "title": "ProfileGProbeOut"
+      },
+      "ProfileGRecordingOut": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "earliest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "replay_available": {
+            "type": "boolean",
+            "title": "Replay Available",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "ProfileGRecordingOut"
+      },
       "ProfileOut": {
         "properties": {
           "token": {
@@ -1393,6 +2399,72 @@
             "type": "boolean",
             "title": "Has Audio"
           },
+          "audio_encoder_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Encoder Token"
+          },
+          "audio_encoding": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Encoding"
+          },
+          "audio_codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Codec"
+          },
+          "audio_bitrate_kbps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Bitrate Kbps"
+          },
+          "audio_sample_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Sample Rate"
+          },
+          "audio_channels": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Channels"
+          },
           "has_ptz": {
             "type": "boolean",
             "title": "Has Ptz"
@@ -1437,6 +2509,405 @@
         ],
         "title": "ProfileOut"
       },
+      "PtzCapabilities": {
+        "properties": {
+          "pan_tilt": {
+            "type": "boolean",
+            "title": "Pan Tilt",
+            "default": false
+          },
+          "zoom": {
+            "type": "boolean",
+            "title": "Zoom",
+            "default": false
+          },
+          "presets": {
+            "type": "boolean",
+            "title": "Presets",
+            "default": false
+          },
+          "home": {
+            "type": "boolean",
+            "title": "Home",
+            "default": false
+          },
+          "home_set": {
+            "type": "boolean",
+            "title": "Home Set",
+            "default": false
+          },
+          "camera_timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera Timeout Seconds"
+          }
+        },
+        "type": "object",
+        "title": "PtzCapabilities"
+      },
+      "PtzCommand": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 16,
+            "title": "Session Id"
+          },
+          "sequence": {
+            "type": "integer",
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Sequence"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "move",
+              "stop",
+              "refresh",
+              "preset_save",
+              "preset_goto",
+              "preset_remove",
+              "home_goto",
+              "home_set"
+            ],
+            "title": "Action"
+          },
+          "pan": {
+            "type": "number",
+            "maximum": 0.5,
+            "minimum": -0.5,
+            "title": "Pan",
+            "default": 0
+          },
+          "tilt": {
+            "type": "number",
+            "maximum": 0.5,
+            "minimum": -0.5,
+            "title": "Tilt",
+            "default": 0
+          },
+          "zoom": {
+            "type": "number",
+            "maximum": 0.5,
+            "minimum": -0.5,
+            "title": "Zoom",
+            "default": 0
+          },
+          "preset_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset Token"
+          },
+          "preset_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset Name"
+          },
+          "confirm": {
+            "type": "boolean",
+            "title": "Confirm",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session_id",
+          "sequence",
+          "action"
+        ],
+        "title": "PtzCommand"
+      },
+      "PtzCommandIn": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "default": 80
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "default": ""
+          },
+          "xaddr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xaddr"
+          },
+          "profile_token": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Profile Token"
+          },
+          "command": {
+            "$ref": "#/components/schemas/PtzCommand"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host",
+          "profile_token",
+          "command"
+        ],
+        "title": "PtzCommandIn"
+      },
+      "PtzOpenIn": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "default": 80
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "default": ""
+          },
+          "xaddr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xaddr"
+          },
+          "profile_token": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Profile Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host",
+          "profile_token"
+        ],
+        "title": "PtzOpenIn"
+      },
+      "PtzPreset": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "name"
+        ],
+        "title": "PtzPreset"
+      },
+      "PtzResult": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PtzStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "presets": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PtzPreset"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "PtzResult"
+      },
+      "PtzState": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "title": "Expires In Seconds",
+            "default": 120
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/PtzCapabilities"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PtzStatus"
+          },
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/PtzPreset"
+            },
+            "type": "array",
+            "title": "Presets",
+            "default": []
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "capabilities",
+          "status"
+        ],
+        "title": "PtzState"
+      },
+      "PtzStatus": {
+        "properties": {
+          "pan": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pan"
+          },
+          "tilt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tilt"
+          },
+          "zoom": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zoom"
+          },
+          "pan_tilt_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pan Tilt State"
+          },
+          "zoom_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zoom State"
+          },
+          "position_valid": {
+            "type": "boolean",
+            "title": "Position Valid",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PtzStatus"
+      },
       "RebootOut": {
         "properties": {
           "message": {
@@ -1449,6 +2920,14 @@
           "message"
         ],
         "title": "RebootOut"
+      },
+      "SegmentOrigin": {
+        "type": "string",
+        "enum": [
+          "NVR",
+          "CAMERA_SD"
+        ],
+        "title": "SegmentOrigin"
       },
       "SnapshotIn": {
         "properties": {

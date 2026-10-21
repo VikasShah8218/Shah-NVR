@@ -26,6 +26,13 @@ requirements
 CLAUDE.md
 .claude/
 docs
+!docs/
+docs/*
+!docs/DESKTOP_FEATURE_PARITY.md
+!docs/H5_ONVIF_SERVER.md
+!docs/H6_AUDIO_INTEGRATION.md
+!docs/L3_EDGE_STORAGE_BACKFILL.md
+!docs/PRODUCTION_READINESS_ROADMAP.md
 IMPLEMENTATION_PLAN.md
 Initial_archetecture.txt
 *PLAN*.md

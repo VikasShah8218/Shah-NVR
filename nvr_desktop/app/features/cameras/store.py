@@ -15,11 +15,17 @@ from app.features.cameras import forms
 CAMERA_ROLES = [
     "id", "name", "description", "username", "has_password", "enabled", "retention_days",
     "created_at", "updated_at", "streams", "assignment", "lastSegment", "recordStatus",
+    "onvif_host", "onvif_port", "manufacturer", "deviceModel", "firmware", "serial", "mac",
+    "onvif_services", "onvif_reachable", "clock_offset_seconds", "onvif_checked_at",
+    "expose_via_onvif",
 ]
 
 
 def _decorate(camera: dict) -> dict:
     """Add the computed fields the camera table and live list show."""
+    # `model` is QML's delegate row object. Keep the API field in dictionaries,
+    # but expose hardware identity under a non-conflicting list role.
+    camera["deviceModel"] = camera.get("model")
     segments = sorted(s["last_segment_at"] for s in camera["streams"] if s.get("last_segment_at"))
     record_stream = next((s for s in camera["streams"] if s["record"]), camera["streams"][0] if camera["streams"] else None)
     camera["lastSegment"] = segments[-1] if segments else None

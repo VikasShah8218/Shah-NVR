@@ -83,12 +83,16 @@ def build_app():
     from app.core.utils import Utils
     from app.features.assignments.store import AssignmentsStore
     from app.features.cameras.detail_store import CameraDetailStore
+    from app.features.cameras.backfill_store import BackfillStore
     from app.features.cameras.store import CamerasStore
     from app.features.dashboard.cluster_store import ClusterStore
     from app.features.dashboard.store import DashboardStore
     from app.features.live.store import LiveStore
+    from app.features.live.ptz_store import PtzStore
     from app.features.nodes.detail_store import NodeDetailStore
     from app.features.nodes.store import NodesStore
+    from app.features.onvif.store import DiscoverStore
+    from app.features.encoder.store import EncoderStore
     from app.features.playback.store import PlaybackStore
     from app.features.settings.store import SettingsStore
     from app.video import register_video_types
@@ -112,11 +116,15 @@ def build_app():
         "Cluster": cluster,
         "Cameras": cameras,
         "Nodes": nodes,
+        "Discover": DiscoverStore(ctx, cameras, nodes),
         "Dashboard": DashboardStore(ctx, cluster, cameras, nodes),
-        "CameraDetail": CameraDetailStore(ctx),
-        "NodeDetail": NodeDetailStore(ctx),
+        "CameraDetail": CameraDetailStore(ctx, nodes),
+        "Backfill": BackfillStore(ctx),
+        "Encoder": EncoderStore(ctx, cameras),
+        "NodeDetail": NodeDetailStore(ctx, cameras, nodes),
         "Assignments": AssignmentsStore(ctx),
-        "Live": LiveStore(ctx),
+        "Live": LiveStore(ctx, cameras, nodes),
+        "Ptz": PtzStore(ctx),
         "Playback": PlaybackStore(ctx, cameras, nodes),
         "SettingsPage": SettingsStore(ctx),
     }

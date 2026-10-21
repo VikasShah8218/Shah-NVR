@@ -24,6 +24,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { type LiveProtocol, readStored, useSettings, writeStored } from "@/lib/settings"
 import { cn } from "@/lib/utils"
 import { LivePlayer, pickStream, saveSnapshot } from "./LivePlayer"
+import { PtzPanel } from "./PtzPanel"
 
 const LAYOUTS = [1, 4, 9, 16] as const
 type Layout = (typeof LAYOUTS)[number]
@@ -195,7 +196,10 @@ export function LivePage() {
             <DialogTitle>{fullscreenCam != null ? byId.get(fullscreenCam)?.name : ""} · main stream</DialogTitle>
           </DialogHeader>
           {fullscreenCam != null && (
-            <LivePlayer cameraId={fullscreenCam} profile="main" protocol={protocol} className="aspect-video w-full rounded-md" />
+            <div className="max-h-[80vh] space-y-2 overflow-auto">
+              <LivePlayer cameraId={fullscreenCam} profile="main" protocol={protocol} className="aspect-video w-full rounded-md" />
+              <FullscreenPtz key={fullscreenCam} cameraId={fullscreenCam} />
+            </div>
           )}
         </DialogContent>
       </Dialog>
@@ -219,6 +223,7 @@ function LiveTile({
   const navigate = useNavigate()
   const live = useLive(camera.id)
   const [override, setOverride] = useState<LiveProtocol | null>(null)
+  const [ptzOpen, setPtzOpen] = useState(false)
   const videoEl = useRef<HTMLVideoElement | null>(null)
   const setVideo = useCallback((v: HTMLVideoElement | null) => {
     videoEl.current = v
@@ -235,6 +240,9 @@ function LiveTile({
   return (
     <div className="group relative size-full" onDoubleClick={onExpand}>
       <LivePlayer cameraId={camera.id} profile={profile} protocol={protocol} className="size-full" onVideo={setVideo} />
+      {ptzOpen && <div className="absolute inset-x-2 bottom-2 z-10 max-h-[75%] overflow-auto">
+        <PtzPanel cameraId={camera.id} profile={profile} />
+      </div>}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center gap-2 bg-gradient-to-b from-black/60 to-transparent px-2 py-1.5 text-xs text-white">
         <span className="truncate font-medium">{camera.name}</span>
         {recording && (
@@ -243,7 +251,8 @@ function LiveTile({
           </span>
         )}
         <span className="text-white/60">{profile}</span>
-        <div className="pointer-events-auto ml-auto flex opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="pointer-events-auto ml-auto flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          <Button variant="ghost" size="sm" className="h-6 text-white" onClick={() => setPtzOpen((v) => !v)}>PTZ</Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="size-6 text-white hover:bg-white/15 hover:text-white">
@@ -280,4 +289,10 @@ function LiveTile({
       </div>
     </div>
   )
+}
+
+function FullscreenPtz({ cameraId }: { cameraId: number }) {
+  const [open, setOpen] = useState(false)
+  return <><Button size="sm" variant="outline" onClick={() => setOpen((v) => !v)}>{open ? "Close PTZ" : "Open PTZ"}</Button>
+    {open && <PtzPanel cameraId={cameraId} profile="main" />}</>
 }
