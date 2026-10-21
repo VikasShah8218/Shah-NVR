@@ -31,7 +31,10 @@ export function NodesPage() {
       {nodes.data && nodes.data.length > 0 && (
         <>
           <ClusterTotals nodes={nodes.data} />
-          <Card className="mt-4 overflow-hidden py-0">
+          <div className="mt-4 space-y-2 md:hidden">
+            {nodes.data.map((n) => <MobileNodeCard key={n.id} node={n} onOpen={() => navigate(`/nodes/${n.id}`)} />)}
+          </div>
+          <Card className="mt-4 hidden overflow-hidden py-0 md:block">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
@@ -56,6 +59,23 @@ export function NodesPage() {
       )}
     </div>
   )
+}
+
+function MobileNodeCard({ node, onOpen }: { node: MediaNode; onOpen: () => void }) {
+  const r = nodeResources(node)
+  const stale = node.state === "UNREACHABLE" || node.state === "OFFLINE"
+  return <Card className="gap-3 p-4" onClick={onOpen}>
+    <div className="flex items-start gap-3">
+      <div className="min-w-0 flex-1"><div className="truncate font-medium">{node.name}</div><div className="mt-1"><StatusBadge status={node.state} /></div></div>
+      <div onClick={(e) => e.stopPropagation()}><NodeActions node={node} /></div>
+    </div>
+    <div className={stale ? "space-y-3 opacity-50" : "space-y-3"}>
+      <div className="grid grid-cols-2 gap-3"><UsageMeter value={formatPercent(r.cpuPercent)} percent={r.cpuPercent} hint="CPU" /><UsageMeter value={`${formatBytes(r.memUsed)} / ${formatBytes(r.memTotal)}`} percent={r.memPercent} hint="RAM" /></div>
+      <UsageMeter value={r.quota != null ? `${formatBytes(r.recordings)} / ${formatBytes(r.quota)}` : `${formatBytes(r.recordings)} · no quota`} percent={r.storagePercent} hint={`Storage · ${formatBytes(r.diskFree)} free`} />
+      <div className="grid grid-cols-2 gap-3 text-xs"><div><span className="text-muted-foreground">Cameras </span>{node.assigned_cameras}/{node.capacity_cameras}</div><div className="text-right tabular-nums">↓ {formatMbps(r.netRx)} · ↑ {formatMbps(r.netTx)}</div></div>
+    </div>
+    <div className="text-[11px] text-muted-foreground">Heartbeat {timeAgo(node.last_heartbeat_at)} · MediaMTX {node.mediamtx_version ?? "?"}</div>
+  </Card>
 }
 
 function NodeRow({ node, onOpen }: { node: MediaNode; onOpen: () => void }) {
@@ -129,7 +149,7 @@ function ClusterTotals({ nodes }: { nodes: MediaNode[] }) {
   const capacity = nodes.reduce((a, n) => a + n.capacity_cameras, 0)
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-5">
       <KpiCard icon={Server} label="Nodes healthy" value={`${healthy} / ${nodes.length}`} tone={healthy < nodes.length ? "warning" : "success"} />
       <KpiCard icon={Cpu} label="CPU (average)" value={formatPercent(cpuAvg)} hint={`${sum((r) => r.cpuCount)} cores total`} />
       <KpiCard

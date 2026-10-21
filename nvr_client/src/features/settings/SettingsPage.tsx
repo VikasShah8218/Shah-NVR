@@ -48,7 +48,7 @@ export function SettingsPage() {
         <CardContent className="space-y-3">
           <div className="grid gap-1.5">
             <Label htmlFor="url">API URL</Label>
-            <div className="flex gap-2">
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
               <Input id="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://192.168.1.3:8000" />
               <Button variant="outline" onClick={testConnection} disabled={test.kind === "testing"}>
                 {test.kind === "testing" && <Loader2 className="size-4 animate-spin" />} Test
@@ -76,13 +76,13 @@ export function SettingsPage() {
           <CardTitle className="text-base">Display</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
             <div>
               <Label>Refresh interval</Label>
               <p className="text-xs text-muted-foreground">How often lists and statuses are refreshed.</p>
             </div>
             <Select value={String(settings.pollSeconds)} onValueChange={(v) => update({ pollSeconds: Number(v) })}>
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-full sm:w-32">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -94,13 +94,13 @@ export function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
             <div>
               <Label>Media node connection</Label>
               <p className="text-xs text-muted-foreground">Auto uses LAN when reachable and otherwise uses each node&apos;s public mapping.</p>
             </div>
             <Select value={settings.nodeAccess} onValueChange={(v) => { update({ nodeAccess: v as NodeAccessPreference }); qc.removeQueries({ queryKey: ["node-access"] }) }}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -110,13 +110,13 @@ export function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
             <div>
               <Label>Live video protocol</Label>
               <p className="text-xs text-muted-foreground">WebRTC has the lowest delay; LL-HLS works through more networks.</p>
             </div>
             <Select value={settings.liveProtocol} onValueChange={(v) => update({ liveProtocol: v as LiveProtocol })}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

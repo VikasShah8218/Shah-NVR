@@ -147,9 +147,9 @@ export function PlaybackPage() {
     <div className="space-y-4">
       <PageHeader title="Playback" description="Browse and play recordings. Click the timeline to play from that moment." />
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
         <Select value={cameraId != null ? String(cameraId) : undefined} onValueChange={(v) => { setCameraId(Number(v)); setPlayFrom(null); setPlayhead(null) }}>
-          <SelectTrigger className="w-56">
+          <SelectTrigger className="col-span-2 w-full sm:w-56">
             <SelectValue placeholder="Select camera" />
           </SelectTrigger>
           <SelectContent>
@@ -161,7 +161,7 @@ export function PlaybackPage() {
           </SelectContent>
         </Select>
         <Select value={profile} onValueChange={(v) => { setProfile(v); setPlayFrom(null) }}>
-          <SelectTrigger className="w-28">
+          <SelectTrigger className="w-full sm:w-28">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -172,13 +172,13 @@ export function PlaybackPage() {
             ))}
           </SelectContent>
         </Select>
-        <div className="flex items-center">
+        <div className="flex min-w-0 items-center">
           <Button variant="outline" size="icon" className="rounded-r-none" onClick={() => changeDay(new Date(dayStart - DAY))}>
             <ChevronLeft className="size-4" />
           </Button>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="rounded-none border-x-0">
+              <Button variant="outline" className="min-w-0 flex-1 rounded-none border-x-0 px-2 sm:flex-none sm:px-4">
                 <CalendarDays className="size-4" /> {fmtDay(day)}
               </Button>
             </PopoverTrigger>
@@ -190,14 +190,14 @@ export function PlaybackPage() {
             <ChevronRight className="size-4" />
           </Button>
         </div>
-        <div className="flex items-center gap-1">
-          <Input className="w-28" placeholder="HH:MM:SS" value={goto} onChange={(e) => setGoto(e.target.value)} onKeyDown={(e) => e.key === "Enter" && goToTime()} />
+        <div className="col-span-2 flex items-center gap-1 sm:col-span-1">
+          <Input className="min-w-0 flex-1 sm:w-28 sm:flex-none" placeholder="HH:MM:SS" inputMode="numeric" value={goto} onChange={(e) => setGoto(e.target.value)} onKeyDown={(e) => e.key === "Enter" && goToTime()} />
           <Button variant="outline" onClick={goToTime}>
             Go
           </Button>
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" onClick={copyVlc} disabled={!src}>
+        <div className="col-span-2 flex items-center gap-2 sm:col-span-1 sm:ml-auto">
+          <Button variant="outline" className="w-full sm:w-auto" onClick={copyVlc} disabled={!src}>
             <Copy className="size-4" /> VLC URL
           </Button>
         </div>
@@ -207,7 +207,7 @@ export function PlaybackPage() {
 
       <Card className="gap-3 py-4">
         <CardContent className="space-y-3 px-4">
-          <div className="flex flex-wrap items-center gap-3 text-sm">
+          <div className="flex flex-col gap-3 text-sm sm:flex-row sm:flex-wrap sm:items-center">
             <ToggleGroup type="single" variant="outline" size="sm" value={String(zoom)} onValueChange={(v) => v && setZoomAround(Number(v))}>
               {ZOOMS.map((z) => (
                 <ToggleGroupItem key={z.label} value={String(z.ms)} className="px-3">
@@ -220,7 +220,7 @@ export function PlaybackPage() {
                 <Crosshair className="size-4" /> Now
               </Button>
             )}
-            <span className="ml-auto flex items-center gap-4 text-xs text-muted-foreground">
+            <span className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground sm:ml-auto sm:gap-4">
               <span className="flex items-center gap-1.5">
                 <span className="size-2.5 rounded-sm bg-success/75" /> recorded
               </span>
@@ -261,7 +261,23 @@ export function PlaybackPage() {
           {windowSegments.length === 0 ? (
             <div className="px-6 pb-2 text-sm text-muted-foreground">No recordings in this window.</div>
           ) : (
-            <Table>
+            <>
+            <div className="space-y-2 px-3 pb-3 md:hidden">
+              {[...windowSegments].reverse().map((s) => {
+                const start = new Date(s.start_time)
+                const apiUrl = nodeUrl.get(s.node_id)
+                return <button key={s.id} type="button" onClick={() => seek(start.getTime())} className="flex w-full items-center gap-3 rounded-lg border bg-background/30 p-3 text-left">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium tabular-nums">{fmtTime(start)} – {fmtTime(new Date(s.end_time))}</div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>{formatDuration(s.duration_ms)}</span><span>{formatBytes(s.size_bytes)}</span><span>{s.audio_codec ? s.audio_codec.toUpperCase() : "No audio"}</span><span>node {s.node_id}</span>
+                    </div>
+                  </div>
+                  {apiUrl && <a href={mediaFileUrl(apiUrl, s.id)} download title="Download MP4" aria-label="Download recording" onClick={(e) => e.stopPropagation()} className="grid size-11 shrink-0 place-items-center rounded-md hover:bg-accent"><Download className="size-4" /></a>}
+                </button>
+              })}
+            </div>
+            <div className="hidden md:block"><Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="pl-6">Start</TableHead>
@@ -298,7 +314,8 @@ export function PlaybackPage() {
                   )
                 })}
               </TableBody>
-            </Table>
+            </Table></div>
+            </>
           )}
         </CardContent>
       </Card>

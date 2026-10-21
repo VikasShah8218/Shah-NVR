@@ -82,7 +82,7 @@ export function ConnectivityTab({ node }: { node: MediaNode }) {
           </label>
         </div>
 
-        <div className="space-y-1 rounded-lg border bg-muted/30 p-3 font-mono text-xs">
+        <div className="space-y-1 overflow-hidden rounded-lg border bg-muted/30 p-3 font-mono text-xs [&>div]:break-all">
           <div>Public API preview: {enabled && apiUrl ? apiUrl : "disabled"}</div>
           <div>RTSP: rtsp://{enabled && host ? host : node.media_host}:{enabled ? rtspPort : node.rtsp_port}</div>
           <div>{tls && enabled ? "https" : "http"}://{enabled && host ? host : node.media_host}:{enabled ? hlsPort : node.hls_port} (HLS)</div>
@@ -94,7 +94,7 @@ export function ConnectivityTab({ node }: { node: MediaNode }) {
           port cannot be represented by this mapping. HTTPS pages also require HTTPS media endpoints to avoid browser mixed-content blocking.
         </div>
 
-        <Button onClick={save} disabled={!valid || update.isPending}>Save connectivity</Button>
+        <Button className="w-full sm:w-auto" onClick={save} disabled={!valid || update.isPending}>Save connectivity</Button>
       </CardContent>
     </Card>
   )

@@ -44,7 +44,7 @@ export function BackfillTab({ camera: c, active }: { camera: Camera; active: boo
     <div className="space-y-4">
       {(config.error || jobs.error) && <ErrorState error={config.error ?? jobs.error!} />}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
           <CardTitle className="flex items-center gap-2 text-sm font-medium">
             <DatabaseBackup className="size-4" /> Camera SD storage
           </CardTitle>
@@ -122,7 +122,16 @@ export function BackfillTab({ camera: c, active }: { camera: Camera; active: boo
         <CardHeader><CardTitle className="text-sm font-medium">Backfill jobs</CardTitle></CardHeader>
         <CardContent>
           {!jobs.data?.length ? <p className="text-sm text-muted-foreground">No jobs yet.</p> : (
-            <Table>
+            <>
+            <div className="space-y-2 md:hidden">{jobs.data.map((job) => (
+              <div key={job.id} className="space-y-2 rounded-lg border p-3">
+                <div className="flex items-center justify-between gap-2"><span className={job.state === "FAILED" ? "text-danger" : ACTIVE.has(job.state) ? "text-warning" : "text-success"}>{job.state}</span><span className="text-xs text-muted-foreground">{job.imported_seconds ? `${job.imported_seconds.toFixed(1)} s imported` : "—"}</span></div>
+                <div className="text-xs">{fmtDateTime(new Date(job.start_time))}<br />to {fmtDateTime(new Date(job.end_time))}</div>
+                <div><Progress value={job.progress_percent} /><span className="text-xs text-muted-foreground">{job.progress_percent.toFixed(0)}%</span></div>
+                <div className="text-xs text-muted-foreground">{job.error_message ?? `Attempt ${job.attempt_count}`}</div>
+              </div>
+            ))}</div>
+            <div className="hidden md:block"><Table>
               <TableHeader><TableRow><TableHead>Range</TableHead><TableHead>Status</TableHead><TableHead>Progress</TableHead><TableHead>Imported</TableHead><TableHead>Detail</TableHead></TableRow></TableHeader>
               <TableBody>{jobs.data.map((job) => (
                 <TableRow key={job.id}>
@@ -133,7 +142,8 @@ export function BackfillTab({ camera: c, active }: { camera: Camera; active: boo
                   <TableCell className="max-w-64 text-xs text-muted-foreground">{job.error_message ?? `Attempt ${job.attempt_count}`}</TableCell>
                 </TableRow>
               ))}</TableBody>
-            </Table>
+            </Table></div>
+            </>
           )}
         </CardContent>
       </Card>

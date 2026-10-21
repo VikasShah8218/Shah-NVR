@@ -44,12 +44,12 @@ export function CameraDetailPage() {
         actions={
           <>
             {!c.enabled && <StatusBadge status="DISABLED" />}
-            <Button variant="outline" asChild>
+            <Button variant="outline" className="flex-1 sm:flex-none" asChild>
               <Link to={`/playback?camera=${c.id}`}>
                 <History className="size-4" /> Recordings
               </Link>
             </Button>
-            <Button onClick={() => setEditing(true)}>
+            <Button className="flex-1 sm:flex-none" onClick={() => setEditing(true)}>
               <Pencil className="size-4" /> Edit
             </Button>
           </>
@@ -164,7 +164,22 @@ function Overview({ camera: c }: { camera: Camera }) {
       </div>
 
       <Card className="py-0 xl:col-span-5">
-        <Table>
+        <div className="space-y-2 p-3 md:hidden">{c.streams.map((s) => (
+          <div key={s.profile} className="space-y-2 rounded-lg border p-3">
+            <div className="flex items-center justify-between gap-2"><span className="font-medium">{s.profile}</span><StatusBadge status={s.status} /></div>
+            {s.status_detail && <div className="text-xs text-muted-foreground">{s.status_detail}</div>}
+            <div className="break-all rounded bg-muted px-2 py-1 font-mono text-[11px]">{s.source_url}</div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div><span className="text-muted-foreground">Mode </span>{s.record ? "Recording" : "Live only"}</div>
+              <div><span className="text-muted-foreground">Transport </span>{s.rtsp_transport.toUpperCase()}</div>
+              <div><span className="text-muted-foreground">Audio </span>{s.audio_codec?.toUpperCase() ?? (s.audio_state === "none" ? "None" : s.audio_state === "available" ? "Available" : "Unknown")}</div>
+              <div><span className="text-muted-foreground">Received </span>{formatBytes(s.bytes_received)}</div>
+              <div><span className="text-muted-foreground">Last chunk </span>{s.last_segment_at ? timeAgo(s.last_segment_at) : "—"}</div>
+              <div><span className="text-muted-foreground">Report </span>{s.last_status_at ? timeAgo(s.last_status_at) : "—"}</div>
+            </div>
+          </div>
+        ))}</div>
+        <div className="hidden md:block"><Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="pl-4">Stream</TableHead>
@@ -211,7 +226,7 @@ function Overview({ camera: c }: { camera: Camera }) {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </Table></div>
       </Card>
     </div>
   )
@@ -303,7 +318,10 @@ function AssignmentTab({ camera: c }: { camera: Camera }) {
         </CardContent>
       </Card>
       <Card className="py-0 lg:col-span-2">
-        <Table>
+        <div className="space-y-2 p-3 md:hidden">{(history.data ?? []).map((h) => (
+          <div key={h.generation} className="rounded-lg border p-3 text-sm"><div className="flex justify-between gap-2"><b>Generation {h.generation}</b><span>{h.node_id ? `node ${h.node_id}` : "—"}</span></div><div className="mt-1 text-muted-foreground">{h.reason}</div><div className="mt-2 text-xs tabular-nums">{fmtDateTime(new Date(h.started_at))}<br />to {h.ended_at ? fmtDateTime(new Date(h.ended_at)) : <span className="text-success">current</span>}</div></div>
+        ))}</div>
+        <div className="hidden md:block"><Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="pl-4">Generation</TableHead>
@@ -324,7 +342,7 @@ function AssignmentTab({ camera: c }: { camera: Camera }) {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </Table></div>
       </Card>
       {moving && (
         <MoveCameraDialog cameraId={c.id} cameraName={c.name} currentNodeId={a?.node_id ?? null} open onOpenChange={setMoving} />

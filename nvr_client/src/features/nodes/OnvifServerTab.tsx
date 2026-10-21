@@ -32,7 +32,7 @@ export function OnvifServerTab({ node }: { node: MediaNode }) {
   return <div className="space-y-4">
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <div><CardTitle className="text-base">Virtual ONVIF NVR</CardTitle>
             <CardDescription>Expose this node and its assigned cameras to third-party VMS software.</CardDescription></div>
           <div className="flex items-center gap-3"><StatusBadge status={state.status.toUpperCase()} />

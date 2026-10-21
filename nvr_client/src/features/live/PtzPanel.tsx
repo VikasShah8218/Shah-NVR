@@ -78,7 +78,7 @@ function Controls({ url, cameraId, profile, onReload }: { url: string; cameraId:
   const disabled = loading || busy || !!error || !state
   const moveButton = (label: string, velocity: Velocity, supported: boolean) => (
     <Button type="button" variant="outline" size="sm" disabled={disabled || !supported}
-      aria-label={label} title={`Hold: ${label}`} className="touch-none select-none"
+      aria-label={label} title={`Hold: ${label}`} className="min-h-11 min-w-20 touch-none select-none md:min-h-0 md:min-w-0"
       onContextMenu={(e) => e.preventDefault()}
       onPointerDown={(e) => {
         if (e.button !== 0) return
@@ -99,17 +99,17 @@ function Controls({ url, cameraId, profile, onReload }: { url: string; cameraId:
     {loading && <p>Reading camera capabilities…</p>}
     {error && <p role="alert" className="text-danger">{error}</p>}
     {state?.warnings.map((w) => <p key={w} className="text-warning">{w}</p>)}
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
       {moveButton("Left", { pan: -speed }, !!caps?.pan_tilt)}
       {moveButton("Right", { pan: speed }, !!caps?.pan_tilt)}
       {moveButton("Up", { tilt: speed }, !!caps?.pan_tilt)}
       {moveButton("Down", { tilt: -speed }, !!caps?.pan_tilt)}
       {moveButton("Zoom +", { zoom: speed }, !!caps?.zoom)}
       {moveButton("Zoom −", { zoom: -speed }, !!caps?.zoom)}
-      <Button size="sm" variant="destructive" disabled={!state} onClick={stop}>Stop</Button>
+      <Button size="sm" variant="destructive" className="min-h-11 sm:min-h-0" disabled={!state} onClick={stop}>Stop</Button>
     </div>
-    <label className="flex items-center gap-2">Speed
-      <input aria-label="PTZ speed" type="range" min="0.05" max="0.5" step="0.05" value={speed}
+    <label className="flex items-center gap-2 py-2">Speed
+      <input aria-label="PTZ speed" className="h-10 min-w-0 flex-1 accent-primary sm:h-auto sm:flex-none" type="range" min="0.05" max="0.5" step="0.05" value={speed}
         onChange={(e) => { stop(); setSpeed(Number(e.target.value)) }} />{speed.toFixed(2)}
     </label>
     {state && <p className="text-muted-foreground">Last read status: pan/tilt {state.status.pan_tilt_state ?? "unknown"}, zoom {state.status.zoom_state ?? "unknown"}.
@@ -125,7 +125,7 @@ function Controls({ url, cameraId, profile, onReload }: { url: string; cameraId:
           if (window.confirm("Delete this preset from the camera?")) void operate({ action: "preset_remove", preset_token: preset, confirm: true })
         }}>Delete</Button>
       </div>
-      <div className="flex gap-2"><Input aria-label="New preset name" placeholder="New preset name" maxLength={64} value={name} onChange={(e) => setName(e.target.value)} />
+      <div className="flex flex-col gap-2 sm:flex-row"><Input aria-label="New preset name" placeholder="New preset name" maxLength={64} value={name} onChange={(e) => setName(e.target.value)} />
         <Button size="sm" disabled={disabled || !name.trim()} onClick={() => void operate({ action: "preset_save", preset_name: name.trim() })}>Save position</Button>
       </div>
     </div>}
