@@ -91,7 +91,7 @@ export function Timeline({
   }
 
   return (
-    <div className="select-none">
+    <div className="select-none py-1">
       <svg
         ref={ref}
         className={cn("w-full touch-none", onPan ? "cursor-grab active:cursor-grabbing" : "cursor-pointer")}
@@ -99,6 +99,7 @@ export function Timeline({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={() => { drag.current = null }}
         onPointerLeave={() => setHover(null)}
       >
         <defs>

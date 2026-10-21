@@ -20,8 +20,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { type LiveProtocol, readStored, useSettings, writeStored } from "@/lib/settings"
+import { useMediaQuery } from "@/lib/useMediaQuery"
 import { cn } from "@/lib/utils"
 import { LivePlayer, pickStream, saveSnapshot } from "./LivePlayer"
 import { PtzPanel } from "./PtzPanel"
@@ -29,6 +31,7 @@ import { PtzPanel } from "./PtzPanel"
 const LAYOUTS = [1, 4, 9, 16] as const
 type Layout = (typeof LAYOUTS)[number]
 const STORAGE_KEY = "shah-nvr.live"
+const MOBILE_STORAGE_KEY = "shah-nvr.live.mobile"
 
 interface LiveState {
   layout: Layout
@@ -40,17 +43,26 @@ const recordStatus = (c: Camera) => (c.enabled ? (c.streams.find((s) => s.record
 export function LivePage() {
   const cameras = useCameras()
   const { settings } = useSettings()
-  const [state, setState] = useState<LiveState>(() => readStored(STORAGE_KEY, { layout: 4, tiles: Array(16).fill(null) }))
+  const isMobile = useMediaQuery("(max-width: 767px)")
+  const [desktopState, setDesktopState] = useState<LiveState>(() => readStored(STORAGE_KEY, { layout: 4, tiles: Array(16).fill(null) }))
+  const [mobileState, setMobileState] = useState<LiveState>(() => readStored(MOBILE_STORAGE_KEY, { layout: 1, tiles: Array(16).fill(null) }))
+  const state = isMobile ? mobileState : desktopState
   const [selected, setSelected] = useState(0)
   const [protocol, setProtocol] = useState<LiveProtocol>(settings.liveProtocol)
   const [search, setSearch] = useState("")
   const [fullscreenCam, setFullscreenCam] = useState<number | null>(null)
+  const [cameraPicker, setCameraPicker] = useState(false)
   const gridRef = useRef<HTMLDivElement>(null)
 
   const save = useCallback((next: LiveState) => {
-    setState(next)
-    writeStored(STORAGE_KEY, next)
-  }, [])
+    if (isMobile) {
+      setMobileState(next)
+      writeStored(MOBILE_STORAGE_KEY, next)
+    } else {
+      setDesktopState(next)
+      writeStored(STORAGE_KEY, next)
+    }
+  }, [isMobile])
 
   const byId = useMemo(() => new Map((cameras.data ?? []).map((c) => [c.id, c])), [cameras.data])
   const visible = state.tiles.slice(0, state.layout)
@@ -62,6 +74,7 @@ export function LivePage() {
     if (target < 0) target = selected
     tiles[target] = cameraId
     save({ ...state, tiles })
+    setCameraPicker(false)
     setSelected(Math.min(state.layout - 1, target + 1))
   }
   const clearTile = (index: number) => {
@@ -73,9 +86,9 @@ export function LivePage() {
   const filtered = (cameras.data ?? []).filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <div className="-m-5 flex h-[calc(100dvh-3.5rem)]">
+    <div className="-m-3 flex min-h-full sm:-m-4 lg:-m-5 lg:h-[calc(100dvh-3.5rem)]">
       {/* camera list */}
-      <aside className="flex w-64 shrink-0 flex-col border-r bg-card/30">
+      <aside className="hidden w-64 shrink-0 flex-col border-r bg-card/30 md:flex">
         <div className="p-3">
           <div className="relative">
             <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
@@ -106,7 +119,10 @@ export function LivePage() {
 
       {/* grid */}
       <section className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-wrap items-center gap-3 border-b px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-2 border-b px-2 py-2 sm:px-4 sm:py-2.5">
+          <Button variant="outline" size="sm" className="md:hidden" onClick={() => setCameraPicker(true)}>
+            <CameraIcon className="size-4" /> Cameras
+          </Button>
           <ToggleGroup
             type="single"
             variant="outline"
@@ -114,14 +130,14 @@ export function LivePage() {
             value={String(state.layout)}
             onValueChange={(v) => v && save({ ...state, layout: Number(v) as Layout })}
           >
-            {LAYOUTS.map((l) => (
+            {(isMobile ? LAYOUTS.slice(0, 2) : LAYOUTS).map((l) => (
               <ToggleGroupItem key={l} value={String(l)} className="px-3">
                 {l === 1 ? "1" : `${Math.sqrt(l)}×${Math.sqrt(l)}`}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
           <Select value={protocol} onValueChange={(v) => setProtocol(v as LiveProtocol)}>
-            <SelectTrigger size="sm" className="w-48">
+            <SelectTrigger size="sm" className="min-w-0 flex-1 sm:w-48 sm:flex-none">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -130,12 +146,12 @@ export function LivePage() {
               <SelectItem value="hls">LL-HLS only</SelectItem>
             </SelectContent>
           </Select>
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex gap-1 sm:gap-2">
             <Button variant="outline" size="sm" onClick={() => save({ ...state, tiles: Array(16).fill(null) })}>
-              <Trash2 className="size-4" /> Clear
+              <Trash2 className="size-4" /> <span className="hidden sm:inline">Clear</span>
             </Button>
             <Button variant="outline" size="sm" onClick={() => gridRef.current?.requestFullscreen?.()}>
-              <Maximize className="size-4" /> Fullscreen
+              <Maximize className="size-4" /> <span className="hidden sm:inline">Fullscreen</span>
             </Button>
           </div>
         </div>
@@ -149,8 +165,8 @@ export function LivePage() {
         ) : (
           <div
             ref={gridRef}
-            className="grid min-h-0 flex-1 gap-1 bg-background p-1"
-            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${cols}, minmax(0, 1fr))` }}
+            className="grid min-h-0 flex-1 auto-rows-[minmax(12rem,calc((100vw-0.75rem)*9/16))] content-start gap-1 overflow-y-auto bg-background p-1 md:auto-rows-auto md:overflow-hidden"
+            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, ...(isMobile ? {} : { gridTemplateRows: `repeat(${cols}, minmax(0, 1fr))` }) }}
           >
             {visible.map((camId, i) => {
               const cam = camId != null ? byId.get(camId) : undefined
@@ -190,13 +206,32 @@ export function LivePage() {
         )}
       </section>
 
+      <Sheet open={cameraPicker} onOpenChange={setCameraPicker}>
+        <SheetContent side="bottom" className="max-h-[82dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)] md:hidden">
+          <SheetHeader className="border-b px-4 pb-3">
+            <SheetTitle>Choose a camera</SheetTitle>
+            <SheetDescription>Camera will be placed in selected tile {selected + 1}.</SheetDescription>
+          </SheetHeader>
+          <div className="px-4"><div className="relative"><Search className="absolute top-3 left-3 size-4 text-muted-foreground" /><Input className="h-11 pl-9" placeholder="Search cameras" value={search} onChange={(e) => setSearch(e.target.value)} /></div></div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+            {cameras.isLoading && <Loading />}
+            {cameras.error && <ErrorState error={cameras.error} />}
+            {filtered.map((c) => (
+              <button key={c.id} type="button" onClick={() => place(c.id)} disabled={!c.enabled} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left hover:bg-accent disabled:opacity-50">
+                <StatusDot status={recordStatus(c)} /><span className="min-w-0 flex-1 truncate">{c.name}</span>{visible.includes(c.id) && <span className="text-xs text-primary">On view</span>}
+              </button>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+
       <Dialog open={fullscreenCam != null} onOpenChange={(o) => !o && setFullscreenCam(null)}>
-        <DialogContent className="max-w-[min(96vw,1600px)] sm:max-w-[min(96vw,1600px)]">
+        <DialogContent className="h-dvh max-h-dvh w-screen max-w-none rounded-none p-3 sm:h-auto sm:max-h-[96dvh] sm:max-w-[min(96vw,1600px)] sm:rounded-lg sm:p-6">
           <DialogHeader>
             <DialogTitle>{fullscreenCam != null ? byId.get(fullscreenCam)?.name : ""} · main stream</DialogTitle>
           </DialogHeader>
           {fullscreenCam != null && (
-            <div className="max-h-[80vh] space-y-2 overflow-auto">
+            <div className="max-h-[calc(100dvh-5rem)] space-y-2 overflow-auto sm:max-h-[80vh]">
               <LivePlayer cameraId={fullscreenCam} profile="main" protocol={protocol} className="aspect-video w-full rounded-md" />
               <FullscreenPtz key={fullscreenCam} cameraId={fullscreenCam} />
             </div>
@@ -221,6 +256,7 @@ function LiveTile({
   onExpand: () => void
 }) {
   const navigate = useNavigate()
+  const isMobile = useMediaQuery("(max-width: 767px)")
   const live = useLive(camera.id)
   const [override, setOverride] = useState<LiveProtocol | null>(null)
   const [ptzOpen, setPtzOpen] = useState(false)
@@ -240,9 +276,15 @@ function LiveTile({
   return (
     <div className="group relative size-full" onDoubleClick={onExpand}>
       <LivePlayer cameraId={camera.id} profile={profile} protocol={protocol} className="size-full" onVideo={setVideo} />
-      {ptzOpen && <div className="absolute inset-x-2 bottom-2 z-10 max-h-[75%] overflow-auto">
+      {ptzOpen && <div className="absolute inset-x-2 bottom-2 z-10 hidden max-h-[75%] overflow-auto md:block">
         <PtzPanel cameraId={camera.id} profile={profile} />
       </div>}
+      {isMobile && <Sheet open={ptzOpen} onOpenChange={setPtzOpen}>
+        <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-2xl pb-[calc(1rem+env(safe-area-inset-bottom))] md:hidden">
+          <SheetHeader><SheetTitle>{camera.name} PTZ</SheetTitle><SheetDescription>Hold a movement control and release it to stop.</SheetDescription></SheetHeader>
+          <div className="px-3 pb-3"><PtzPanel cameraId={camera.id} profile={profile} /></div>
+        </SheetContent>
+      </Sheet>}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center gap-2 bg-gradient-to-b from-black/60 to-transparent px-2 py-1.5 text-xs text-white">
         <span className="truncate font-medium">{camera.name}</span>
         {recording && (
@@ -251,11 +293,11 @@ function LiveTile({
           </span>
         )}
         <span className="text-white/60">{profile}</span>
-        <div className="pointer-events-auto ml-auto flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-          <Button variant="ghost" size="sm" className="h-6 text-white" onClick={() => setPtzOpen((v) => !v)}>PTZ</Button>
+        <div className="pointer-events-auto ml-auto flex opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+          <Button variant="ghost" size="sm" className="h-8 min-w-11 text-white md:h-6 md:min-w-0" onClick={() => setPtzOpen((v) => !v)}>PTZ</Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-6 text-white hover:bg-white/15 hover:text-white">
+              <Button variant="ghost" size="icon" className="size-9 text-white hover:bg-white/15 hover:text-white md:size-6">
                 <MoreVertical className="size-4" />
               </Button>
             </DropdownMenuTrigger>

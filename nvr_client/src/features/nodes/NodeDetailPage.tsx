@@ -197,7 +197,8 @@ function NodeCameras({ apiUrl }: { apiUrl: string }) {
   if (!q.data.length) return <EmptyState title="No cameras on this node" />
   return (
     <Card className="py-0">
-      <Table>
+      <div className="space-y-2 p-3 md:hidden">{q.data.map((c) => <div key={c.camera_id} className="rounded-lg border p-3"><div className="flex items-center justify-between gap-2"><Link className="font-medium hover:text-primary" to={`/cameras/${c.camera_id}`}>{c.camera_name}</Link><span className="text-xs text-muted-foreground">Generation {c.generation}</span></div><div className="mt-2 flex flex-wrap gap-1">{c.streams.map((s) => <Badge key={s.profile} variant="secondary">{s.profile} {s.record ? "· rec" : "· live"}</Badge>)}</div></div>)}</div>
+      <div className="hidden md:block"><Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead>Camera</TableHead>
@@ -224,7 +225,7 @@ function NodeCameras({ apiUrl }: { apiUrl: string }) {
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+      </Table></div>
     </Card>
   )
 }
@@ -236,7 +237,8 @@ function NodePaths({ apiUrl }: { apiUrl: string }) {
   if (!q.data.length) return <EmptyState title="No active MediaMTX paths" />
   return (
     <Card className="py-0">
-      <Table>
+      <div className="space-y-2 p-3 md:hidden">{q.data.map((p) => <div key={p.name} className="space-y-2 rounded-lg border p-3"><div className="flex items-center justify-between gap-2"><span className="break-all font-mono text-xs">{p.name}</span><StatusBadge status={p.ready ? "STREAMING" : "CONNECTING"} /></div><div className="text-xs text-muted-foreground">{(p.tracks ?? []).map((t) => typeof t === "string" ? t : t.codec).join(", ") || "No tracks"}</div><div className="grid grid-cols-2 gap-2 text-xs"><span>{p.readers?.length ?? 0} viewers</span><span className="text-right">Online {p.readyTime ? timeAgo(p.readyTime) : "—"}</span><span>↓ {formatBytes(p.bytesReceived)}</span><span className="text-right">↑ {formatBytes(p.bytesSent)}</span></div></div>)}</div>
+      <div className="hidden md:block"><Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead>Path</TableHead>
@@ -263,7 +265,7 @@ function NodePaths({ apiUrl }: { apiUrl: string }) {
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+      </Table></div>
     </Card>
   )
 }
@@ -275,7 +277,8 @@ function NodeChunks({ apiUrl }: { apiUrl: string }) {
   if (!q.data.length) return <EmptyState title="No recorded chunks yet" />
   return (
     <Card className="py-0">
-      <Table>
+      <div className="space-y-2 p-3 md:hidden">{q.data.map((s) => <div key={s.id} className="flex items-center gap-3 rounded-lg border p-3"><div className="min-w-0 flex-1"><div className="text-sm tabular-nums">{fmtDateTime(new Date(s.start_time))}</div><Link to={`/cameras/${s.camera_id}`} className="text-xs text-primary">cam-{s.camera_id}/{s.profile}</Link><div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground"><span>{formatDuration(s.duration_ms)}</span><span>{formatBytes(s.size_bytes)}</span><span>{s.codec ?? "—"}</span><span>{s.uploaded ? "In catalog" : "Pending"}</span></div></div><Button variant="ghost" size="icon" className="size-11 shrink-0" asChild><a href={mediaFileUrl(apiUrl, s.id)} download title="Download MP4"><Download className="size-4" /></a></Button></div>)}</div>
+      <div className="hidden md:block"><Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead>Start</TableHead>
@@ -318,7 +321,7 @@ function NodeChunks({ apiUrl }: { apiUrl: string }) {
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+      </Table></div>
     </Card>
   )
 }

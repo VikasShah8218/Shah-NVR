@@ -102,11 +102,34 @@
     }
   body {
     @apply bg-background text-foreground;
+    min-width: 320px;
+    overscroll-behavior: none;
     }
   html {
     @apply font-sans;
     color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
     }
+  button, a, input, select, textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@media (pointer: coarse) {
+  [data-slot="button"],
+  [data-slot="toggle"],
+  [data-slot="tabs-trigger"] {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+  [data-slot="input"],
+  [data-slot="select-trigger"] {
+    min-height: 2.75rem;
+  }
+  [data-slot="dropdown-menu-item"],
+  [data-slot="select-item"] {
+    min-height: 2.75rem;
+  }
 }
 
 /* Thin, theme-coloured scrollbars */

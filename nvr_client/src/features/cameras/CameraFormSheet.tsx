@@ -150,7 +150,7 @@ export function CameraFormSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto data-[side=right]:sm:max-w-xl">
+      <SheetContent className="w-full overflow-y-auto pb-[env(safe-area-inset-bottom)] data-[side=right]:sm:max-w-xl">
         <SheetHeader>
           <SheetTitle>{camera ? `Edit ${camera.name}` : "Add camera"}</SheetTitle>
           <SheetDescription>
@@ -167,7 +167,7 @@ export function CameraFormSheet({
             <Label htmlFor="desc">Description</Label>
             <Textarea id="desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="user">Username</Label>
               <Input id="user" autoComplete="off" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="admin" />
@@ -186,7 +186,7 @@ export function CameraFormSheet({
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="ret">Keep recordings</Label>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col items-start gap-3 min-[420px]:flex-row min-[420px]:items-center">
               <div className="flex items-center gap-2">
                 <Input
                   id="ret"
@@ -218,7 +218,7 @@ export function CameraFormSheet({
           </label>
 
           <Separator />
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-sm font-medium">Streams</div>
               <div className="text-xs text-muted-foreground">Credentials are added to the URL automatically.</div>
@@ -236,9 +236,9 @@ export function CameraFormSheet({
 
           {streams.map((s) => (
             <div key={s.key} className="space-y-2.5 rounded-lg border bg-muted/40 p-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Input
-                  className="h-8 w-32"
+                  className="h-10 min-w-24 flex-1 sm:h-8 sm:w-32 sm:flex-none"
                   value={s.profile}
                   disabled={s.existing}
                   onChange={(e) => setStream(s.key, { profile: e.target.value.toLowerCase() })}
@@ -294,7 +294,7 @@ export function CameraFormSheet({
           )}
         </div>
 
-        <SheetFooter>
+        <SheetFooter className="sticky bottom-0 border-t bg-popover pb-[calc(1rem+env(safe-area-inset-bottom))]">
           <Button onClick={submit} disabled={busy}>
             {camera ? "Save changes" : "Add camera"}
           </Button>

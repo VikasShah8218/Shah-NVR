@@ -80,7 +80,7 @@ export function DashboardPage() {
     <div className="space-y-5">
       <PageHeader title="Dashboard" description="Cluster overview: cameras, recording health and media nodes." />
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 xl:grid-cols-5">
         <KpiCard icon={Video} label="Cameras" value={h.cameras_total} hint={`${h.cameras_enabled} enabled`} />
         <KpiCard
           icon={CheckCircle2}

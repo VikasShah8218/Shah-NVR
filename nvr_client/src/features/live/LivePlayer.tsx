@@ -47,17 +47,34 @@ export function LivePlayer({
 }) {
   const live = useLive(cameraId)
   const stream = pickStream(live.data, profile)
+  const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const [info, setInfo] = useState<PlayerInfo>(EMPTY)
   const [attempt, setAttempt] = useState(0) // bumping it reconnects
   const failures = useRef(0)
   const audioId = useId()
   const [muted, setMuted] = useState(true)
+  const [active, setActive] = useState(() => typeof document === "undefined" || !document.hidden)
   const [volume, setVolume] = useState(() => Number(localStorage.getItem("shah-nvr.live-volume") ?? 0.8))
   const mutedRef = useRef(muted)
   const volumeRef = useRef(volume)
   const webrtcUrl = stream?.webrtc
   const hlsUrl = stream?.hls
+
+  useEffect(() => {
+    const container = containerRef.current
+    let inViewport = true
+    const update = () => setActive(!document.hidden && inViewport)
+    const observer = container && "IntersectionObserver" in window
+      ? new IntersectionObserver(([entry]) => { inViewport = entry.isIntersecting; update() }, { threshold: 0.01 })
+      : null
+    if (container && observer) observer.observe(container)
+    document.addEventListener("visibilitychange", update)
+    return () => {
+      observer?.disconnect()
+      document.removeEventListener("visibilitychange", update)
+    }
+  }, [])
 
   useEffect(() => {
     const takeFocus = (event: Event) => {
@@ -84,7 +101,7 @@ export function LivePlayer({
 
   useEffect(() => {
     const video = videoRef.current
-    if (!video || !webrtcUrl || !hlsUrl) return
+    if (!video || !webrtcUrl || !hlsUrl || !active) return
     let cancelled = false
     let whep: WhepSession | null = null
     let hls: Hls | null = null
@@ -163,7 +180,7 @@ export function LivePlayer({
       video.srcObject = null
     }
     // `attempt` re-runs the effect for reconnects; URLs change when the camera moves node.
-  }, [webrtcUrl, hlsUrl, protocol, attempt])
+  }, [webrtcUrl, hlsUrl, protocol, attempt, active])
 
   const showAudio = stream?.audio_state === "available" || stream?.audio_state === "advertised_not_observed" || stream?.audio_state === "unsupported"
   const audioPlayable = showAudio && stream?.audio_state !== "unsupported" && (info.protocol !== "HLS" || stream.audio_codec === "aac")
@@ -187,7 +204,7 @@ export function LivePlayer({
   const errorText = liveError ?? (info.phase === "error" ? info.error : null)
 
   return (
-    <div className={cn("relative overflow-hidden bg-video", className)}>
+    <div ref={containerRef} className={cn("relative overflow-hidden bg-video", className)}>
       <video
         ref={videoRef}
         className="size-full object-contain"

@@ -84,7 +84,7 @@ export function DiscoverPage() {
         actions={
           <>
             <Select value={nodeId} onValueChange={setNodeId}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -96,7 +96,7 @@ export function DiscoverPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button onClick={scan} disabled={discover.isPending || online.length === 0}>
+            <Button className="flex-1 sm:flex-none" onClick={scan} disabled={discover.isPending || online.length === 0}>
               {discover.isPending ? <Loader2 className="size-4 animate-spin" /> : <Radar className="size-4" />}
               {discover.isPending ? "Scanning…" : "Scan network"}
             </Button>
@@ -107,15 +107,15 @@ export function DiscoverPage() {
       {online.length === 0 && nodes.data && <ErrorState className="mb-4" error="No media node is online: discovery runs on a node." />}
       {discover.error && <ErrorState className="mb-4" error={onvifErrorText(discover.error)} />}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-4 grid gap-2 sm:flex sm:flex-wrap sm:items-center">
         <Input
-          className="w-80"
+          className="w-full sm:w-80"
           placeholder="Not listed? Camera IP, e.g. 192.168.1.64:80"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addByAddress()}
         />
-        <Button variant="outline" onClick={addByAddress} disabled={!address.trim() || online.length === 0}>
+        <Button variant="outline" className="w-full sm:w-auto" onClick={addByAddress} disabled={!address.trim() || online.length === 0}>
           <Plus className="size-4" /> Add address
         </Button>
         <span className="text-xs text-muted-foreground">Discovery only reaches cameras on the node's own subnet.</span>
@@ -128,7 +128,19 @@ export function DiscoverPage() {
             : "The media node sends a WS-Discovery probe on its LAN; cameras answer within a few seconds."}
         </EmptyState>
       ) : (
-        <Card className="py-0">
+        <>
+        <div className="space-y-2 md:hidden">
+          {rows.map((d) => <Card key={d.endpoint} className={d.camera_id ? "gap-3 p-4 opacity-70" : "gap-3 p-4"}>
+            <div className="flex items-start gap-3">
+              <input type="checkbox" className="mt-0.5 size-5 shrink-0 accent-primary" disabled={!!d.camera_id} checked={selected.has(d.endpoint)} onChange={() => toggle(d.endpoint)} aria-label={`Select ${d.host}`} />
+              <div className="min-w-0 flex-1"><div className="font-mono text-sm">{d.host}{d.port !== 80 && <span className="text-muted-foreground">:{d.port}</span>}</div><div className="mt-1 truncate text-sm">{d.name || d.hardware || (d.endpoint.startsWith("manual:") ? "Added by address" : "ONVIF device")}</div></div>
+              <span className="text-xs text-muted-foreground">{d.camera_id ? "Added" : "New"}</span>
+            </div>
+            <div className="flex flex-wrap gap-1">{profileLabels(d.profiles).map((p) => <span key={p} className="rounded bg-muted px-2 py-1 text-xs">Profile {p}</span>)}</div>
+            <div className="border-t pt-2 text-xs text-muted-foreground">Found by {d.node_name}{d.camera_id && <> · <Link to={`/cameras/${d.camera_id}`} className="text-primary">Open {d.camera_name}</Link></>}</div>
+          </Card>)}
+        </div>
+        <Card className="hidden py-0 md:block">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -193,10 +205,11 @@ export function DiscoverPage() {
             </TableBody>
           </Table>
         </Card>
+        </>
       )}
 
       {picked.length > 0 && (
-        <div className="fixed right-6 bottom-6 z-20 flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-lg">
+        <div className="fixed inset-x-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-30 flex items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-lg md:inset-x-auto md:right-6 md:bottom-6 md:justify-start">
           <span className="text-sm">
             <b>{picked.length}</b> selected
           </span>

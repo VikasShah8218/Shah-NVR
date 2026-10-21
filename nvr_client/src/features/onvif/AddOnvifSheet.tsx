@@ -117,7 +117,7 @@ export function AddOnvifSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full gap-0 data-[side=right]:sm:max-w-2xl">
+      <SheetContent className="w-full gap-0 pb-[env(safe-area-inset-bottom)] data-[side=right]:sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>Add {devices.length === 1 ? "camera" : `${devices.length} cameras`}</SheetTitle>
           <SheetDescription>
@@ -159,7 +159,7 @@ export function AddOnvifSheet({
           ))}
         </div>
 
-        <SheetFooter className="border-t">
+        <SheetFooter className="sticky bottom-0 border-t bg-popover pb-[calc(1rem+env(safe-area-inset-bottom))]">
           {added === rows.length ? (
             <Button onClick={() => onOpenChange(false)}>Done</Button>
           ) : (
@@ -185,9 +185,9 @@ function DeviceRow({ row: r, onChange }: { row: Row; onChange: (p: Partial<Row>)
 
   return (
     <div className={cn("rounded-lg border p-3", r.status === "added" && "border-success/40 bg-success/5")}>
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         {r.probe && (
-          <div className="grid aspect-video w-36 shrink-0 place-items-center overflow-hidden rounded-md bg-video text-muted-foreground">
+          <div className="grid aspect-video w-full shrink-0 place-items-center overflow-hidden rounded-md bg-video text-muted-foreground sm:w-36">
             {r.snapshot ? (
               <img src={r.snapshot} alt="" className="size-full object-cover" />
             ) : r.snapshot === null ? (

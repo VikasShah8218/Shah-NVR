@@ -4,6 +4,8 @@ import {
   Clock,
   Gauge,
   History,
+  Menu,
+  MoreHorizontal,
   MonitorPlay,
   PanelLeftClose,
   PanelLeftOpen,
@@ -13,10 +15,11 @@ import {
   Video,
 } from "lucide-react"
 import { Suspense, useEffect, useState } from "react"
-import { NavLink, Outlet } from "react-router"
+import { NavLink, Outlet, useLocation } from "react-router"
 import { useClusterHealth } from "@/api/queries"
 import { Loading } from "@/components/common"
 import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { readStored, useSettings, writeStored } from "@/lib/settings"
 import { fmtTime } from "@/lib/time"
@@ -34,9 +37,13 @@ const NAV = [
 ]
 
 const COLLAPSE_KEY = "shah-nvr.sidebar"
+const PRIMARY_MOBILE = NAV.slice(0, 4)
+const SECONDARY_MOBILE = NAV.slice(4)
 
 export function AppLayout() {
   const [collapsed, setCollapsed] = useState(() => readStored(COLLAPSE_KEY, { collapsed: false }).collapsed)
+  const [mobileMenu, setMobileMenu] = useState(false)
+  const location = useLocation()
   const toggle = () =>
     setCollapsed((c: boolean) => {
       writeStored(COLLAPSE_KEY, { collapsed: !c })
@@ -44,10 +51,10 @@ export function AppLayout() {
     })
 
   return (
-    <div className="flex h-dvh overflow-hidden">
+    <div className="flex h-dvh min-h-0 overflow-hidden">
       <aside
         className={cn(
-          "flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200",
+          "hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 lg:flex",
           collapsed ? "w-16" : "w-56",
         )}
       >
@@ -97,18 +104,50 @@ export function AppLayout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar />
-        <main className="min-h-0 flex-1 overflow-auto p-5">
+        <Topbar onMenu={() => setMobileMenu(true)} />
+        <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:p-4 sm:pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:p-5 lg:pb-5">
           <Suspense fallback={<Loading />}>
             <Outlet />
           </Suspense>
         </main>
       </div>
+
+      <nav aria-label="Primary navigation" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-sidebar-border bg-sidebar/95 pb-[env(safe-area-inset-bottom)] text-sidebar-foreground shadow-[0_-8px_30px_rgba(0,0,0,.18)] backdrop-blur lg:hidden">
+        {PRIMARY_MOBILE.map(({ to, label, icon: Icon, end }) => (
+          <NavLink key={to} to={to} end={end} className={({ isActive }) => cn("flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-[10px]", isActive ? "text-sidebar-primary" : "text-sidebar-foreground/75")}>
+            <Icon className="size-5" />
+            <span>{label === "Live View" ? "Live" : label}</span>
+          </NavLink>
+        ))}
+        <button type="button" onClick={() => setMobileMenu(true)} className={cn("flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-[10px]", SECONDARY_MOBILE.some((item) => location.pathname.startsWith(item.to)) ? "text-sidebar-primary" : "text-sidebar-foreground/75")}>
+          <MoreHorizontal className="size-5" />
+          <span>More</span>
+        </button>
+      </nav>
+
+      <Sheet open={mobileMenu} onOpenChange={setMobileMenu}>
+        <SheetContent side="left" className="w-[min(88vw,22rem)] overflow-y-auto p-0 pb-[env(safe-area-inset-bottom)] lg:hidden">
+          <SheetHeader className="border-b pt-[calc(1rem+env(safe-area-inset-top))]">
+            <SheetTitle className="flex items-center gap-2">
+              <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground"><Video className="size-5" /></span>
+              Shah-NVR
+            </SheetTitle>
+            <SheetDescription>Monitoring and administration</SheetDescription>
+          </SheetHeader>
+          <nav className="space-y-1 p-3">
+            {NAV.map(({ to, label, icon: Icon, end }) => (
+              <NavLink key={to} to={to} end={end} onClick={() => setMobileMenu(false)} className={({ isActive }) => cn("flex min-h-12 items-center gap-3 rounded-lg px-3 text-sm", isActive ? "bg-accent font-medium text-primary" : "text-foreground/85")}>
+                <Icon className="size-5" /> {label}
+              </NavLink>
+            ))}
+          </nav>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
 
-function Topbar() {
+function Topbar({ onMenu }: { onMenu: () => void }) {
   const { settings } = useSettings()
   const health = useClusterHealth()
   const [now, setNow] = useState(() => new Date())
@@ -124,19 +163,27 @@ function Topbar() {
   const recording = h?.streams_by_status.RECORDING ?? 0
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-5 border-b bg-card/40 px-5 text-sm">
-      <Pill ok={online} label={online ? "Central online" : health.isLoading ? "Connecting…" : "Central offline"} title={settings.centralUrl} />
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-card/40 px-3 text-sm sm:px-4 lg:gap-5 lg:px-5">
+      <Button variant="ghost" size="icon" className="-ml-1 size-10 lg:hidden" onClick={onMenu} aria-label="Open navigation">
+        <Menu className="size-5" />
+      </Button>
+      <div className="flex min-w-0 items-center gap-2 lg:hidden">
+        <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground"><Video className="size-4.5" /></div>
+        <span className="truncate font-semibold">Shah-NVR</span>
+      </div>
+      <div className="hidden lg:block"><Pill ok={online} label={online ? "Central online" : health.isLoading ? "Connecting…" : "Central offline"} title={settings.centralUrl} /></div>
+      <span className={cn("ml-auto size-2.5 shrink-0 rounded-full lg:hidden", online ? "bg-success" : "animate-pulse bg-danger")} title={online ? "Central online" : "Central offline"} />
       {h && (
         <>
-          <span className="text-muted-foreground">
+          <span className="hidden text-muted-foreground md:inline">
             Nodes <span className={cn("font-medium", nodesHealthy < nodesTotal ? "text-warning" : "text-foreground")}>{nodesHealthy}/{nodesTotal}</span> healthy
           </span>
-          <span className="text-muted-foreground">
+          <span className="hidden text-muted-foreground sm:inline">
             Cameras <span className="font-medium text-foreground">{recording}</span> recording of {h.cameras_enabled}
           </span>
         </>
       )}
-      <div className="ml-auto flex items-center gap-2 tabular-nums text-muted-foreground">
+      <div className="hidden items-center gap-2 tabular-nums text-muted-foreground lg:ml-auto lg:flex">
         <Clock className="size-4" /> {fmtTime(now)}
       </div>
     </header>

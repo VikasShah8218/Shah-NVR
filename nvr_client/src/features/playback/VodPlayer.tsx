@@ -166,28 +166,28 @@ export function VodPlayer({ src, audioSrc, onTime, onEnded }: { src: string | nu
           </div>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-1.5 border-t bg-card/60 px-3 py-2">
-        <Button variant="ghost" size="icon" className="size-8" onClick={() => seekBy(-60)} title="Back 1 min" disabled={!src}>
+      <div className="flex flex-wrap items-center gap-1 border-t bg-card/60 px-2 py-2 sm:gap-1.5 sm:px-3">
+        <Button variant="ghost" size="icon" className="size-10 sm:size-8" onClick={() => seekBy(-60)} title="Back 1 min" disabled={!src}>
           <SkipBack className="size-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="size-8" onClick={() => seekBy(-10)} title="Back 10 s" disabled={!src}>
+        <Button variant="ghost" size="icon" className="size-10 sm:size-8" onClick={() => seekBy(-10)} title="Back 10 s" disabled={!src}>
           <Rewind className="size-4" />
         </Button>
-        <Button size="icon" className="size-9 rounded-full" onClick={toggle} disabled={!src}>
+        <Button size="icon" className="size-11 rounded-full sm:size-9" onClick={toggle} disabled={!src}>
           {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
         </Button>
-        <Button variant="ghost" size="icon" className="size-8" onClick={() => seekBy(10)} title="Forward 10 s" disabled={!src}>
+        <Button variant="ghost" size="icon" className="size-10 sm:size-8" onClick={() => seekBy(10)} title="Forward 10 s" disabled={!src}>
           <FastForward className="size-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="size-8" onClick={() => seekBy(60)} title="Forward 1 min" disabled={!src}>
+        <Button variant="ghost" size="icon" className="size-10 sm:size-8" onClick={() => seekBy(60)} title="Forward 1 min" disabled={!src}>
           <SkipForward className="size-4" />
         </Button>
-        <span className="ml-2 text-sm tabular-nums text-muted-foreground">{wall ? fmtDateTime(wall) : "—"}</span>
-        <div className="ml-auto flex items-center gap-2">
+        <span className="order-last w-full px-1 pt-1 text-xs tabular-nums text-muted-foreground sm:order-none sm:ml-2 sm:w-auto sm:pt-0 sm:text-sm">{wall ? fmtDateTime(wall) : "—"}</span>
+        <div className="ml-auto flex items-center gap-1 sm:gap-2">
           <Button
             variant="ghost"
             size="icon"
-            className="size-8"
+            className="size-10 sm:size-8"
             disabled={!audioSrc}
             title={muted ? "Listen to recorded audio" : "Mute recorded audio"}
             onClick={() => setMuted((value) => !value)}
@@ -197,7 +197,7 @@ export function VodPlayer({ src, audioSrc, onTime, onEnded }: { src: string | nu
           {!muted && (
             <input
               aria-label="Recorded audio volume"
-              className="w-20 accent-primary"
+              className="hidden w-20 accent-primary sm:block"
               type="range"
               min="0"
               max="1"
@@ -222,7 +222,7 @@ export function VodPlayer({ src, audioSrc, onTime, onEnded }: { src: string | nu
               ))}
             </SelectContent>
           </Select>
-          <Button variant="ghost" size="icon" className="size-8" onClick={() => wrapRef.current?.requestFullscreen?.()} title="Fullscreen">
+          <Button variant="ghost" size="icon" className="size-10 sm:size-8" onClick={() => wrapRef.current?.requestFullscreen?.()} title="Fullscreen">
             <Maximize className="size-4" />
           </Button>
         </div>

@@ -27,7 +27,7 @@ export function VideoTab({ camera, active }: { camera: Camera; active: boolean }
   if (!camera.streams.length) return <p>No streams configured.</p>
   return <div className="space-y-4">
     <div className="flex items-center gap-3"><label htmlFor="encoder-stream">Stream</label>
-      <select id="encoder-stream" className={selectClass} value={profile} onChange={e => setProfile(e.target.value)}>
+      <select id="encoder-stream" className={`${selectClass} min-w-0 flex-1 sm:flex-none`} value={profile} onChange={e => setProfile(e.target.value)}>
         {camera.streams.map(s => <option key={s.profile}>{s.profile}</option>)}
       </select>
     </div>
@@ -107,15 +107,15 @@ function EncoderEditor({ camera, profile, active }: { camera: Camera; profile: s
         <fieldset disabled={busy || pending} className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <label htmlFor="onvif-profile">ONVIF profile mapping</label>
-            <select id="onvif-profile" className={selectClass} value={token || state.profile_token || ""} onChange={e => setToken(e.target.value)}>
+            <select id="onvif-profile" className={`${selectClass} min-w-0 w-full sm:w-auto`} value={token || state.profile_token || ""} onChange={e => setToken(e.target.value)}>
               <option value="">Select explicitly…</option>
               {state.profiles?.filter(p => p.encoder_token).map(p => <option key={p.token} value={p.token}>{p.name || p.token} ({p.token})</option>)}
             </select>
-            <Button variant="outline" disabled={!token} onClick={() => void run(async () => {
+            <Button variant="outline" className="flex-1 sm:flex-none" disabled={!token} onClick={() => void run(async () => {
               const next = await api.map(camera.id, profile, token); setLoaded(next); setDraft(null); setToken(""); setShared(false); setSelectedOption(null)
               void cache.invalidateQueries({ queryKey: [api.url, "cameras"] })
             })}>Save mapping</Button>
-            <Button variant="outline" onClick={() => void run(refresh)}>Reload / discard draft</Button>
+            <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => void run(refresh)}>Reload / discard draft</Button>
           </div>
           <p className="text-xs text-muted-foreground">Map this NVR stream to its actual camera profile. Saving a mapping does not change its RTSP URL. Encoder token: {state.encoder_token ?? "not mapped"} · {state.api === "tr2" ? "Media2" : "Media1"}</p>
           {state.warnings?.map(w => <p key={w} className="text-sm text-warning">{w}</p>)}
@@ -192,7 +192,7 @@ function EncoderEditor({ camera, profile, active }: { camera: Camera; profile: s
             {(values.encoding === "H265" || current.encoding === "H265") && <p className="text-sm text-warning">
               H.265 browser support varies. An H.264 substream can help live viewing; it does not make H.265 main-stream recordings browser-compatible. No transcoding is performed.
             </p>}
-            <Button disabled={!option || optionIssues.length > 0 || !Object.keys(changedValues(current, values)).length || (sharedEncoder && !shared) || !!history.error}
+            <Button className="w-full sm:w-auto" disabled={!option || optionIssues.length > 0 || !Object.keys(changedValues(current, values)).length || (sharedEncoder && !shared) || !!history.error}
               onClick={() => void run(() => prepare())}>Review and apply</Button>
           </>}
         </fieldset>

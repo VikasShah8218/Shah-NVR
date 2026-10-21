@@ -17,9 +17,9 @@ export function AssignmentsPage() {
   const run = useRunScheduler()
   const [moving, setMoving] = useState<Assignment | null>(null)
   const [historyFor, setHistoryFor] = useState<Assignment | null>(null)
-  const [, tick] = useState(0)
+  const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    const t = setInterval(() => tick((n) => n + 1), 1000)
+    const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
 
@@ -38,7 +38,22 @@ export function AssignmentsPage() {
       {assignments.error && <ErrorState error={assignments.error} />}
       {assignments.data && assignments.data.length === 0 && <EmptyState title="No assignments yet">Add a camera and start a media node.</EmptyState>}
       {assignments.data && assignments.data.length > 0 && (
-        <Card className="overflow-hidden py-0">
+        <>
+        <div className="space-y-2 md:hidden">
+          {assignments.data.map((a) => {
+            const left = a.lease_expires_at ? Math.round((new Date(a.lease_expires_at).getTime() - now) / 1000) : null
+            return <Card key={a.camera_id} className="gap-3 p-4">
+              <div><Link to={`/cameras/${a.camera_id}`} className="font-medium hover:text-primary">{a.camera_name}</Link><div className="mt-1 text-xs text-muted-foreground">Generation {a.generation} · updated {timeAgo(a.updated_at)}</div></div>
+              <div className="grid grid-cols-2 gap-3 border-y py-3 text-sm">
+                <div><div className="text-xs text-muted-foreground">Media node</div>{a.node_id ? <Link to={`/nodes/${a.node_id}`} className="hover:text-primary">{a.node_name}</Link> : "Unassigned"}</div>
+                <div><div className="text-xs text-muted-foreground">Lease</div>{left == null ? "—" : left >= 0 ? `${left}s` : <span className="text-warning">Expired</span>}</div>
+                <div className="col-span-2"><div className="text-xs text-muted-foreground">Reason</div>{a.reason ?? "—"}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-2"><Button variant="outline" className="min-h-11" onClick={() => setHistoryFor(a)}><History className="size-4" /> History</Button><Button className="min-h-11" onClick={() => setMoving(a)}><ArrowLeftRight className="size-4" /> Move</Button></div>
+            </Card>
+          })}
+        </div>
+        <Card className="hidden overflow-hidden py-0 md:block">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -53,7 +68,7 @@ export function AssignmentsPage() {
             </TableHeader>
             <TableBody>
               {assignments.data.map((a) => {
-                const left = a.lease_expires_at ? Math.round((new Date(a.lease_expires_at).getTime() - Date.now()) / 1000) : null
+                const left = a.lease_expires_at ? Math.round((new Date(a.lease_expires_at).getTime() - now) / 1000) : null
                 return (
                   <TableRow key={a.camera_id}>
                     <TableCell className="pl-4">
@@ -90,6 +105,7 @@ export function AssignmentsPage() {
             </TableBody>
           </Table>
         </Card>
+        </>
       )}
       {moving && (
         <MoveCameraDialog
@@ -109,7 +125,7 @@ function HistorySheet({ assignment, onClose }: { assignment: Assignment | null; 
   const history = useAssignmentHistory(assignment?.camera_id ?? null)
   return (
     <Sheet open={assignment != null} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="data-[side=right]:sm:max-w-lg">
+      <SheetContent side="right" className="w-full data-[side=right]:max-w-full data-[side=right]:sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>Ownership history</SheetTitle>
           <SheetDescription>{assignment?.camera_name}: every move between media nodes.</SheetDescription>

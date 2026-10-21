@@ -36,7 +36,7 @@ export function CamerasPage() {
         description="Register cameras, their streams and how long recordings are kept."
         actions={
           <>
-            <div className="relative w-60">
+            <div className="relative w-full sm:w-60">
               <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
               <Input className="pl-8" placeholder="Search cameras" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
@@ -59,7 +59,11 @@ export function CamerasPage() {
         </EmptyState>
       )}
       {list.length > 0 && (
-        <Card className="overflow-hidden py-0">
+        <>
+        <div className="space-y-2 md:hidden">
+          {list.map((c) => <MobileCameraCard key={c.id} camera={c} onEdit={() => setEditing(c)} />)}
+        </div>
+        <Card className="hidden overflow-hidden py-0 md:block">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -80,12 +84,43 @@ export function CamerasPage() {
             </TableBody>
           </Table>
         </Card>
+        </>
       )}
       {editing && (
         <CameraFormSheet camera={editing === "new" ? undefined : editing} open onOpenChange={(o) => !o && setEditing(null)} />
       )}
     </div>
   )
+}
+
+function MobileCameraCard({ camera: c, onEdit }: { camera: Camera; onEdit: () => void }) {
+  const navigate = useNavigate()
+  const update = useUpdateCamera()
+  const del = useDeleteCamera()
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const lastSegment = c.streams.map((s) => s.last_segment_at).filter(Boolean).sort().pop()
+  return <Card className="gap-3 p-4" onClick={() => navigate(`/cameras/${c.id}`)}>
+    <div className="flex items-start gap-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2"><span className="truncate font-medium">{c.name}</span><span className="text-xs text-muted-foreground">#{c.id}</span></div>
+        {c.description && <div className="mt-0.5 truncate text-xs text-muted-foreground">{c.description}</div>}
+      </div>
+      <div onClick={(e) => e.stopPropagation()}><Switch checked={c.enabled} disabled={update.isPending} onCheckedChange={(v) => update.mutate({ id: c.id, body: { enabled: v } })} /></div>
+      <div onClick={(e) => e.stopPropagation()}><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="size-10"><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={onEdit}><Pencil className="size-4" /> Edit</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate(`/cameras/${c.id}`)}><MonitorPlay className="size-4" /> Details & live</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate(`/playback?camera=${c.id}`)}><History className="size-4" /> Recordings</DropdownMenuItem>
+        <DropdownMenuSeparator /><DropdownMenuItem className="text-danger focus:text-danger" onClick={() => setConfirmDelete(true)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>
+      </DropdownMenuContent></DropdownMenu></div>
+    </div>
+    <div className="flex flex-wrap gap-1.5">{c.streams.map((s) => <span key={s.profile} className="flex items-center gap-1 text-xs"><span className="text-muted-foreground">{s.profile}</span><StatusBadge status={s.status} /></span>)}</div>
+    <div className="grid grid-cols-2 gap-2 border-t pt-3 text-xs">
+      <div><div className="text-muted-foreground">Media node</div><div className="truncate">{c.assignment?.node_name ?? "Unassigned"}</div></div>
+      <div><div className="text-muted-foreground">Retention</div><div>{retentionLabel(c.retention_days)}</div></div>
+      <div className="col-span-2"><span className="text-muted-foreground">Last recording: </span>{lastSegment ? timeAgo(lastSegment) : "—"}</div>
+    </div>
+    <ConfirmDialog open={confirmDelete} onOpenChange={setConfirmDelete} title={`Delete ${c.name}?`} description="Only cameras without recordings can be deleted. Disable cameras with recordings to preserve their history." confirmLabel="Delete camera" destructive onConfirm={() => del.mutate(c.id)} />
+  </Card>
 }
 
 function CameraRow({ camera: c, onEdit }: { camera: Camera; onEdit: () => void }) {

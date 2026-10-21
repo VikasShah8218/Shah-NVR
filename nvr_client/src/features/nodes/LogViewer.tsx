@@ -54,7 +54,7 @@ export function LogViewer({ apiUrl }: { apiUrl: string }) {
           <ToggleGroupItem value="warn">Warnings+</ToggleGroupItem>
           <ToggleGroupItem value="error">Errors</ToggleGroupItem>
         </ToggleGroup>
-        <div className="relative ml-auto w-56">
+        <div className="relative order-last w-full sm:order-none sm:ml-auto sm:w-56">
           <Search className="absolute top-2 left-2.5 size-4 text-muted-foreground" />
           <Input className="h-8 pl-8" placeholder="Filter…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
@@ -68,7 +68,7 @@ export function LogViewer({ apiUrl }: { apiUrl: string }) {
       {logs.error && <ErrorState error={logs.error} />}
       <div
         ref={boxRef}
-        className="h-[28rem] overflow-auto rounded-lg border bg-video p-3 font-mono text-[12px] leading-5"
+        className="h-[55dvh] overflow-auto rounded-lg border bg-video p-3 font-mono text-[12px] leading-5 sm:h-[28rem]"
       >
         {lines.length === 0 ? (
           <div className="text-muted-foreground">{logs.isLoading ? "Loading…" : "No log lines."}</div>
