@@ -1,15 +1,16 @@
-import { CalendarDays, ChevronLeft, ChevronRight, Copy, Crosshair, Download, Film } from "lucide-react"
+import { CalendarDays, ChevronLeft, ChevronRight, Copy, Crosshair, Download, FileVideo, Film, X } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router"
 import { toast } from "sonner"
-import { mediaFileUrl, playbackAudioUrl, playbackUrl } from "@/api/client"
-import { useCameras, useNodes, useTimeline } from "@/api/queries"
+import { exportDownloadUrl, mediaFileUrl, playbackAudioUrl, playbackUrl } from "@/api/client"
+import { useCameras, useCancelExport, useExports, useNodes, useTimeline } from "@/api/queries"
 import type { Segment } from "@/api/types"
 import { EmptyState, ErrorState, PageHeader } from "@/components/common"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Progress } from "@/components/ui/progress"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -20,6 +21,7 @@ import { nodeApiUrl, playbackAccess, selectedNodeAccess, useNodeAccessMap } from
 import { DAY, HOUR, fmtDay, fmtTime, startOfLocalDay } from "@/lib/time"
 import { Timeline } from "./Timeline"
 import { VodPlayer } from "./VodPlayer"
+import { ExportDialog } from "./ExportDialog"
 
 const ZOOMS = [
   { label: "24h", ms: DAY },
@@ -46,6 +48,7 @@ export function PlaybackPage() {
   const [playTo, setPlayTo] = useState<Date>(() => new Date(Math.min(startOfLocalDay(initialT ?? new Date()).getTime() + DAY, Date.now())))
   const [playhead, setPlayhead] = useState<Date | null>(null)
   const [goto, setGoto] = useState("")
+  const [exportOpen, setExportOpen] = useState(false)
 
   // Default to the first camera once the list loads.
   useEffect(() => {
@@ -62,6 +65,8 @@ export function PlaybackPage() {
   const dayEnd = dayStart + DAY
   const isToday = startOfLocalDay(new Date()).getTime() === dayStart
   const timeline = useTimeline(cameraId, profile, new Date(dayStart), new Date(dayEnd), isToday ? 20_000 : 0)
+  const exports = useExports(cameraId)
+  const cancelExport = useCancelExport()
   const segments: Segment[] = timeline.data?.segments ?? []
   const access = playbackAccess(
     nodes.data ?? [], [...new Set(segments.map((segment) => segment.node_id))], settings.nodeAccess, detected.data,
@@ -133,6 +138,9 @@ export function PlaybackPage() {
   }
 
   const windowSegments = segments.filter((s) => new Date(s.end_time).getTime() > viewStart && new Date(s.start_time).getTime() < viewEnd)
+  const latestExportEnd = Math.min(Date.now(), dayEnd)
+  const exportEnd = new Date(playFrom ? Math.min(latestExportEnd, playFrom.getTime() + 15 * 60_000) : latestExportEnd)
+  const exportStart = playFrom ?? new Date(Math.max(dayStart, exportEnd.getTime() - 15 * 60_000))
 
   if (cameras.data && cameras.data.length === 0) {
     return (
@@ -197,6 +205,9 @@ export function PlaybackPage() {
           </Button>
         </div>
         <div className="col-span-2 flex items-center gap-2 sm:col-span-1 sm:ml-auto">
+          <Button className="w-full sm:w-auto" onClick={() => setExportOpen(true)} disabled={cameraId == null || segments.length === 0}>
+            <FileVideo className="size-4" /> Export
+          </Button>
           <Button variant="outline" className="w-full sm:w-auto" onClick={copyVlc} disabled={!src}>
             <Copy className="size-4" /> VLC URL
           </Button>
@@ -319,6 +330,30 @@ export function PlaybackPage() {
           )}
         </CardContent>
       </Card>
+
+      {(exports.data?.length ?? 0) > 0 && <Card className="gap-2">
+        <CardHeader><CardTitle className="text-sm font-medium">Exports</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {exports.data!.map(job => {
+            const active = ["QUEUED", "CLAIMED", "PROCESSING", "FINALIZING"].includes(job.state)
+            return <div key={job.id} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2 text-sm"><span className="font-medium">{job.mode === "original" ? "Original" : "Compressed"} · {job.profile}</span><span className="text-muted-foreground">{new Date(job.start_time).toLocaleString()} – {new Date(job.end_time).toLocaleTimeString()}</span><span className={job.state === "FAILED" ? "text-danger" : job.state === "READY" ? "text-success" : "text-muted-foreground"}>{job.state}</span></div>
+                {active && <div className="mt-2 flex items-center gap-2"><Progress value={job.progress_percent} /><span className="text-xs tabular-nums">{job.progress_percent.toFixed(0)}%</span></div>}
+                {job.error_message && <p className="mt-1 text-xs text-danger">{job.error_message}</p>}
+                {job.gap_seconds > 2 && <p className="mt-1 text-xs text-warning">The requested interval contains {Math.round(job.gap_seconds)} seconds without recordings.</p>}
+              </div>
+              <div className="flex gap-2">
+                {job.state === "READY" && <Button size="sm" asChild><a href={exportDownloadUrl(settings.centralUrl, job.id, access)}><Download className="size-4" /> Download {formatBytes(job.output_size_bytes)}</a></Button>}
+                {active && <Button size="sm" variant="outline" onClick={() => cancelExport.mutate({ id: job.id, cameraId: job.camera_id })}><X className="size-4" /> Cancel</Button>}
+              </div>
+            </div>
+          })}
+        </CardContent>
+      </Card>}
+
+      {cameraId != null && <ExportDialog open={exportOpen} onOpenChange={setExportOpen} cameraId={cameraId} profile={profile}
+        initialStart={exportStart} initialEnd={exportEnd} />}
     </div>
   )
 }

@@ -50,6 +50,8 @@ class Settings(BaseSettings):
     DEFAULT_RETENTION_DAYS: int = 7
     PLAYBACK_GAP_TOLERANCE_SECONDS: float = 2.0
     PLAYBACK_MAX_HOURS: int = 24
+    EXPORT_MAX_HOURS: int = 4
+    EXPORT_FILE_TTL_HOURS: int = 24
 
     @property
     def cors_origins(self) -> list[str]:

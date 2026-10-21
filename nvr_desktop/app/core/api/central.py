@@ -19,6 +19,7 @@ from app.core.api.models import (
     BackfillConfig,
     BackfillJob,
     BackfillProbe,
+    ExportJob,
     Camera,
     ClusterHealth,
     LiveInfo,
@@ -164,6 +165,20 @@ class CentralApi:
         return BackfillJob.model_validate(self._request(
             "POST", f"/api/v1/cameras/{camera_id}/backfill/jobs", json=body,
         ))
+
+    # ------------------------------------------------------------------ recording exports
+    def exports(self, camera_id: int) -> list[ExportJob]:
+        rows = self._request("GET", "/api/v1/exports", params={"camera_id": camera_id, "limit": 50})
+        return [ExportJob.model_validate(row) for row in rows]
+
+    def create_export(self, body: dict) -> ExportJob:
+        return ExportJob.model_validate(self._request("POST", "/api/v1/exports", json=body))
+
+    def cancel_export(self, export_id: str) -> ExportJob:
+        return ExportJob.model_validate(self._request("POST", f"/api/v1/exports/{export_id}/cancel"))
+
+    def export_download_url(self, export_id: str, access: str = "lan") -> str:
+        return f"{self.base_url}/api/v1/exports/{export_id}/download?{urlencode({'access': access})}"
 
     # ------------------------------------------------------------------ ONVIF H1
     def onvif_discover(self, node_id: int | None = None, seconds: float = 3.0) -> list[OnvifDiscovered]:

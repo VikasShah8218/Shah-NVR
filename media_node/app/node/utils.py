@@ -99,5 +99,25 @@ class CentralClient:
         await self._request("POST", f"/internal/v1/backfill/{job_id}/fail",
                             json={"node_id": node_id, "code": code, "message": message[:512]})
 
+    async def claim_export(self, node_id: int) -> dict | None:
+        return await self._request("POST", "/internal/v1/exports/claim", json={"node_id": node_id})
+
+    async def export_progress(self, job_id: str, node_id: int, state: str, progress: float) -> dict:
+        return await self._request("POST", f"/internal/v1/exports/{job_id}/progress", json={
+            "node_id": node_id, "state": state, "progress_percent": progress,
+        })
+
+    async def export_complete(self, job_id: str, node_id: int, size: int, sha256: str,
+                              encoder: str, recorded_seconds: float) -> None:
+        await self._request("POST", f"/internal/v1/exports/{job_id}/complete", json={
+            "node_id": node_id, "size_bytes": size, "sha256": sha256,
+            "encoder": encoder, "recorded_seconds": recorded_seconds,
+        })
+
+    async def export_fail(self, job_id: str, node_id: int, code: str, message: str) -> None:
+        await self._request("POST", f"/internal/v1/exports/{job_id}/fail", json={
+            "node_id": node_id, "code": code, "message": message[:512],
+        })
+
 
 central = CentralClient()

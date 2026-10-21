@@ -439,3 +439,30 @@ class BackfillJob(ApiModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     updated_at: datetime
+
+
+class ExportJob(ApiModel):
+    id: UUID
+    camera_id: int
+    node_id: int | None = None
+    profile: str
+    start_time: datetime
+    end_time: datetime
+    mode: str
+    state: str
+    options: dict[str, Any] = {}
+    progress_percent: float = 0
+    attempt_count: int = 0
+    output_name: str | None = None
+    output_size_bytes: int = 0
+    output_sha256: str | None = None
+    encoder: str | None = None
+    recorded_seconds: float = 0
+    gap_seconds: float = 0
+    error_code: str | None = None
+    error_message: str | None = None
+    created_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    expires_at: datetime | None = None
+    updated_at: datetime

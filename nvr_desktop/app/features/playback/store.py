@@ -14,7 +14,9 @@ from datetime import datetime, timezone
 from PySide6.QtCore import Property, Signal, Slot
 
 from app.core.context import AppContext
-from app.core.downloads import download_chunk
+from app.core.downloads import download_chunk, downloads_folder
+from app.core.api import node as node_api
+from app.core.tasks import run_task
 from app.core.format import format_bytes
 from app.core.poller import Poller
 from app.core.store import BaseStore
@@ -32,6 +34,7 @@ class PlaybackStore(BaseStore):
     viewChanged = Signal()
     timelineChanged = Signal()
     playChanged = Signal()
+    exportsChanged = Signal()
 
     def __init__(self, ctx: AppContext, cameras: CamerasStore, nodes: NodesStore, parent=None):
         super().__init__(ctx, parent)
@@ -48,9 +51,12 @@ class PlaybackStore(BaseStore):
         self._ranges: list[dict] = []
         self._backfill_ranges: list[dict] = []
         self._access = "lan"
+        self._exports: list[dict] = []
         self._poller = Poller(self.refresh, 20, self)
+        self._export_poller = Poller(self._refresh_exports, 3, self)
         cameras.camerasChanged.connect(self._ensure_camera)
         self._poller.start(immediately=False)
+        self._export_poller.start(immediately=False)
 
     # ------------------------------------------------------------------ selection
     def _ensure_camera(self) -> None:
@@ -128,6 +134,7 @@ class PlaybackStore(BaseStore):
         cid, profile, day = self._camera_id, self._profile, self._day
         if not cid:
             return
+        self._refresh_exports(cid)
         if not self._is_today() and self._timeline.get("_key") == (cid, profile, day):
             return  # past days do not change
 
@@ -151,6 +158,19 @@ class PlaybackStore(BaseStore):
             self.viewChanged.emit()  # the chunk list depends on the data too
 
         self.fetch("timeline", load, apply)
+
+    def _refresh_exports(self, camera_id: int | None = None) -> None:
+        cid = camera_id or self._camera_id
+        if not cid:
+            return
+        self.fetch("exports", lambda: [job.to_qml() for job in self.api.exports(cid)],
+                   lambda rows: self._apply_exports(cid, rows), track_error=False)
+
+    def _apply_exports(self, camera_id: int, rows: list[dict]) -> None:
+        if camera_id != self._camera_id:
+            return
+        self._exports = rows
+        self.exportsChanged.emit()
 
     def _chunks_in_view(self) -> list[dict]:
         start, end = self._view_start, self._view_start + self._zoom
@@ -216,8 +236,10 @@ class PlaybackStore(BaseStore):
     def _stop_playback(self) -> None:
         self._play_from = self._playhead = 0.0
         self._timeline, self._ranges, self._backfill_ranges = {}, [], []
+        self._exports = []
         self.playChanged.emit()
         self.timelineChanged.emit()
+        self.exportsChanged.emit()
 
     def _playlist_url(self) -> str:
         if not (self._camera_id and self._play_from):
@@ -226,6 +248,39 @@ class PlaybackStore(BaseStore):
 
     playlistUrl = Property(str, _playlist_url, notify=playChanged)
     playhead = Property(float, lambda self: self._playhead, notify=playChanged)
+    playFrom = Property(float, lambda self: self._play_from, notify=playChanged)
+    playTo = Property(float, lambda self: self._play_to, notify=playChanged)
+
+    # ------------------------------------------------------------------ exports
+    exports = Property("QVariantList", lambda self: self._exports, notify=exportsChanged)
+
+    @Slot(float, float, str, str, str, str, int, int, bool)
+    def createExport(self, start_ms: float, end_ms: float, mode: str, codec: str, quality: str,
+                     processor: str, max_height: int, max_fps: int, include_audio: bool) -> None:
+        if not self._camera_id:
+            return
+        if end_ms <= start_ms or end_ms - start_ms > 4 * 60 * 60 * 1000 or end_ms > time.time() * 1000 + 5000:
+            self.ctx.toasts.error("Choose a past interval longer than zero and no more than four hours")
+            return
+        body = {"camera_id": self._camera_id, "profile": self._profile,
+                "start_time": _utc(start_ms).isoformat(), "end_time": _utc(end_ms).isoformat(), "mode": mode,
+                "video_codec": codec, "quality": quality, "processor": processor,
+                "max_height": max_height, "max_fps": max_fps, "include_audio": include_audio,
+                "audio_bitrate_kbps": 128}
+        self.act(lambda: self.api.create_export(body), "Export queued", lambda _job: self._refresh_exports())
+
+    @Slot(str)
+    def cancelExport(self, export_id: str) -> None:
+        self.act(lambda: self.api.cancel_export(export_id), "Export cancelled", lambda _job: self._refresh_exports())
+
+    @Slot(str, str)
+    def downloadExport(self, export_id: str, output_name: str) -> None:
+        target = downloads_folder() / (output_name or f"export-{export_id}.mp4")
+        url = self.api.export_download_url(export_id, self._access)
+        self.ctx.toasts.info(f"Downloading {target.name}…")
+        run_task(lambda: node_api.download(url, target),
+                 lambda path: self.ctx.toasts.success(f"Saved {path}"),
+                 lambda exc: self.ctx.toasts.error(str(exc)))
 
     # ------------------------------------------------------------------ downloads
     @Slot(str, int)

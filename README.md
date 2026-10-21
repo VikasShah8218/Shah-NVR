@@ -388,6 +388,15 @@ sequenceDiagram
 The central server coordinates the timeline while media delivery remains
 distributed.
 
+Operators can also create persistent exports from the same timeline in both the
+web and desktop clients. Central Manager validates the requested range (up to
+four hours), records durable job state, and assigns the work to a healthy media
+node. An **Original** export remuxes compatible fragments without quality loss;
+a **Compressed** export uses FFmpeg with H.264/H.265, quality, resolution,
+frame-rate, audio, and CPU/GPU controls. Jobs expose progress and cancellation,
+and completed MP4 files are downloaded directly from the processing node and
+automatically expire after the configured retention period.
+
 ## Failover model
 
 - Nodes report health and capacity through heartbeats.

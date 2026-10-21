@@ -25,6 +25,55 @@ class BackfillState(str, Enum):
     CANCELLED = "CANCELLED"
 
 
+class ExportState(str, Enum):
+    QUEUED = "QUEUED"
+    CLAIMED = "CLAIMED"
+    PROCESSING = "PROCESSING"
+    FINALIZING = "FINALIZING"
+    READY = "READY"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+    EXPIRED = "EXPIRED"
+
+
+class ExportMode(str, Enum):
+    ORIGINAL = "original"
+    COMPRESSED = "compressed"
+
+
+class ExportJob(Model):
+    id = fields.UUIDField(primary_key=True)
+    camera = fields.ForeignKeyField("models.Camera", related_name="export_jobs", on_delete=fields.CASCADE)
+    node = fields.ForeignKeyField("models.MediaNode", related_name="export_jobs", null=True, on_delete=fields.SET_NULL)
+    profile = fields.CharField(max_length=32, default="main")
+    start_time = fields.DatetimeField()
+    end_time = fields.DatetimeField()
+    mode = fields.CharEnumField(ExportMode, max_length=16)
+    state = fields.CharEnumField(ExportState, max_length=16, default=ExportState.QUEUED)
+    options = fields.JSONField(default=dict)
+    progress_percent = fields.FloatField(default=0)
+    attempt_count = fields.IntField(default=0)
+    lease_expires_at = fields.DatetimeField(null=True)
+    output_name = fields.CharField(max_length=256, null=True)
+    output_size_bytes = fields.BigIntField(default=0)
+    output_sha256 = fields.CharField(max_length=64, null=True)
+    encoder = fields.CharField(max_length=64, null=True)
+    recorded_seconds = fields.FloatField(default=0)
+    gap_seconds = fields.FloatField(default=0)
+    error_code = fields.CharField(max_length=64, null=True)
+    error_message = fields.CharField(max_length=512, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    started_at = fields.DatetimeField(null=True)
+    finished_at = fields.DatetimeField(null=True)
+    expires_at = fields.DatetimeField(null=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "export_jobs"
+        indexes = (("camera_id", "created_at"), ("node_id", "state", "created_at"))
+        ordering = ["-created_at"]
+
+
 class BackfillJob(Model):
     id = fields.UUIDField(primary_key=True)
     camera = fields.ForeignKeyField("models.Camera", related_name="backfill_jobs", on_delete=fields.CASCADE)

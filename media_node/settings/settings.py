@@ -32,11 +32,14 @@ class Settings(BaseSettings):
     # Storage
     DATA_DIR: Path = BASE_DIR / "data"
     RECORDINGS_DIR: Path = BASE_DIR / "data" / "recordings"
+    EXPORTS_DIR: Path = BASE_DIR / "data" / "exports"
+    EXPORT_MIN_FREE_BYTES: int = 1_073_741_824
 
     # MediaMTX
     MEDIAMTX_BIN: Path = BASE_DIR / "bin" / ("mediamtx.exe" if os.name == "nt" else "mediamtx")
     # Used only to make browser-compatible AAC for recorded listening. Video is never transcoded.
     FFMPEG_BIN: str = "ffmpeg"
+    FFPROBE_BIN: str = "ffprobe"
     MEDIAMTX_API_PORT: int = 9997
     MEDIAMTX_METRICS_PORT: int = 9998
     RTSP_PORT: int = 8554
@@ -68,6 +71,8 @@ class Settings(BaseSettings):
     DELETION_INTERVAL_SECONDS: int = 60
     ONVIF_CHECK_INTERVAL_SECONDS: float = 300  # camera reachable + clock offset (no login, see app/onvif/health.py)
     BACKFILL_INTERVAL_SECONDS: float = 5
+    EXPORT_INTERVAL_SECONDS: float = 3
+    EXPORT_FILE_TTL_HOURS: int = 24
 
     # Disk protection: above MAX, delete oldest recordings until below TARGET.
     STORAGE_CHECK_INTERVAL_SECONDS: float = 10
@@ -76,7 +81,7 @@ class Settings(BaseSettings):
     DISK_TARGET_USED_PERCENT: float = 92.0
     DISK_MIN_KEEP_HOURS: float = 1.0  # never auto-delete recordings younger than this
 
-    @field_validator("DATA_DIR", "RECORDINGS_DIR", "MEDIAMTX_BIN")
+    @field_validator("DATA_DIR", "RECORDINGS_DIR", "EXPORTS_DIR", "MEDIAMTX_BIN")
     @classmethod
     def relative_to_base(cls, v: Path) -> Path:
         """Relative paths in .env are relative to the media_node folder, not the working directory."""

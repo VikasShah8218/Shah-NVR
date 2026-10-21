@@ -1,6 +1,7 @@
 import createClient from "openapi-fetch"
 import type { paths as CentralPaths } from "./central"
 import type { paths as NodePaths } from "./node"
+import type { ExportCreate, ExportJob } from "./types"
 
 export class ApiError extends Error {
   readonly status: number
@@ -94,3 +95,31 @@ export function playbackAudioUrl(centralUrl: string, cameraId: number, profile: 
   const q = new URLSearchParams({ profile, start: start.toISOString(), end: end.toISOString(), access })
   return `${centralUrl}/api/v1/playback/${cameraId}/audio.m3u8?${q}`
 }
+
+async function exportFetch<T>(centralUrl: string, path: string, init?: RequestInit): Promise<T> {
+  let response: Response
+  try {
+    response = await fetch(centralUrl.replace(/\/+$/, "") + path, {
+      ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    })
+  } catch {
+    throw new ApiError(0, "Server unreachable")
+  }
+  if (!response.ok) {
+    let error: unknown
+    try { error = await response.json() } catch { error = undefined }
+    const detail = (error as { detail?: unknown } | undefined)?.detail
+    throw new ApiError(response.status, errorMessage(error, response.status),
+      detail && typeof detail === "object" && !Array.isArray(detail) ? detail as Record<string, unknown> : undefined)
+  }
+  return response.json() as Promise<T>
+}
+
+export const listExports = (centralUrl: string, cameraId: number) =>
+  exportFetch<ExportJob[]>(centralUrl, `/api/v1/exports?camera_id=${cameraId}&limit=50`)
+export const createExport = (centralUrl: string, body: ExportCreate) =>
+  exportFetch<ExportJob>(centralUrl, "/api/v1/exports", { method: "POST", body: JSON.stringify(body) })
+export const cancelExport = (centralUrl: string, id: string) =>
+  exportFetch<ExportJob>(centralUrl, `/api/v1/exports/${id}/cancel`, { method: "POST" })
+export const exportDownloadUrl = (centralUrl: string, id: string, access: "lan" | "public") =>
+  `${centralUrl.replace(/\/+$/, "")}/api/v1/exports/${id}/download?access=${access}`

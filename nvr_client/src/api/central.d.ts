@@ -730,6 +730,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Exports */
+        get: operations["list_exports_api_v1_exports_get"];
+        put?: never;
+        /** Create Export */
+        post: operations["create_export_api_v1_exports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Export */
+        get: operations["get_export_api_v1_exports__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Export */
+        post: operations["cancel_export_api_v1_exports__job_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports/{job_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Export */
+        get: operations["download_export_api_v1_exports__job_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/nodes/register": {
         parameters: {
             query?: never;
@@ -923,6 +992,74 @@ export interface paths {
         put?: never;
         /** Job Fail */
         post: operations["job_fail_internal_v1_backfill__job_id__fail_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/exports/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Claim Export */
+        post: operations["claim_export_internal_v1_exports_claim_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/exports/{job_id}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export Progress */
+        post: operations["export_progress_internal_v1_exports__job_id__progress_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/exports/{job_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export Complete */
+        post: operations["export_complete_internal_v1_exports__job_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/exports/{job_id}/fail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export Fail */
+        post: operations["export_fail_internal_v1_exports__job_id__fail_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1305,6 +1442,43 @@ export interface components {
             /** Node Id */
             node_id: number;
         };
+        /** ClaimedExportOut */
+        ClaimedExportOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Source Url */
+            source_url: string;
+            /** Camera Id */
+            camera_id: number;
+            /** Camera Name */
+            camera_name: string;
+            /** Profile */
+            profile: string;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: date-time
+             */
+            end_time: string;
+            mode: components["schemas"]["ExportMode"];
+            /** Options */
+            options: {
+                [key: string]: unknown;
+            };
+            /** Output Name */
+            output_name: string;
+            /** Trim Start Seconds */
+            trim_start_seconds: number;
+            /** Max Output Seconds */
+            max_output_seconds: number;
+        };
         /** ClaimedJobOut */
         ClaimedJobOut: {
             /**
@@ -1368,6 +1542,19 @@ export interface components {
             segments_last_hour: number;
             /** Segments Total */
             segments_total: number;
+        };
+        /** CompleteIn */
+        CompleteIn: {
+            /** Node Id */
+            node_id: number;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Sha256 */
+            sha256: string;
+            /** Encoder */
+            encoder: string;
+            /** Recorded Seconds */
+            recorded_seconds: number;
         };
         /** DeletedIn */
         DeletedIn: {
@@ -1643,6 +1830,153 @@ export interface components {
             acknowledge_shared: boolean;
             /** Restore From */
             restore_from?: string | null;
+        };
+        /** ExportCreate */
+        ExportCreate: {
+            /** Camera Id */
+            camera_id: number;
+            /**
+             * Profile
+             * @default main
+             */
+            profile: string;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: date-time
+             */
+            end_time: string;
+            /** @default original */
+            mode: components["schemas"]["ExportMode"];
+            /**
+             * Video Codec
+             * @default h264
+             * @enum {string}
+             */
+            video_codec: "h264" | "h265";
+            /**
+             * Quality
+             * @default balanced
+             * @enum {string}
+             */
+            quality: "high" | "balanced" | "small";
+            /**
+             * Processor
+             * @default auto
+             * @enum {string}
+             */
+            processor: "auto" | "cpu" | "gpu";
+            /**
+             * Max Height
+             * @default 0
+             * @enum {integer}
+             */
+            max_height: 0 | 360 | 480 | 720 | 1080 | 1440 | 2160;
+            /**
+             * Max Fps
+             * @default 0
+             */
+            max_fps: number;
+            /**
+             * Include Audio
+             * @default true
+             */
+            include_audio: boolean;
+            /**
+             * Audio Bitrate Kbps
+             * @default 128
+             * @enum {integer}
+             */
+            audio_bitrate_kbps: 64 | 96 | 128 | 160 | 192 | 256;
+        };
+        /**
+         * ExportMode
+         * @enum {string}
+         */
+        ExportMode: "original" | "compressed";
+        /** ExportOut */
+        ExportOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Camera Id */
+            camera_id: number;
+            /** Node Id */
+            node_id: number | null;
+            /** Profile */
+            profile: string;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: date-time
+             */
+            end_time: string;
+            mode: components["schemas"]["ExportMode"];
+            state: components["schemas"]["ExportState"];
+            /** Options */
+            options: {
+                [key: string]: unknown;
+            };
+            /** Progress Percent */
+            progress_percent: number;
+            /** Attempt Count */
+            attempt_count: number;
+            /** Output Name */
+            output_name: string | null;
+            /** Output Size Bytes */
+            output_size_bytes: number;
+            /** Output Sha256 */
+            output_sha256: string | null;
+            /** Encoder */
+            encoder: string | null;
+            /** Recorded Seconds */
+            recorded_seconds: number;
+            /** Gap Seconds */
+            gap_seconds: number;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * ExportState
+         * @enum {string}
+         */
+        ExportState: "QUEUED" | "CLAIMED" | "PROCESSING" | "FINALIZING" | "READY" | "FAILED" | "CANCELLED" | "EXPIRED";
+        /** FailIn */
+        FailIn: {
+            /** Node Id */
+            node_id: number;
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
         };
         /** GapOut */
         GapOut: {
@@ -2188,6 +2522,23 @@ export interface components {
             rtsp: string | null;
             /** Snapshot */
             snapshot: string | null;
+        };
+        /** ProgressIn */
+        ProgressIn: {
+            /** Node Id */
+            node_id: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "PROCESSING" | "FINALIZING";
+            /** Progress Percent */
+            progress_percent: number;
+        };
+        /** ProgressOut */
+        ProgressOut: {
+            /** Cancelled */
+            cancelled: boolean;
         };
         /** PtzCapabilities */
         PtzCapabilities: {
@@ -4489,6 +4840,166 @@ export interface operations {
             };
         };
     };
+    list_exports_api_v1_exports_get: {
+        parameters: {
+            query?: {
+                camera_id?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_export_api_v1_exports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_export_api_v1_exports__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_export_api_v1_exports__job_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_export_api_v1_exports__job_id__download_get: {
+        parameters: {
+            query?: {
+                access?: string;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     register_node_internal_v1_nodes_register_post: {
         parameters: {
             query?: never;
@@ -4831,6 +5342,140 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["JobFailIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_export_internal_v1_exports_claim_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimedExportOut"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_progress_internal_v1_exports__job_id__progress_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgressIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgressOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_complete_internal_v1_exports__job_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompleteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_fail_internal_v1_exports__job_id__fail_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FailIn"];
             };
         };
         responses: {

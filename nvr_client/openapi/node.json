@@ -963,6 +963,66 @@
         }
       }
     },
+    "/api/v1/exports/capabilities": {
+      "get": {
+        "tags": [
+          "Exports"
+        ],
+        "summary": "Export Capabilities",
+        "operationId": "export_capabilities_api_v1_exports_capabilities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/exports/{job_id}/file": {
+      "get": {
+        "tags": [
+          "Exports"
+        ],
+        "summary": "Export File",
+        "operationId": "export_file_api_v1_exports__job_id__file_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "tags": [
