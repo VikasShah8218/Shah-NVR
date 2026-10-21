@@ -29,6 +29,8 @@ from app.onvif_server.service import onvif_server
 from app.recordings.router import router as recordings_router
 from app.recordings.services import deletion_tick, scan_tick, upload_tick
 from app.recordings.backfill import backfill_tick
+from app.exports.router import router as exports_router
+from app.exports.service import export_cleanup_tick, export_tick
 from app.storage.services import storage, storage_tick
 from database.config import TORTOISE_ORM
 from database.migrate import migrate
@@ -70,6 +72,8 @@ async def lifespan(app: FastAPI):
                 ("address", settings.ADDRESS_CHECK_INTERVAL_SECONDS, check_public_host),
                 ("onvif-health", settings.ONVIF_CHECK_INTERVAL_SECONDS, onvif_tick),
                 ("backfill", settings.BACKFILL_INTERVAL_SECONDS, backfill_tick),
+                ("exports", settings.EXPORT_INTERVAL_SECONDS, export_tick),
+                ("export-cleanup", 3600, export_cleanup_tick),
             )
         ]
         logger.info("Media node '%s' started; API %s", settings.NODE_NAME, settings.api_url)
@@ -92,6 +96,7 @@ app.include_router(recordings_router)
 app.include_router(onvif_router)
 app.include_router(ptz_router)
 app.include_router(onvif_server_router)
+app.include_router(exports_router)
 
 
 @app.get("/", tags=["System"])

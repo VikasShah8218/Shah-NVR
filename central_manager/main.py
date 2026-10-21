@@ -27,6 +27,8 @@ from app.onvif.router import router as onvif_router
 from app.onvif.encoder_router import router as encoder_router
 from app.onvif.ptz_router import router as ptz_router
 from app.playback.router import router as playback_router
+from app.exports.router import internal_router as exports_internal_router
+from app.exports.router import router as exports_router
 from app.recordings.router import internal_router as recordings_internal_router
 from app.recordings.router import router as recordings_router
 from app.recordings.services import retention_tick
@@ -79,9 +81,11 @@ for r in (
     encoder_router,
     ptz_router,
     backfill_router,
+    exports_router,
     nodes_internal_router,
     recordings_internal_router,
     backfill_internal_router,
+    exports_internal_router,
 ):
     app.include_router(r)
 

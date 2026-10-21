@@ -3,7 +3,7 @@ import { toast } from "sonner"
 import { onvifErrorText } from "@/lib/onvif"
 import { selectedNodeAccess, useNodeAccessMap } from "@/lib/nodeAccess"
 import { useSettings } from "@/lib/settings"
-import { ApiError, centralClient, nodeClient, nodeGet, unwrap } from "./client"
+import { ApiError, cancelExport, centralClient, createExport, listExports, nodeClient, nodeGet, unwrap } from "./client"
 import type {
   Assignment,
   AssignmentHistory,
@@ -37,6 +37,8 @@ import type {
   StorageVolume,
   StreamUpdate,
   Timeline,
+  ExportCreate,
+  ExportJob,
   VolumeCreate,
   VolumeUpdate,
 } from "./types"
@@ -175,6 +177,34 @@ export function useBackfillJobs(cameraId: number, enabled = true) {
       params: { path: { camera_id: cameraId }, query: { limit: 50 } },
     })),
     refetchInterval: 3000,
+  })
+}
+
+export function useExports(cameraId: number | null) {
+  const { url } = useCentral()
+  return useQuery({
+    queryKey: [url, "exports", cameraId], enabled: cameraId != null,
+    queryFn: () => listExports(url, cameraId!), refetchInterval: 3000,
+  })
+}
+
+export function useCreateExport() {
+  const { url } = useCentral()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: ExportCreate) => createExport(url, body),
+    onSuccess: (job: ExportJob) => { qc.invalidateQueries({ queryKey: [url, "exports", job.camera_id] }); toast.success("Export queued") },
+    onError: (error: Error) => toast.error(error.message),
+  })
+}
+
+export function useCancelExport() {
+  const { url } = useCentral()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id }: { id: string; cameraId: number }) => cancelExport(url, id),
+    onSuccess: (_job, values) => { qc.invalidateQueries({ queryKey: [url, "exports", values.cameraId] }); toast.success("Export cancelled") },
+    onError: (error: Error) => toast.error(error.message),
   })
 }
 

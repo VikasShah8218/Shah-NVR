@@ -17,6 +17,7 @@ web client. There are **zero known web-to-desktop parity gaps**.
 | H6 audio detection, live listening and recorded listening | Implemented | Implemented | In parity |
 | L3 ONVIF Profile G edge-storage backfill | Implemented | Implemented | In parity |
 | Per-node public client endpoints | Implemented | Implemented | In parity |
+| Persistent recording export (original/compressed) | Implemented | Implemented | In parity |
 
 H4 events, H6 two-way talk, full Profile G recorded RTSP replay, Profile T, and
 the lower-priority ONVIF roadmap items are product-roadmap work. They are not
@@ -79,6 +80,17 @@ supported camera is available; it does not require more desktop feature code.
   and logs.
 - Private registration endpoints remain the path for heartbeats, assignments,
   and uploads.
+
+### Recording export
+
+- Playback can queue a bounded range of up to four hours as either an original
+  remux or an H.264/H.265 compressed MP4.
+- Compression exposes quality, maximum resolution/frame rate, audio inclusion,
+  and Auto/CPU/GPU processing controls.
+- Both clients display durable job progress and errors, allow cancellation, and
+  download ready files through the user's selected LAN/public node route.
+- Central Manager owns job state; Media Nodes perform FFmpeg work with a bounded
+  worker and clean expired output files.
 
 ## Intentional client differences
 

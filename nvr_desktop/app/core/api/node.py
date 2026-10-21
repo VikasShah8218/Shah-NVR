@@ -60,7 +60,7 @@ def media_file_url(api_url: str, segment_id: str) -> str:
 def download(url: str, target: Path, on_progress: Callable[[int, int], None] | None = None) -> Path:
     """Stream a file to disk (used for chunk downloads). Returns the saved path."""
     try:
-        with httpx.stream("GET", url, timeout=settings.HTTP_TIMEOUT_SECONDS * 6) as response:
+        with httpx.stream("GET", url, timeout=settings.HTTP_TIMEOUT_SECONDS * 60, follow_redirects=True) as response:
             if response.status_code >= 400:
                 response.read()  # load the error body so its message can be shown
                 raise_for_response(response)
