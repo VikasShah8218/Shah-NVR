@@ -221,15 +221,47 @@ PageScroll {
                         AppButton {
                             visible: Playback.hasAudio
                             variant: "ghost"; size: "icon"
-                            iconName: "waves"
+                            iconName: video.player.muted ? "volume-x" : "volume-2"
                             tip: video.player.muted ? "Listen to recorded audio" : "Mute audio"
                             onClicked: video.player.muted = !video.player.muted
                         }
                         Slider {
+                            id: volumeSlider
                             visible: Playback.hasAudio && !video.player.muted
                             implicitWidth: 100
+                            implicitHeight: 24
+                            leftPadding: 0
+                            rightPadding: 0
                             from: 0; to: 1; value: Prefs.playbackVolume
                             onMoved: Prefs.playbackVolume = value
+
+                            background: Rectangle {
+                                x: volumeSlider.leftPadding
+                                y: volumeSlider.topPadding + (volumeSlider.availableHeight - height) / 2
+                                width: volumeSlider.availableWidth
+                                height: 4
+                                radius: 2
+                                color: Theme.muted
+
+                                Rectangle {
+                                    width: volumeSlider.visualPosition * parent.width
+                                    height: parent.height
+                                    radius: parent.radius
+                                    color: Theme.primary
+                                }
+                            }
+
+                            handle: Rectangle {
+                                x: volumeSlider.leftPadding
+                                    + volumeSlider.visualPosition * (volumeSlider.availableWidth - width)
+                                y: volumeSlider.topPadding + (volumeSlider.availableHeight - height) / 2
+                                implicitWidth: 10
+                                implicitHeight: 10
+                                radius: 5
+                                color: Theme.primary
+                                border.width: 1
+                                border.color: Theme.card
+                            }
                         }
                         AppSelect {
                             implicitWidth: 84
