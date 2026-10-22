@@ -40,7 +40,7 @@ ApplicationWindow {
     minimumWidth: 1100
     minimumHeight: 700
     visible: true
-    title: "Shah-NVR"
+    title: ProductName
     color: Theme.background
     font.family: Theme.font
 

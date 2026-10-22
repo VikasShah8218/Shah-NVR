@@ -191,15 +191,20 @@ ColumnLayout {
         Layout.fillWidth: true; title: "Apply this draft to other cameras"; spacing: 10
         AppText {
             text: "Select up to 20 targets. Only edited fields are copied to the same NVR stream name (" + root.profile + "). Each target is checked separately; unsupported or shared encoders are skipped. Changes run sequentially and stop after an unverified result."
-            wrapMode: Text.WordWrap; elide: Text.ElideNone; Layout.fillWidth: true
+            variant: "muted"; wrapMode: Text.WordWrap; elide: Text.ElideNone; Layout.fillWidth: true
         }
-        Flow {
-            Layout.fillWidth: true; spacing: 16
+        GridLayout {
+            Layout.fillWidth: true
+            columns: root.width >= 720 ? 2 : 1
+            columnSpacing: 28
+            rowSpacing: 10
             Repeater {
                 model: Cameras.all.filter(c => c.id !== root.cameraId && c.onvif_host)
-                CheckBox {
+                AppCheckBox {
                     required property var modelData
                     id: bulkCheck
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 1
                     text: modelData.name
                     enabled: !root.v.busy && (checked || root.v.selected.length < 20)
                     Binding { target: bulkCheck; property: "checked"; value: root.v.selected.includes(bulkCheck.modelData.id) }

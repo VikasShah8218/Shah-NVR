@@ -80,7 +80,7 @@ Rectangle {
             anchors.fill: parent
             anchors.leftMargin: 8
             anchors.rightMargin: 4
-            spacing: 8
+            spacing: tile.width < 260 ? 4 : 8
             Text {
                 text: tile.camera ? tile.camera.name : ""
                 color: "white"
@@ -88,10 +88,12 @@ Rectangle {
                 font.pixelSize: Theme.textXs
                 font.weight: Font.Medium
                 elide: Text.ElideRight
-                Layout.maximumWidth: tile.width * 0.55
+                Layout.fillWidth: true
+                Layout.preferredWidth: 1
+                Layout.minimumWidth: 0
             }
             Rectangle {
-                visible: tile.recording
+                visible: tile.recording && tile.width >= 220
                 implicitWidth: recRow.implicitWidth + 8
                 implicitHeight: 16
                 radius: 3
@@ -112,12 +114,17 @@ Rectangle {
                     Text { text: "REC"; color: "white"; font.family: Theme.font; font.pixelSize: 10; font.weight: Font.DemiBold }
                 }
             }
-            Text { text: tile.profile; color: Qt.rgba(1, 1, 1, 0.6); font.family: Theme.font; font.pixelSize: Theme.textXs }
-            Item { Layout.fillWidth: true }
+            Text {
+                visible: tile.width >= 180
+                text: tile.profile
+                color: Qt.rgba(1, 1, 1, 0.6)
+                font.family: Theme.font
+                font.pixelSize: Theme.textXs
+            }
             AppButton {
                 visible: (hover.hovered || Live.activeAudioCameraId === tile.cameraId) && (tile.urls.audio_state === "available" || tile.urls.audio_state === "advertised_not_observed")
                 variant: "ghost"; size: "icon"; implicitWidth: 24; implicitHeight: 24
-                iconName: "waves"
+                iconName: Live.activeAudioCameraId === tile.cameraId ? "volume-2" : "volume-x"
                 tip: Live.activeAudioCameraId === tile.cameraId ? "Mute audio" : "Listen to this camera"
                 onClicked: Live.toggleAudio(tile.cameraId)
             }

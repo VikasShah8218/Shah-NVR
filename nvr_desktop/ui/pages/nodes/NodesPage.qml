@@ -108,6 +108,7 @@ PageScroll {
                     ColumnLayout {
                         spacing: 4
                         Layout.preferredWidth: root.columns[0].width
+                        Layout.alignment: Qt.AlignTop
                         AppText { text: model.name; font.weight: Font.Medium; Layout.fillWidth: true }
                         StatusBadge { status: model.state }
                         AppText {
@@ -120,34 +121,47 @@ PageScroll {
                     }
                     UsageMeter {
                         Layout.preferredWidth: root.columns[1].width
+                        Layout.alignment: Qt.AlignTop
                         opacity: row.stale ? 0.5 : 1
+                        alignValueLeft: true
                         value: Fmt.percent(r.cpuPercent) + (r.cpuCount ? " · " + r.cpuCount + " cores" : "")
                         percent: r.cpuPercent
                     }
                     Item {
                         Layout.preferredWidth: root.columns[2].width
+                        Layout.alignment: Qt.AlignTop
                         implicitHeight: gpuMeter.visible ? gpuMeter.implicitHeight : 20
                         opacity: row.stale ? 0.5 : 1
                         UsageMeter {
                             id: gpuMeter
                             visible: row.gpu !== null
                             width: parent.width
+                            alignValueLeft: true
                             value: row.gpu ? Fmt.percent(row.gpu.utilization_percent) : ""
                             percent: row.gpu ? row.gpu.utilization_percent : null
                             hint: row.gpu ? row.gpu.name + (row.gpu.memory_total_bytes
                                 ? " · " + Fmt.bytes(row.gpu.memory_used_bytes) + " / " + Fmt.bytes(row.gpu.memory_total_bytes) : "") : ""
                         }
-                        AppText { visible: row.gpu === null; text: "No GPU data"; variant: "small" }
+                        AppText {
+                            visible: row.gpu === null
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: "No GPU data"
+                            variant: "small"
+                        }
                     }
                     UsageMeter {
                         Layout.preferredWidth: root.columns[3].width
+                        Layout.alignment: Qt.AlignTop
                         opacity: row.stale ? 0.5 : 1
+                        alignValueLeft: true
                         value: Fmt.bytes(r.memUsed) + " / " + Fmt.bytes(r.memTotal)
                         percent: r.memPercent
                     }
                     UsageMeter {
                         Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignTop
                         opacity: row.stale ? 0.5 : 1
+                        alignValueLeft: true
                         value: r.quota !== null && r.quota !== undefined
                             ? Fmt.bytes(r.recordings) + " / " + Fmt.bytes(r.quota) + " (" + Fmt.percent(r.storagePercent) + ")"
                             : Fmt.bytes(r.recordings) + " · no quota"
@@ -158,12 +172,15 @@ PageScroll {
                     }
                     UsageMeter {
                         Layout.preferredWidth: root.columns[5].width
+                        Layout.alignment: Qt.AlignTop
+                        alignValueLeft: true
                         value: model.assigned_cameras + " / " + model.capacity_cameras
                         percent: r.camerasPercent
                     }
                     ColumnLayout {
                         spacing: 2
                         Layout.preferredWidth: root.columns[6].width
+                        Layout.alignment: Qt.AlignTop
                         AppText { text: "↓ " + Fmt.mbps(r.netRx); font.pixelSize: Theme.textXs }
                         AppText { text: "↑ " + Fmt.mbps(r.netTx); variant: "small" }
                     }

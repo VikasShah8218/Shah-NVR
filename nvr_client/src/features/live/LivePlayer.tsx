@@ -1,5 +1,6 @@
 import Hls from "hls.js"
 import { Loader2, VideoOff, Volume2, VolumeX } from "lucide-react"
+import type { CSSProperties } from "react"
 import { useEffect, useId, useRef, useState } from "react"
 import { useLive } from "@/api/queries"
 import type { LiveInfo } from "@/api/types"
@@ -35,6 +36,7 @@ export function LivePlayer({
   profile,
   protocol,
   className,
+  videoStyle,
   onVideo,
   overlay = true,
 }: {
@@ -42,6 +44,7 @@ export function LivePlayer({
   profile: string
   protocol: LiveProtocol
   className?: string
+  videoStyle?: CSSProperties
   onVideo?: (video: HTMLVideoElement | null) => void
   overlay?: boolean
 }) {
@@ -208,6 +211,7 @@ export function LivePlayer({
       <video
         ref={videoRef}
         className="size-full object-contain"
+        style={videoStyle}
         playsInline
         muted={muted}
         autoPlay
