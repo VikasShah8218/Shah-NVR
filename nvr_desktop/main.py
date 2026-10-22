@@ -32,11 +32,13 @@ except LibmpvMissingError as exc:
 
 os.environ.setdefault("QSG_RENDER_LOOP", "basic")  # see app/video/gl_surface.py
 
-from PySide6.QtCore import QThreadPool  # noqa: E402
+from PySide6.QtCore import QThreadPool, QUrl  # noqa: E402
 from PySide6.QtGui import QFontDatabase, QGuiApplication, QIcon, QWindow  # noqa: E402
 from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterSingletonInstance  # noqa: E402
 from PySide6.QtQuick import QQuickWindow, QSGRendererInterface  # noqa: E402
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
+
+from app.core.branding import PRODUCT_LOGO_PATH, PRODUCT_NAME  # noqa: E402
 
 UI_DIR = BASE_DIR / "ui"
 ASSETS_DIR = BASE_DIR / "assets"
@@ -66,9 +68,9 @@ def build_app():
     QQuickStyle.setStyle("Basic")  # fully re-skinned by ui/theme + ui/components
 
     qt_app = QGuiApplication(sys.argv)
-    qt_app.setApplicationName(settings.APP_NAME)
+    qt_app.setApplicationName(PRODUCT_NAME)
     qt_app.setOrganizationName("ShahNVR")
-    qt_app.setWindowIcon(QIcon(str(ASSETS_DIR / "app-icon.svg")))
+    qt_app.setWindowIcon(QIcon(str(PRODUCT_LOGO_PATH)))
     locale.setlocale(locale.LC_NUMERIC, "C")  # libmpv requirement
     load_fonts()
 
@@ -132,6 +134,8 @@ def build_app():
         qmlRegisterSingletonInstance(type(instance), "App", 1, 0, name, instance)
 
     engine = QQmlApplicationEngine()
+    engine.rootContext().setContextProperty("ProductName", PRODUCT_NAME)
+    engine.rootContext().setContextProperty("ProductLogo", QUrl.fromLocalFile(str(PRODUCT_LOGO_PATH)))
     engine.addImageProvider("icon", IconProvider())
     engine.load(UI_DIR / "Main.qml")
     return qt_app, engine, singletons
@@ -160,6 +164,8 @@ def main() -> int:
         logger.error("Failed to load ui/Main.qml")
         return 1
     window = engine.rootObjects()[0]
+    from app.core.window_chrome import apply_window_chrome
+    apply_window_chrome(window)
     restore_window(window, singletons["Prefs"])
     qt_app.aboutToQuit.connect(lambda: save_window(window, singletons["Prefs"]))
     code = qt_app.exec()

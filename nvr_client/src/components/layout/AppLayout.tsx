@@ -12,7 +12,6 @@ import {
   Radar,
   Server,
   Settings,
-  Video,
 } from "lucide-react"
 import { Suspense, useEffect, useState } from "react"
 import { NavLink, Outlet, useLocation } from "react-router"
@@ -21,6 +20,7 @@ import { Loading } from "@/components/common"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { PRODUCT_LOGO, PRODUCT_NAME } from "@/lib/branding"
 import { readStored, useSettings, writeStored } from "@/lib/settings"
 import { fmtTime } from "@/lib/time"
 import { cn } from "@/lib/utils"
@@ -59,10 +59,8 @@ export function AppLayout() {
         )}
       >
         <div className="flex h-14 items-center gap-2 px-4">
-          <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Video className="size-4.5" />
-          </div>
-          {!collapsed && <span className="font-semibold tracking-tight">Shah-NVR</span>}
+          <img src={PRODUCT_LOGO} alt="" className="size-8 shrink-0 object-contain" />
+          {!collapsed && <span className="font-semibold tracking-tight">{PRODUCT_NAME}</span>}
         </div>
         <nav className="flex-1 space-y-1 px-2 py-2">
           {NAV.map(({ to, label, icon: Icon, end }) => {
@@ -129,8 +127,8 @@ export function AppLayout() {
         <SheetContent side="left" className="w-[min(88vw,22rem)] overflow-y-auto p-0 pb-[env(safe-area-inset-bottom)] lg:hidden">
           <SheetHeader className="border-b pt-[calc(1rem+env(safe-area-inset-top))]">
             <SheetTitle className="flex items-center gap-2">
-              <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground"><Video className="size-5" /></span>
-              Shah-NVR
+              <img src={PRODUCT_LOGO} alt="" className="size-9 shrink-0 object-contain" />
+              {PRODUCT_NAME}
             </SheetTitle>
             <SheetDescription>Monitoring and administration</SheetDescription>
           </SheetHeader>
@@ -168,8 +166,8 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
         <Menu className="size-5" />
       </Button>
       <div className="flex min-w-0 items-center gap-2 lg:hidden">
-        <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground"><Video className="size-4.5" /></div>
-        <span className="truncate font-semibold">Shah-NVR</span>
+        <img src={PRODUCT_LOGO} alt="" className="size-8 shrink-0 object-contain" />
+        <span className="truncate font-semibold">{PRODUCT_NAME}</span>
       </div>
       <div className="hidden lg:block"><Pill ok={online} label={online ? "Central online" : health.isLoading ? "Connecting…" : "Central offline"} title={settings.centralUrl} /></div>
       <span className={cn("ml-auto size-2.5 shrink-0 rounded-full lg:hidden", online ? "bg-success" : "animate-pulse bg-danger")} title={online ? "Central online" : "Central offline"} />

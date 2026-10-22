@@ -38,16 +38,24 @@ Rectangle {
             Layout.preferredHeight: 56
             Layout.leftMargin: 16
             spacing: 10
-            Rectangle {
+            Item {
                 width: 32
                 height: 32
-                radius: Theme.radius
-                color: Theme.primary
-                Icon { anchors.centerIn: parent; name: "video"; size: 18; color: Theme.primaryForeground }
+                Image {
+                    anchors.centerIn: parent
+                    width: 32
+                    height: 32
+                    source: ProductLogo
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                    mipmap: true
+                    sourceSize.width: 48
+                    sourceSize.height: 48
+                }
             }
             AppText {
                 visible: !sidebar.collapsed
-                text: "Shah-NVR"
+                text: ProductName
                 font.pixelSize: Theme.textBase
                 font.weight: Font.DemiBold
                 Layout.fillWidth: true
