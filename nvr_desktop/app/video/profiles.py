@@ -1,6 +1,7 @@
 """mpv option sets, in one place.
 
-LIVE    - camera streams (RTSP or LL-HLS): lowest latency, no cache, never "ends".
+LIVE RTSP - camera streams at minimum delay, with no cache.
+LIVE HLS  - camera streams with a five-second safety buffer for smoothness.
 PLAYBACK - recorded HLS VOD from the central manager: normal buffering, exact seeking, and
            `rebase-start-time=no` so `time-pos` is the absolute media timestamp.
 
@@ -49,6 +50,10 @@ BASE_OPTIONS = {
 LIVE_OPTIONS = {
     "cache": "no",
     "cache_pause": "no",
+    "cache_pause_initial": "no",
+    "cache_pause_wait": 1,
+    "cache_secs": 1,
+    "demuxer_readahead_secs": 1,
     "untimed": "yes",
     "video_sync": "audio",
     "video_latency_hacks": "yes",
@@ -64,9 +69,35 @@ LIVE_OPTIONS = {
     "hr_seek": "no",
 }
 
+LIVE_HLS_OPTIONS = {
+    "cache": "yes",
+    "cache_pause": "yes",
+    "cache_pause_initial": "yes",
+    "cache_pause_wait": 5,
+    "cache_secs": 5,
+    "demuxer_readahead_secs": 5,
+    "untimed": "no",
+    "video_sync": "audio",
+    "video_latency_hacks": "no",
+    "interpolation": "no",
+    "vd_lavc_threads": "1",
+    "stream_buffer_size": "128KiB",
+    "demuxer_lavf_o": "",
+    "demuxer_lavf_probe_info": "auto",
+    "demuxer_lavf_analyzeduration": "0.1",
+    "rtsp_transport": "tcp",
+    "network_timeout": "10",
+    "rebase_start_time": "yes",
+    "hr_seek": "no",
+}
+
 PLAYBACK_OPTIONS = {
     "cache": "yes",
     "cache_pause": "yes",
+    "cache_pause_initial": "no",
+    "cache_pause_wait": 1,
+    "cache_secs": 30,
+    "demuxer_readahead_secs": 1,
     "untimed": "no",
     "video_sync": "audio",
     "video_latency_hacks": "no",
@@ -107,9 +138,14 @@ CPU_RENDER_OPTIONS = {
 HWDEC_CHOICES = ["auto-safe", "nvdec", "d3d11va-copy", "nvdec-copy", "no"]
 
 
-def options_for(mode: str, render_mode: str = "gpu") -> dict:
-    """mode: 'live' | 'playback'; render_mode: 'gpu' | 'cpu'."""
-    options = dict(LIVE_OPTIONS if mode == "live" else PLAYBACK_OPTIONS)
+def options_for(mode: str, render_mode: str = "gpu", source: str = "", live_buffer_seconds: int = 5) -> dict:
+    """Return complete options for the mode, renderer and active media URL."""
+    is_live_hls = mode == "live" and source.partition("?")[0].lower().endswith(".m3u8")
+    options = dict(LIVE_HLS_OPTIONS if is_live_hls else LIVE_OPTIONS if mode == "live" else PLAYBACK_OPTIONS)
+    if is_live_hls:
+        buffer_seconds = max(2, min(10, int(live_buffer_seconds)))
+        options.update(cache_pause_wait=buffer_seconds, cache_secs=buffer_seconds,
+                       demuxer_readahead_secs=buffer_seconds)
     options.update(CPU_RENDER_OPTIONS if render_mode == "cpu" else GPU_RENDER_OPTIONS)
     if render_mode == "cpu" and mode == "playback":
         options["vd_lavc_threads"] = "2"  # one big view: a second decode thread keeps seeking snappy

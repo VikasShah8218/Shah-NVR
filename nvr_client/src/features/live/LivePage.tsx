@@ -207,7 +207,8 @@ export function LivePage() {
                   {cam ? (
                     <LiveTile
                       camera={cam}
-                      profile={state.layout > 1 && settings.gridUsesSubstream && cam.streams.some((s) => s.profile === "sub") ? "sub" : "main"}
+                      // Fixed policy: one-up uses main; every multi-camera grid uses sub when present.
+                      profile={state.layout > 1 && cam.streams.some((s) => s.profile === "sub") ? "sub" : "main"}
                       protocol={protocol}
                       onRemove={() => clearTile(i)}
                       onExpand={() => setFullscreenCam(cam.id)}

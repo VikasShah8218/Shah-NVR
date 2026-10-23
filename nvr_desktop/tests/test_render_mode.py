@@ -36,6 +36,17 @@ def test_options_per_render_mode():
     assert options_for("live", "cpu")["vd_lavc_threads"] == "1"
 
 
+def test_live_hls_uses_stability_buffer_without_changing_rtsp_policy():
+    rtsp = options_for("live", "gpu", "rtsp://node:8554/cam-1/sub")
+    hls = options_for("live", "gpu", "http://node:8888/cam-1/sub/index.m3u8?token=x")
+    assert rtsp["cache"] == "no" and rtsp["untimed"] == "yes"
+    assert hls["cache"] == "yes" and hls["cache_pause_initial"] == "yes"
+    assert hls["cache_secs"] == 5 and hls["cache_pause_wait"] == 5
+    assert hls["untimed"] == "no"
+    safer = options_for("live", "gpu", "http://node/live.m3u8", live_buffer_seconds=8)
+    assert safer["cache_secs"] == 8 and safer["demuxer_readahead_secs"] == 8
+
+
 def test_active_mode_validation():
     previous = render_mode.active()
     try:

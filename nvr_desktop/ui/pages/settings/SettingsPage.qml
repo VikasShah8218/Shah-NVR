@@ -110,11 +110,19 @@ PageScroll {
             }
         }
         SettingRow {
-            title: "Use substream in grids"
-            hint: "Multi-camera grids play the low-resolution \"sub\" profile when a camera has one."
-            AppSwitch {
-                checked: Prefs.gridUsesSubstream
-                onToggled: Prefs.gridUsesSubstream = checked
+            title: "HLS stability buffer"
+            hint: "More buffering absorbs network jitter but increases LL-HLS live delay. RTSP is unaffected."
+            AppSelect {
+                implicitWidth: 220
+                options: [
+                    { value: 2, label: "2 seconds" },
+                    { value: 3, label: "3 seconds" },
+                    { value: 5, label: "5 seconds (recommended)" },
+                    { value: 8, label: "8 seconds" },
+                    { value: 10, label: "10 seconds" }
+                ]
+                value: Prefs.hlsBufferSeconds
+                onPicked: v => Prefs.hlsBufferSeconds = v
             }
         }
         SettingRow {

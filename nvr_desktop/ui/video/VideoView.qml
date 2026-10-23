@@ -27,6 +27,7 @@ Rectangle {
         id: mpv
         mode: view.mode
         hwdec: Prefs.hwdec
+        liveBufferSeconds: Prefs.hlsBufferSeconds
         fallbackSource: view.fallbackSource
         source: view.source
     }

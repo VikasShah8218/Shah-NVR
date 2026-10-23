@@ -23,7 +23,8 @@ Rectangle {
     readonly property bool selected: Live.selected === index
     property string protocolOverride: "" // "" = same as the grid
     readonly property string protocol: protocolOverride || gridProtocol
-    readonly property string profile: camera && Live.layout > 1 && Prefs.gridUsesSubstream
+    // Fixed policy: one-up uses main; every multi-camera grid uses sub when present.
+    readonly property string profile: camera && Live.layout > 1
         && camera.streams.some(s => s.profile === "sub") ? "sub" : "main"
     readonly property var urls: {
         Live.urlsRevision // re-evaluate when the URLs refresh

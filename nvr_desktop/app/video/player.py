@@ -129,6 +129,7 @@ class MpvPlayer(QObject):
     sourceChanged = Signal()
     fallbackSourceChanged = Signal()
     modeChanged = Signal()
+    liveBufferSecondsChanged = Signal()
     hwdecChanged = Signal()
     playStateChanged = Signal()
     errorTextChanged = Signal()
@@ -152,6 +153,7 @@ class MpvPlayer(QObject):
         self._fallback_source = ""
         self._active_source = ""
         self._mode = "live"
+        self._live_buffer_seconds = 5
         self._hwdec = "auto-safe"
         self._state = "idle"  # idle | connecting | playing | reconnecting | error
         self._error_text = ""
@@ -292,7 +294,8 @@ class MpvPlayer(QObject):
             self.activeSourceChanged.emit()
 
     def _apply_mode_options(self) -> None:
-        for key, value in options_for(self._mode, render_mode.active()).items():
+        for key, value in options_for(self._mode, render_mode.active(), self._active_source,
+                                      self._live_buffer_seconds).items():
             try:
                 self.mpv[key.replace("_", "-")] = value
             except Exception as exc:  # an option unknown to this libmpv build must not break playback
@@ -397,6 +400,19 @@ class MpvPlayer(QObject):
                 self.mpv["hwdec"] = self._hwdec_option()
             self.hwdecChanged.emit()
 
+    def _get_live_buffer_seconds(self) -> int:
+        return self._live_buffer_seconds
+
+    def _set_live_buffer_seconds(self, value: int) -> None:
+        value = max(2, min(10, int(value)))
+        if value != self._live_buffer_seconds:
+            self._live_buffer_seconds = value
+            self.liveBufferSecondsChanged.emit()
+            if (self._mode == "live" and ".m3u8" in self._active_source.lower()
+                    and not self._stopped and self._render_ready):
+                self._retry_timer.stop()
+                self._load_active_source()
+
     def _get_paused(self) -> bool:
         return self._paused
 
@@ -436,6 +452,8 @@ class MpvPlayer(QObject):
     source = Property(str, _get_source, _set_source, notify=sourceChanged)
     fallbackSource = Property(str, _get_fallback, _set_fallback, notify=fallbackSourceChanged)
     mode = Property(str, _get_mode, _set_mode, notify=modeChanged)
+    liveBufferSeconds = Property(int, _get_live_buffer_seconds, _set_live_buffer_seconds,
+                                 notify=liveBufferSecondsChanged)
     hwdec = Property(str, _get_hwdec, _set_hwdec, notify=hwdecChanged)
     paused = Property(bool, _get_paused, _set_paused, notify=pausedChanged)
     speed = Property(float, _get_speed, _set_speed, notify=speedChanged)

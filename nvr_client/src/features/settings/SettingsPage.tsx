@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
 import { type LiveProtocol, type NodeAccessPreference, useSettings } from "@/lib/settings"
 
 type TestState = { kind: "idle" } | { kind: "testing" } | { kind: "ok"; text: string } | { kind: "fail"; text: string }
@@ -126,12 +125,21 @@ export function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
             <div>
-              <Label>Use substream in grids</Label>
-              <p className="text-xs text-muted-foreground">Multi-camera grids play the low-resolution "sub" profile when a camera has one.</p>
+              <Label>HLS stability buffer</Label>
+              <p className="text-xs text-muted-foreground">More buffering absorbs network jitter but increases HLS live delay.</p>
             </div>
-            <Switch checked={settings.gridUsesSubstream} onCheckedChange={(v) => update({ gridUsesSubstream: v })} />
+            <Select value={String(settings.hlsBufferSeconds)} onValueChange={(v) => update({ hlsBufferSeconds: Number(v) })}>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[2, 3, 5, 8, 10].map((seconds) => (
+                  <SelectItem key={seconds} value={String(seconds)}>{seconds} seconds{seconds === 5 ? " (recommended)" : ""}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
