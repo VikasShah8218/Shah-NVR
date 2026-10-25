@@ -23,6 +23,13 @@ ApplicationWindow {
         settings: "pages/settings/SettingsPage.qml"
     })
 
+    // Live View is kept loaded (hidden, its tiles paused) for LIVE_KEEP_ALIVE_MS after leaving it, so switching
+    // pages is instant both ways: destroying 16 players costs ~1.6 s on the UI thread (GL render contexts and
+    // decoders must be freed there). After the keep-alive the tiles release their players one by one
+    // (LivePage.releasePlayers), then the page is unloaded.
+    property int liveKeepAliveMs: 120000
+    property bool liveKept: false
+
     // Live View fullscreen: hide the sidebar and top bar and fill the screen (F11 / Esc).
     property bool immersive: false
     property int visibilityBeforeImmersive: Window.Windowed
@@ -57,14 +64,54 @@ ApplicationWindow {
 
             Topbar { visible: !window.immersive; Layout.fillWidth: true }
 
-            Loader {
-                id: page
+            Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                source: window.pages[Router.page]
-                asynchronous: false
+
+                Loader {
+                    id: page
+                    anchors.fill: parent
+                    source: Router.page === "live" ? "" : window.pages[Router.page]
+                    asynchronous: false
+                }
+                Loader {
+                    id: livePage
+                    anchors.fill: parent
+                    active: Router.page === "live" || window.liveKept
+                    visible: Router.page === "live"
+                    source: window.pages.live
+                    asynchronous: false
+                    onLoaded: window.liveKept = true  // set before leaving, so `active` stays true then
+                }
+                Binding {
+                    target: livePage.item
+                    property: "away"
+                    value: Router.page !== "live"
+                    when: livePage.item !== null
+                }
+                Connections {
+                    target: livePage.item
+                    ignoreUnknownSignals: true
+                    function onPlayersReleased() { window.liveKept = false }
+                }
             }
         }
+    }
+
+    Connections {
+        target: Router
+        function onChanged() {
+            if (Router.page === "live") {
+                liveKeepAlive.stop()
+            } else if (window.liveKept && !liveKeepAlive.running) {
+                liveKeepAlive.start()
+            }
+        }
+    }
+    Timer {
+        id: liveKeepAlive
+        interval: window.liveKeepAliveMs
+        onTriggered: if (livePage.item) livePage.item.releasePlayers()
     }
 
     Toaster {

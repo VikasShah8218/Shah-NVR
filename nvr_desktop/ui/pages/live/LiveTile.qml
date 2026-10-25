@@ -14,7 +14,9 @@ Rectangle {
     required property int index
     property var cameraId: null         // null = empty tile
     property string gridProtocol: "auto"
-    property bool suspended: false      // the main-stream dialog is open: freeze, free the network
+    property bool suspended: false      // the main-stream dialog is open or the page is hidden: freeze, free the network
+    property bool released: false       // hidden page kept too long: destroy the player (LivePage.releasePlayers)
+    readonly property var video: videoLoader.item
     signal expand(int cameraId)
 
     readonly property var camera: {
@@ -39,17 +41,20 @@ Rectangle {
 
     onCameraIdChanged: protocolOverride = ""
 
-    VideoView {
-        id: video
+    Loader {
+        id: videoLoader
+        active: !tile.released
         visible: !!tile.camera
         anchors.fill: parent
-        source: tile.camera ? tile.urls.source ?? "" : ""
-        fallbackSource: tile.camera ? tile.urls.fallback ?? "" : ""
-        waitingText: tile.urls.error ? tile.urls.error : "Loading stream URLs…"
-        suspended: tile.suspended
-        showInfo: hover.hovered || Live.layout <= 4
-        player.muted: Live.activeAudioCameraId !== tile.cameraId
-        player.volume: Prefs.liveVolume
+        sourceComponent: VideoView {
+            source: tile.camera ? tile.urls.source ?? "" : ""
+            fallbackSource: tile.camera ? tile.urls.fallback ?? "" : ""
+            waitingText: tile.urls.error ? tile.urls.error : "Loading stream URLs…"
+            suspended: tile.suspended
+            showInfo: hover.hovered || Live.layout <= 4
+            player.muted: Live.activeAudioCameraId !== tile.cameraId
+            player.volume: Prefs.liveVolume
+        }
     }
 
     // frozen behind the main-stream dialog
@@ -193,7 +198,7 @@ Rectangle {
             iconName: "image-down"
             onTriggered: {
                 const path = Live.snapshotPath(tile.camera.name)
-                if (video.player.playState === "playing" && video.player.screenshot(path))
+                if (tile.video && tile.video.player.playState === "playing" && tile.video.player.screenshot(path))
                     Toasts.success("Snapshot saved to " + path)
                 else
                     Toasts.error("No video frame yet")
