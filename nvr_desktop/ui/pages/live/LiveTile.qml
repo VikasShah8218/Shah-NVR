@@ -14,6 +14,7 @@ Rectangle {
     required property int index
     property var cameraId: null         // null = empty tile
     property string gridProtocol: "auto"
+    property bool suspended: false      // the main-stream dialog is open: freeze, free the network
     signal expand(int cameraId)
 
     readonly property var camera: {
@@ -23,7 +24,8 @@ Rectangle {
     readonly property bool selected: Live.selected === index
     property string protocolOverride: "" // "" = same as the grid
     readonly property string protocol: protocolOverride || gridProtocol
-    readonly property string profile: camera && Live.layout > 1 && Prefs.gridUsesSubstream
+    // Fixed policy: one-up uses main; every multi-camera grid uses sub when present.
+    readonly property string profile: camera && Live.layout > 1
         && camera.streams.some(s => s.profile === "sub") ? "sub" : "main"
     readonly property var urls: {
         Live.urlsRevision // re-evaluate when the URLs refresh
@@ -44,9 +46,29 @@ Rectangle {
         source: tile.camera ? tile.urls.source ?? "" : ""
         fallbackSource: tile.camera ? tile.urls.fallback ?? "" : ""
         waitingText: tile.urls.error ? tile.urls.error : "Loading stream URLs…"
+        suspended: tile.suspended
         showInfo: hover.hovered || Live.layout <= 4
         player.muted: Live.activeAudioCameraId !== tile.cameraId
         player.volume: Prefs.liveVolume
+    }
+
+    // frozen behind the main-stream dialog
+    Rectangle {
+        visible: tile.suspended && !!tile.camera
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 6
+        radius: 4
+        color: Qt.rgba(0, 0, 0, 0.55)
+        implicitWidth: pausedRow.implicitWidth + 12
+        implicitHeight: 18
+        Row {
+            id: pausedRow
+            anchors.centerIn: parent
+            spacing: 4
+            Icon { name: "pause"; size: 10; color: "white"; anchors.verticalCenter: parent.verticalCenter }
+            Text { text: "Paused"; color: Qt.rgba(1, 1, 1, 0.85); font.family: Theme.font; font.pixelSize: 10 }
+        }
     }
 
     // empty tile

@@ -4,7 +4,7 @@ import type { CSSProperties } from "react"
 import { useEffect, useId, useRef, useState } from "react"
 import { useLive } from "@/api/queries"
 import type { LiveInfo } from "@/api/types"
-import type { LiveProtocol } from "@/lib/settings"
+import { useSettings, type LiveProtocol } from "@/lib/settings"
 import { cn } from "@/lib/utils"
 import { startWhep, webrtcDelayMs, type WhepSession } from "./whep"
 
@@ -48,6 +48,8 @@ export function LivePlayer({
   onVideo?: (video: HTMLVideoElement | null) => void
   overlay?: boolean
 }) {
+  const { settings } = useSettings()
+  const hlsBufferSeconds = Math.max(2, Math.min(10, Number(settings.hlsBufferSeconds) || 5))
   const live = useLive(cameraId)
   const stream = pickStream(live.data, profile)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -110,6 +112,7 @@ export function LivePlayer({
     let hls: Hls | null = null
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     let statsTimer: ReturnType<typeof setInterval> | undefined
+    let hlsStartTimer: ReturnType<typeof setTimeout> | undefined
 
     const retry = (message: string) => {
       if (cancelled) return
@@ -121,9 +124,24 @@ export function LivePlayer({
     const playHls = () => {
       setInfo((i) => ({ ...i, protocol: "HLS", phase: "loading", error: null }))
       if (Hls.isSupported()) {
-        hls = new Hls({ lowLatencyMode: true, backBufferLength: 10, liveDurationInfinity: true })
+        // Stay deliberately behind the live edge. The configured safety window absorbs short
+        // camera/network delivery variations; this player values continuity over minimum delay.
+        hls = new Hls({
+          lowLatencyMode: true,
+          liveSyncMode: "buffered",
+          liveSyncDuration: hlsBufferSeconds,
+          liveMaxLatencyDuration: Math.max(hlsBufferSeconds * 2, hlsBufferSeconds + 3),
+          liveSyncOnStallIncrease: 1,
+          maxLiveSyncPlaybackRate: 1,
+          maxBufferLength: Math.max(15, hlsBufferSeconds * 3),
+          maxMaxBufferLength: Math.max(30, hlsBufferSeconds * 4),
+          maxBufferHole: 0.5,
+          backBufferLength: 10,
+          liveDurationInfinity: true,
+        })
         hls.on(Hls.Events.ERROR, (_e, data) => {
           if (data.fatal) {
+            clearTimeout(hlsStartTimer)
             hls?.destroy()
             hls = null
             retry(`HLS: ${data.details}`)
@@ -131,16 +149,42 @@ export function LivePlayer({
         })
         hls.loadSource(hlsUrl)
         hls.attachMedia(video)
+        let started = false
+        const startWhenBuffered = (force = false) => {
+          if (started || cancelled) return
+          const ranges = video.buffered
+          let bufferedAhead = 0
+          for (let index = 0; index < ranges.length; index += 1) {
+            if (ranges.end(index) >= video.currentTime && ranges.start(index) <= video.currentTime + 0.5) {
+              bufferedAhead = ranges.end(index) - Math.max(video.currentTime, ranges.start(index))
+              break
+            }
+          }
+          // Before the media timeline selects its initial position, currentTime can be zero while
+          // the buffered live range uses large timestamps. Its duration is still a valid gate.
+          if (!bufferedAhead && ranges.length) {
+            const last = ranges.length - 1
+            bufferedAhead = ranges.end(last) - ranges.start(last)
+          }
+          if (force || bufferedAhead >= hlsBufferSeconds) {
+            started = true
+            clearTimeout(hlsStartTimer)
+            video.play().catch(() => {})
+          }
+        }
+        hls.on(Hls.Events.BUFFER_APPENDED, () => startWhenBuffered())
+        // A malformed timeline must not leave the tile waiting forever.
+        hlsStartTimer = setTimeout(() => startWhenBuffered(true), Math.max(8000, hlsBufferSeconds * 2000))
         statsTimer = setInterval(() => {
           const latency = hls?.latency
           if (latency != null && Number.isFinite(latency)) setInfo((i) => ({ ...i, delayMs: Math.round(latency * 1000) }))
         }, 2000)
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = hlsUrl // Safari: native HLS
+        video.play().catch(() => {})
       } else {
         retry("HLS is not supported by this browser")
       }
-      video.play().catch(() => {})
     }
 
     const playWebrtc = async () => {
@@ -176,6 +220,7 @@ export function LivePlayer({
     return () => {
       cancelled = true
       clearTimeout(retryTimer)
+      clearTimeout(hlsStartTimer)
       clearInterval(statsTimer)
       whep?.close()
       hls?.destroy()
@@ -183,7 +228,7 @@ export function LivePlayer({
       video.srcObject = null
     }
     // `attempt` re-runs the effect for reconnects; URLs change when the camera moves node.
-  }, [webrtcUrl, hlsUrl, protocol, attempt, active])
+  }, [webrtcUrl, hlsUrl, protocol, attempt, active, hlsBufferSeconds])
 
   const showAudio = stream?.audio_state === "available" || stream?.audio_state === "advertised_not_observed" || stream?.audio_state === "unsupported"
   const audioPlayable = showAudio && stream?.audio_state !== "unsupported" && (info.protocol !== "HLS" || stream.audio_codec === "aac")

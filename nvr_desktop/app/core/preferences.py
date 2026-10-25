@@ -10,6 +10,7 @@ import json
 
 from PySide6.QtCore import Property, QObject, QRect, QSettings, Signal, Slot
 
+from app.video import gpu_preference
 from settings.settings import settings
 
 LIVE_PROTOCOLS = ("auto", "rtsp", "hls")
@@ -22,10 +23,11 @@ class Preferences(QObject):
     centralUrlChanged = Signal()
     pollSecondsChanged = Signal()
     liveProtocolChanged = Signal()
-    gridUsesSubstreamChanged = Signal()
+    hlsBufferSecondsChanged = Signal()
     hwdecChanged = Signal()
     sidebarCollapsedChanged = Signal()
     renderModeChanged = Signal()
+    gpuPreferenceChanged = Signal()
     nodeAccessChanged = Signal()
     liveVolumeChanged = Signal()
     playbackVolumeChanged = Signal()
@@ -35,6 +37,8 @@ class Preferences(QObject):
         self._store = QSettings("ShahNVR", "Desktop")
         self._active_render_mode = "gpu"  # set by main.py at startup; fixed for this process
         self._render_mode_at_start = "auto"
+        self._active_gpu = ""  # OpenGL renderer name probed at startup ("" in CPU mode)
+        self._gpu_preference_at_start = gpu_preference.read()
 
     # ------------------------------------------------------------------ helpers
     def _get(self, key: str, default, kind=str):
@@ -73,11 +77,11 @@ class Preferences(QObject):
         if value in LIVE_PROTOCOLS:
             self._set("liveProtocol", value, self.liveProtocolChanged)
 
-    def _get_substream(self) -> bool:
-        return self._get("gridUsesSubstream", True, bool)
+    def _get_hls_buffer(self) -> int:
+        return max(2, min(10, self._get("hlsBufferSeconds", 5, int)))
 
-    def _set_substream(self, value: bool) -> None:
-        self._set("gridUsesSubstream", bool(value), self.gridUsesSubstreamChanged)
+    def _set_hls_buffer(self, value: int) -> None:
+        self._set("hlsBufferSeconds", max(2, min(10, int(value))), self.hlsBufferSecondsChanged)
 
     def _get_hwdec(self) -> str:
         return self._get("hwdec", "auto-safe")
@@ -93,9 +97,19 @@ class Preferences(QObject):
         if value in RENDER_MODES:
             self._set("renderMode", value, self.renderModeChanged)  # applies after a restart
 
-    def set_active_render_mode(self, mode: str) -> None:
+    def set_active_render_mode(self, mode: str, gpu_name: str | None = None) -> None:
         self._active_render_mode = mode
         self._render_mode_at_start = self._get_render_mode()
+        self._active_gpu = gpu_name or ""
+
+    # Windows' per-app graphics card choice; lives in the registry, not QSettings (app/video/gpu_preference.py).
+    def _get_gpu_preference(self) -> str:
+        return gpu_preference.read()
+
+    def _set_gpu_preference(self, value: str) -> None:
+        if value in gpu_preference.CHOICES and value != gpu_preference.read():
+            gpu_preference.write(value)  # applies after a restart
+            self.gpuPreferenceChanged.emit()
 
     def _get_sidebar(self) -> bool:
         return self._get("sidebarCollapsed", False, bool)
@@ -126,12 +140,16 @@ class Preferences(QObject):
     centralUrl = Property(str, _get_central_url, _set_central_url, notify=centralUrlChanged)
     pollSeconds = Property(int, _get_poll, _set_poll, notify=pollSecondsChanged)
     liveProtocol = Property(str, _get_protocol, _set_protocol, notify=liveProtocolChanged)
-    gridUsesSubstream = Property(bool, _get_substream, _set_substream, notify=gridUsesSubstreamChanged)
+    hlsBufferSeconds = Property(int, _get_hls_buffer, _set_hls_buffer, notify=hlsBufferSecondsChanged)
     hwdec = Property(str, _get_hwdec, _set_hwdec, notify=hwdecChanged)
     sidebarCollapsed = Property(bool, _get_sidebar, _set_sidebar, notify=sidebarCollapsedChanged)
     renderMode = Property(str, _get_render_mode, _set_render_mode, notify=renderModeChanged)
     activeRenderMode = Property(str, lambda self: self._active_render_mode, constant=True)
     renderModeAtStart = Property(str, lambda self: self._render_mode_at_start, constant=True)
+    gpuPreference = Property(str, _get_gpu_preference, _set_gpu_preference, notify=gpuPreferenceChanged)
+    gpuPreferenceAtStart = Property(str, lambda self: self._gpu_preference_at_start, constant=True)
+    gpuPreferenceSupported = Property(bool, lambda self: gpu_preference.supported(), constant=True)
+    activeGpu = Property(str, lambda self: self._active_gpu, constant=True)
     nodeAccess = Property(str, _get_node_access, _set_node_access, notify=nodeAccessChanged)
     liveVolume = Property(float, _get_live_volume, _set_live_volume, notify=liveVolumeChanged)
     playbackVolume = Property(float, _get_playback_volume, _set_playback_volume, notify=playbackVolumeChanged)
@@ -166,7 +184,8 @@ class Preferences(QObject):
     def reset(self) -> None:
         self._store.clear()
         for signal in (self.centralUrlChanged, self.pollSecondsChanged, self.liveProtocolChanged,
-                       self.gridUsesSubstreamChanged, self.hwdecChanged, self.sidebarCollapsedChanged,
+                       self.hlsBufferSecondsChanged,
+                       self.hwdecChanged, self.sidebarCollapsedChanged,
                        self.renderModeChanged, self.nodeAccessChanged, self.liveVolumeChanged,
                        self.playbackVolumeChanged):
             signal.emit()

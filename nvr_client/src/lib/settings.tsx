@@ -7,7 +7,7 @@ export interface ClientSettings {
   centralUrl: string
   pollSeconds: number
   liveProtocol: LiveProtocol
-  gridUsesSubstream: boolean
+  hlsBufferSeconds: number
   nodeAccess: NodeAccessPreference
 }
 
@@ -17,7 +17,7 @@ export const DEFAULT_SETTINGS: ClientSettings = {
   centralUrl: (import.meta.env.VITE_CENTRAL_URL as string | undefined) ?? "http://localhost:8000",
   pollSeconds: 5,
   liveProtocol: "auto",
-  gridUsesSubstream: true,
+  hlsBufferSeconds: 5,
   nodeAccess: "auto",
 }
 

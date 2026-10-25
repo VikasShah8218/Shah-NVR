@@ -106,6 +106,9 @@ hls: true
 hlsAddress: :{settings.HLS_PORT}
 hlsVariant: {settings.HLS_VARIANT}
 hlsAlwaysRemux: false
+hlsSegmentCount: {settings.HLS_SEGMENT_COUNT}
+hlsSegmentDuration: {_duration(settings.HLS_SEGMENT_SECONDS)}
+hlsPartDuration: {_duration(settings.HLS_PART_SECONDS)}
 hlsAllowOrigins: ["*"]
 
 webrtc: true

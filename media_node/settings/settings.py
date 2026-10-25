@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     RTCP_PORT: int = 8001
     HLS_PORT: int = 8888
     HLS_VARIANT: str = "lowLatency"  # lowLatency | fmp4 | mpegts
+    # Keep an explicit LL-HLS window for clients that deliberately play ~5s behind live.
+    # Segment count provides history; the client, not this value, chooses playback latency.
+    HLS_SEGMENT_COUNT: int = 15
+    HLS_SEGMENT_SECONDS: float = 1.0
+    HLS_PART_SECONDS: float = 0.2
     WEBRTC_PORT: int = 8889
     WEBRTC_UDP_PORT: int = 8189
 
