@@ -143,6 +143,24 @@ PageScroll {
             }
         }
         SettingRow {
+            visible: Prefs.gpuPreferenceSupported
+            title: "Graphics card"
+            hint: "On PCs with two GPUs (laptops), High performance runs video on the dedicated card: much lighter "
+                + "for big grids. Same setting as Windows Settings → Display → Graphics. "
+                + "Active now: " + (Prefs.activeGpu || "none (CPU rendering)")
+                + (Prefs.gpuPreference !== Prefs.gpuPreferenceAtStart ? " · restart the app to apply the change" : "")
+            AppSelect {
+                implicitWidth: 220
+                options: [
+                    { value: "default", label: "Windows default" },
+                    { value: "high", label: "High performance" },
+                    { value: "power", label: "Power saving" }
+                ]
+                value: Prefs.gpuPreference
+                onPicked: v => Prefs.gpuPreference = v
+            }
+        }
+        SettingRow {
             title: "Hardware decoding"
             hint: Prefs.activeRenderMode === "cpu"
                 ? "CPU rendering decodes on the processor; this applies in GPU rendering only."

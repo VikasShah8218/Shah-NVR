@@ -50,17 +50,17 @@ def load_fonts() -> None:
             logger.warning("Could not load font %s", font.name)
 
 
-def choose_render_mode(preference: str) -> str:
-    """GPU (OpenGL) or CPU (software) drawing for this run. Must run before the first window."""
+def choose_render_mode(preference: str) -> tuple[str, str | None]:
+    """GPU (OpenGL) or CPU (software) drawing for this run, plus the GPU's name. Must run before the first window."""
     from app.video import render_mode
 
-    renderer = render_mode.gl_renderer_name() if preference == "auto" else None
+    renderer = render_mode.gl_renderer_name() if preference != "cpu" else None
     mode = render_mode.resolve(preference, renderer)
     logger.info("Render mode: %s (preference %s, OpenGL renderer: %s)", mode.upper(), preference,
-                renderer if preference == "auto" else "not probed")
+                renderer if preference != "cpu" else "not probed")
     api = QSGRendererInterface.GraphicsApi
     QQuickWindow.setGraphicsApi(api.OpenGL if mode == "gpu" else api.Software)
-    return mode
+    return mode, renderer if mode == "gpu" else None
 
 
 def build_app():
@@ -100,8 +100,8 @@ def build_app():
     from app.video import register_video_types
 
     prefs = Preferences()
-    mode = choose_render_mode(settings.RENDER_MODE or prefs.renderMode)
-    prefs.set_active_render_mode(mode)
+    mode, gpu_name = choose_render_mode(settings.RENDER_MODE or prefs.renderMode)
+    prefs.set_active_render_mode(mode, gpu_name)
     register_video_types(mode)  # import Nvr.Video: MpvPlayer + MpvSurface (GPU or CPU)
     toasts = ToastBus()
     ctx = AppContext(prefs, toasts)

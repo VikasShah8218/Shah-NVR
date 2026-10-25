@@ -10,6 +10,7 @@ import json
 
 from PySide6.QtCore import Property, QObject, QRect, QSettings, Signal, Slot
 
+from app.video import gpu_preference
 from settings.settings import settings
 
 LIVE_PROTOCOLS = ("auto", "rtsp", "hls")
@@ -26,6 +27,7 @@ class Preferences(QObject):
     hwdecChanged = Signal()
     sidebarCollapsedChanged = Signal()
     renderModeChanged = Signal()
+    gpuPreferenceChanged = Signal()
     nodeAccessChanged = Signal()
     liveVolumeChanged = Signal()
     playbackVolumeChanged = Signal()
@@ -35,6 +37,8 @@ class Preferences(QObject):
         self._store = QSettings("ShahNVR", "Desktop")
         self._active_render_mode = "gpu"  # set by main.py at startup; fixed for this process
         self._render_mode_at_start = "auto"
+        self._active_gpu = ""  # OpenGL renderer name probed at startup ("" in CPU mode)
+        self._gpu_preference_at_start = gpu_preference.read()
 
     # ------------------------------------------------------------------ helpers
     def _get(self, key: str, default, kind=str):
@@ -93,9 +97,19 @@ class Preferences(QObject):
         if value in RENDER_MODES:
             self._set("renderMode", value, self.renderModeChanged)  # applies after a restart
 
-    def set_active_render_mode(self, mode: str) -> None:
+    def set_active_render_mode(self, mode: str, gpu_name: str | None = None) -> None:
         self._active_render_mode = mode
         self._render_mode_at_start = self._get_render_mode()
+        self._active_gpu = gpu_name or ""
+
+    # Windows' per-app graphics card choice; lives in the registry, not QSettings (app/video/gpu_preference.py).
+    def _get_gpu_preference(self) -> str:
+        return gpu_preference.read()
+
+    def _set_gpu_preference(self, value: str) -> None:
+        if value in gpu_preference.CHOICES and value != gpu_preference.read():
+            gpu_preference.write(value)  # applies after a restart
+            self.gpuPreferenceChanged.emit()
 
     def _get_sidebar(self) -> bool:
         return self._get("sidebarCollapsed", False, bool)
@@ -132,6 +146,10 @@ class Preferences(QObject):
     renderMode = Property(str, _get_render_mode, _set_render_mode, notify=renderModeChanged)
     activeRenderMode = Property(str, lambda self: self._active_render_mode, constant=True)
     renderModeAtStart = Property(str, lambda self: self._render_mode_at_start, constant=True)
+    gpuPreference = Property(str, _get_gpu_preference, _set_gpu_preference, notify=gpuPreferenceChanged)
+    gpuPreferenceAtStart = Property(str, lambda self: self._gpu_preference_at_start, constant=True)
+    gpuPreferenceSupported = Property(bool, lambda self: gpu_preference.supported(), constant=True)
+    activeGpu = Property(str, lambda self: self._active_gpu, constant=True)
     nodeAccess = Property(str, _get_node_access, _set_node_access, notify=nodeAccessChanged)
     liveVolume = Property(float, _get_live_volume, _set_live_volume, notify=liveVolumeChanged)
     playbackVolume = Property(float, _get_playback_volume, _set_playback_volume, notify=playbackVolumeChanged)

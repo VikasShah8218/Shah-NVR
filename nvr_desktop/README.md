@@ -114,6 +114,7 @@ app/video/               the video engine (see below)
   sw_surface.py          MpvSurface in CPU mode: libswscale into memory, Qt software renderer
   render_context.py      safe ctypes wrappers of libmpv's render API (GL and SW)
   render_mode.py         Auto / CPU / GPU selection at startup
+  gpu_preference.py      Windows per-app graphics card choice (two-GPU PCs)
   profiles.py            mpv options per stream type (live / playback) and render mode
 ui/                      QML: layout and bindings only, no business logic
   theme/Theme.qml        Dusk slate tokens (same hex values as nvr_client/src/index.css)
@@ -180,6 +181,9 @@ Playback wall clock: the media node rebases recorded timestamps to time since
 
 ## Troubleshooting
 
+- **Big grids are heavy on a laptop with two GPUs**: Settings → **Graphics card** → High performance, then restart.
+  Windows otherwise runs the app on the integrated GPU, whose video decoder saturates at 16 × 1080p (measured: 18 fps
+  at 30% CPU on the AMD iGPU vs 30 fps at 6% CPU on the RTX 3050). Settings shows the GPU in use.
 - **"libmpv-2.dll not found"**: see Setup step 2. `MPV_DLL_DIR` in `.env` can point elsewhere.
 - **Video is black and the info label says "CPU decode"** (GPU mode): the GPU decoder was refused. Pick another one
   in Settings → Hardware decoding (`d3d11va-copy` works on any DirectX 11 GPU).

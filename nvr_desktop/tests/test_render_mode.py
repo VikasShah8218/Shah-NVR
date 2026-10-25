@@ -56,3 +56,32 @@ def test_active_mode_validation():
             render_mode.set_active("vulkan")
     finally:
         render_mode.set_active(previous)
+
+
+def test_gpu_preference_parse_and_update():
+    from app.video import gpu_preference as gp
+
+    assert gp.parse(None) == "default"
+    assert gp.parse("GpuPreference=2;") == "high"
+    assert gp.parse("SwapEffectUpgradeEnable=1;GpuPreference=1;") == "power"
+    assert gp.parse("AppStatus=0;") == "default"
+    # other entries Windows keeps in the same value survive
+    assert gp.update("SwapEffectUpgradeEnable=1;", "high") == "SwapEffectUpgradeEnable=1;GpuPreference=2;"
+    assert gp.update("SwapEffectUpgradeEnable=1;GpuPreference=2;", "power") == "SwapEffectUpgradeEnable=1;GpuPreference=1;"
+    assert gp.update("GpuPreference=2;", "default") == ""
+
+
+def test_gpu_preference_registry_round_trip():
+    import pytest
+    from app.video import gpu_preference as gp
+
+    if not gp.supported():
+        pytest.skip("Windows only")
+    exe = r"C:\ShahNVR-test\does-not-exist.exe"  # a value of its own, removed again
+    try:
+        gp.write("high", exe)
+        assert gp.read(exe) == "high"
+        gp.write("default", exe)
+        assert gp.read(exe) == "default"
+    finally:
+        gp.write("default", exe)
