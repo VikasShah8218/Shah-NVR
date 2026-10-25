@@ -2,6 +2,21 @@
 
 ### A distributed, ONVIF-native video platform built to scale from one site to thousands of cameras
 
+<p align="center">
+  <img src="gallery/Live-View.png" alt="Shah-NVR Desktop: 4×4 Live View of sixteen recording cameras" width="100%">
+</p>
+<p align="center">
+  <em>Shah-NVR Desktop: a 4×4 Live View of sixteen recording cameras, with the camera list and live cluster status.</em>
+</p>
+
+<p align="center">
+  <a href="#gallery"><strong>Gallery</strong></a> ·
+  <a href="#product-capabilities">Capabilities</a> ·
+  <a href="#performance-highlights">Performance</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#quick-start-for-development">Quick start</a>
+</p>
+
 Shah-NVR is a modern network video recorder and video-management platform for
 organizations that need to operate cameras across rooms, buildings, campuses,
 branches, and remote sites without sending every video stream through one large
@@ -18,6 +33,30 @@ Shah-NVR is under active development. Its distributed recording, playback,
 ONVIF, PTZ, audio, storage, failover, and edge-storage recovery foundations are
 implemented. Production security hardening, formal scale certification, and
 long-duration soak testing remain planned milestones.
+
+---
+
+## Gallery
+
+Screenshots from a pilot deployment: one media node recording 35 ONVIF cameras. More images are in
+[`gallery/`](gallery/).
+
+<table>
+  <tr>
+    <td width="33%" align="center" valign="top">
+      <a href="gallery/Full-View.png"><img src="gallery/Full-View.png" alt="Fullscreen 4×4 camera wall"></a><br>
+      <sub><strong>Fullscreen video wall</strong><br>Sixteen live tiles with recording status, substreams in grids</sub>
+    </td>
+    <td width="33%" align="center" valign="top">
+      <a href="gallery/Add_camera.png"><img src="gallery/Add_camera.png" alt="ONVIF bulk onboarding"></a><br>
+      <sub><strong>ONVIF bulk onboarding</strong><br>One login for many cameras, snapshot preview, clock check, main/sub selection</sub>
+    </td>
+    <td width="33%" align="center" valign="top">
+      <a href="gallery/Media-Node.png"><img src="gallery/Media-Node.png" alt="Media node health"></a><br>
+      <sub><strong>Media node health</strong><br>CPU, RAM, GPU, network, storage volumes and recording target</sub>
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -70,6 +109,13 @@ need a flexible alternative to fixed-channel proprietary appliances.
 - Main/substream-aware grids to reduce decode and bandwidth cost.
 - Live audio when an audio track is available.
 - Snapshot, fullscreen, stream health, codec, and connection information.
+- Digital zoom and pan (1–4×) on the main-stream view by mouse wheel, drag,
+  on-screen controls, or keyboard.
+- Bandwidth-aware viewing: when one camera is opened full size, the grid behind
+  it pauses and frees its network and decoders, then resumes without a
+  reconnect overlay.
+- Adjustable LL-HLS safety buffer (2–10 s) for smooth video over slow or
+  unstable links.
 - LAN/public route selection per client without changing other users.
 
 ### Continuous recording and playback
@@ -78,6 +124,7 @@ need a flexible alternative to fixed-channel proprietary appliances.
 - Configurable recording volumes, fill order, quotas, and disk-pressure cleanup.
 - Central recording timeline with gaps, coverage, size, and segment provenance.
 - HLS VOD playback across chunks and across different media nodes.
+- Digital zoom and pan on recorded video, identical to the live view.
 - Recorded audio with synchronized native or browser-compatible playback paths.
 - Direct MP4 segment downloads.
 - Retention by camera plus local emergency overwrite protection.
@@ -112,12 +159,33 @@ need a flexible alternative to fixed-channel proprietary appliances.
 | Application | Technology | Best fit |
 |---|---|---|
 | **Web client** | React, TypeScript, Vite, TanStack Query, Tailwind CSS | Any modern browser, remote access, administration |
-| **Desktop client** | Python, PySide6/QML, libmpv | Windows control rooms, native RTSP, GPU/CPU video rendering |
+| **Desktop client** | Python, PySide6/QML, libmpv | Windows control rooms, native RTSP, automatic GPU/CPU rendering, graphics-card selection |
 | **Open APIs** | FastAPI and generated OpenAPI contracts | Integrations, automation, monitoring, future mobile clients |
 
 The web and desktop clients cover the same current operator feature set. Their
 media engines intentionally differ: browsers favor WebRTC/HLS, while desktop
 uses native RTSP/libmpv for low latency and broad codec support.
+
+---
+
+## Performance highlights
+
+Measured on real deployments and development hardware, not estimated:
+
+| Area | Result |
+|---|---|
+| Desktop, 16 tiles on a PC without a usable GPU | **8–11% CPU** at full frame rate (was 74% CPU at 1.4 fps) with the CPU render mode |
+| Desktop, 16 × 1080p30 on a dedicated GPU | **6% CPU**, 30 fps with zero-copy NVIDIA decoding; 3.5–5% with substreams |
+| Desktop GPU mode tuning for tile walls | **−50% GPU load, −45% GPU memory** with no visible difference at tile size |
+| Grid behind a full-size camera view | network use drops from **10.4 to 0.09 Mbps** while the grid is paused |
+| Leaving Live View with 16 playing tiles | page switch in **~25 ms** (was a 1.6 s freeze); Live View stays warm for two minutes |
+| Recorded playback across chunk boundaries | **0 frames lost** (timestamp rebasing, no remux) |
+| Seeking in recordings | parts of **~6 s** even when the camera GOP does not align |
+| ONVIF calls | **12–40 ms** per call with the built-in SOAP client |
+| Failover after a node is hard-killed | recording resumes on another node in **~43 s** |
+
+The underlying rule throughout the platform: never decode, copy, or move video
+unless a viewer actually needs it.
 
 ---
 
@@ -448,6 +516,7 @@ Shah-NVR/
 ├── nvr_client/        React/TypeScript browser application
 ├── nvr_desktop/       PySide6/QML/libmpv Windows application
 ├── docs/              Architecture decisions, roadmaps and protocol plans
+├── gallery/           Product screenshots
 └── tools/             Development and camera-simulation utilities
 ```
 

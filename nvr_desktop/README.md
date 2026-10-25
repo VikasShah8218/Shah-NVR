@@ -2,18 +2,19 @@
 
 Native Windows client for Shah-NVR: **Python + PySide6 (Qt Quick / QML) + libmpv**.
 It has the same pages, design and operations as the web client (`nvr_client/`). Video is
-decoded on the GPU and drawn by libmpv; **video frames never pass through Python**.
+decoded and drawn by libmpv (on the GPU, or on the CPU when there is no usable graphics card);
+**video frames never pass through Python**.
 
 | Page | What you can do |
 |---|---|
 | Dashboard | KPIs, alerts, streams by status, node cards |
-| Live View | 1 / 2×2 / 3×3 / 4×4 grid, click or drag cameras onto tiles, RTSP or LL-HLS, snapshot, fullscreen (F11) |
-| Playback | Day timeline (24h / 6h / 1h / 10m, drag to pan, click to play), wall-clock player, ±10 s / ±1 min, 0.5–8×, chunk list, MP4 download |
+| Live View | 1 / 2×2 / 3×3 / 4×4 grid, click or drag cameras onto tiles, RTSP or LL-HLS, snapshot, fullscreen (F11), main stream with digital zoom / pan and PTZ, audio |
+| Playback | Day timeline (24h / 6h / 1h / 10m, drag to pan, click to play), wall-clock player, ±10 s / ±1 min, 0.5–8×, digital zoom / pan, chunk list, MP4 download, exports |
 | Cameras | Add / edit (streams, brand URL examples), enable / disable, delete; detail tabs Overview / Device / Video / Recordings / Assignment |
 | Discover | ONVIF network discovery or manual address, multi-camera credential checks, snapshot preview, main/sub selection and onboarding |
 | Media Nodes | CPU / GPU / RAM / storage / quota per node, limits, drain / cordon / activate / delete; detail charts, MediaMTX paths, chunks, logs |
 | Assignments | Which node records each camera, lease countdown, move, history, run scheduler |
-| Settings | Central URL (test / save), refresh interval, live protocol, substreams in grids, hardware decoding |
+| Settings | Central URL (test / save), refresh interval, media-node route (LAN / public), live protocol, HLS stability buffer, video rendering (Auto / CPU / GPU), graphics card, hardware decoding |
 
 ## Setup
 
@@ -49,6 +50,22 @@ Shortcuts:
 - **Esc**: leave fullscreen.
 - Double-click a tile: open its main stream.
 - Double-click the playback video: fullscreen.
+- Digital zoom (Live main stream and Playback): mouse wheel zooms 1–4×, drag pans, or click the
+  video and use **+ / −** to zoom, **arrow keys** to pan and **0** to reset.
+
+## Smooth by design
+
+- **Grids use substreams**; a camera's main stream is only opened when it is shown alone.
+- **Grid pauses behind the main-stream view.** Opening a tile full size pauses the other tiles (last
+  frame kept, network and decoders freed). On close they resume: within 8 s they simply continue,
+  later they reconnect quietly behind the frozen frame, and only after 60 s without video do they
+  show "Reconnecting".
+- **Instant page switching.** Leaving Live View keeps it loaded but paused for two minutes, so
+  switching pages takes ~25 ms instead of a 1.6 s freeze, and coming back shows the last frames at
+  once. After two minutes the players are released one by one, without a visible stall.
+- **HLS stability buffer** (Settings, 2–10 s): LL-HLS deliberately plays a few seconds behind live
+  to ride out an unstable network; RTSP stays at minimum delay.
+- **Render mode and graphics card** are chosen for the hardware (see below).
 
 ## Tests
 
