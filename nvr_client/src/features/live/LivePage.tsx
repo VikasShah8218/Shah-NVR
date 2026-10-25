@@ -1,28 +1,22 @@
 import {
   Camera as CameraIcon,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
   Copy,
   ExternalLink,
   ImageDown,
   Maximize,
-  Minus,
   MoreVertical,
   Plus,
-  RotateCcw,
   Search,
   Trash2,
   X,
 } from "lucide-react"
-import type { ReactNode } from "react"
 import { useCallback, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 import { useCameras, useLive } from "@/api/queries"
 import type { Camera } from "@/api/types"
 import { EmptyState, ErrorState, Loading } from "@/components/common"
+import { DigitalZoom } from "@/components/DigitalZoom"
 import { StatusDot } from "@/components/StatusBadge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -355,104 +349,11 @@ function LiveTile({
 }
 
 function DigitalZoomPlayer({ cameraId, protocol }: { cameraId: number; protocol: LiveProtocol }) {
-  const viewport = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null)
-  const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
-
-  const clampPan = (next: { x: number; y: number }, scale: number) => {
-    const bounds = viewport.current?.getBoundingClientRect()
-    const maxX = ((bounds?.width ?? 0) * (scale - 1)) / 2
-    const maxY = ((bounds?.height ?? 0) * (scale - 1)) / 2
-    return {
-      x: Math.max(-maxX, Math.min(maxX, next.x)),
-      y: Math.max(-maxY, Math.min(maxY, next.y)),
-    }
-  }
-  const changeZoom = (value: number) => {
-    const next = Math.max(1, Math.min(4, value))
-    setZoom(next)
-    setPan((current) => next === 1 ? { x: 0, y: 0 } : clampPan(current, next))
-  }
-  const panBy = (x: number, y: number) => {
-    if (zoom <= 1) return
-    setPan((current) => clampPan({ x: current.x + x, y: current.y + y }, zoom))
-  }
-  const reset = () => {
-    setZoom(1)
-    setPan({ x: 0, y: 0 })
-  }
-  const isControl = (target: EventTarget | null) => target instanceof Element && !!target.closest("button,input")
-
   return (
-    <div
-      ref={viewport}
-      className={cn("relative min-h-0 w-full flex-1 overflow-hidden rounded-md bg-video", zoom > 1 && "cursor-grab active:cursor-grabbing")}
-      style={{ touchAction: zoom > 1 ? "none" : "auto" }}
-      onWheel={(event) => {
-        if (isControl(event.target)) return
-        event.preventDefault()
-        changeZoom(zoom + (event.deltaY < 0 ? 0.25 : -0.25))
-      }}
-      onDoubleClick={(event) => {
-        if (!isControl(event.target)) reset()
-      }}
-      onPointerDown={(event) => {
-        if (zoom <= 1 || isControl(event.target)) return
-        event.currentTarget.setPointerCapture(event.pointerId)
-        drag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y }
-      }}
-      onPointerMove={(event) => {
-        const start = drag.current
-        if (!start || start.pointerId !== event.pointerId) return
-        setPan(clampPan({ x: start.panX + event.clientX - start.x, y: start.panY + event.clientY - start.y }, zoom))
-      }}
-      onPointerUp={(event) => {
-        if (drag.current?.pointerId !== event.pointerId) return
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-        drag.current = null
-      }}
-      onPointerCancel={() => { drag.current = null }}
-    >
-      <LivePlayer
-        cameraId={cameraId}
-        profile="main"
-        protocol={protocol}
-        className="size-full"
-        videoStyle={{
-          transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
-          transformOrigin: "center",
-          willChange: "transform",
-        }}
-      />
-
-      <div className="absolute top-1/2 right-3 z-20 flex -translate-y-1/2 flex-col items-center gap-0.5 rounded-md border border-white/15 bg-black/50 p-1.5 text-white shadow-lg backdrop-blur-sm">
-        <span className="w-8 text-center text-[10px] tabular-nums" aria-live="polite">{zoom.toFixed(1)}×</span>
-        <DigitalButton label="Digital zoom in (mouse wheel up)" disabled={zoom >= 4} onClick={() => changeZoom(zoom + 0.25)}><Plus /></DigitalButton>
-        <DigitalButton label="Pan up" disabled={zoom <= 1} onClick={() => panBy(0, 40)}><ChevronUp /></DigitalButton>
-        <DigitalButton label="Pan left" disabled={zoom <= 1} onClick={() => panBy(40, 0)}><ChevronLeft /></DigitalButton>
-        <DigitalButton label="Pan right" disabled={zoom <= 1} onClick={() => panBy(-40, 0)}><ChevronRight /></DigitalButton>
-        <DigitalButton label="Pan down" disabled={zoom <= 1} onClick={() => panBy(0, -40)}><ChevronDown /></DigitalButton>
-        <DigitalButton label="Digital zoom out (mouse wheel down)" disabled={zoom <= 1} onClick={() => changeZoom(zoom - 0.25)}><Minus /></DigitalButton>
-        <DigitalButton label="Reset digital view (double-click)" disabled={zoom <= 1} onClick={reset}><RotateCcw /></DigitalButton>
-      </div>
-    </div>
+    <DigitalZoom className="min-h-0 w-full flex-1 rounded-md bg-video">
+      {(videoStyle) => <LivePlayer cameraId={cameraId} profile="main" protocol={protocol} className="size-full" videoStyle={videoStyle} />}
+    </DigitalZoom>
   )
-}
-
-function DigitalButton({
-  label,
-  disabled,
-  onClick,
-  children,
-}: {
-  label: string
-  disabled: boolean
-  onClick: () => void
-  children: ReactNode
-}) {
-  return <Button type="button" variant="ghost" size="icon" className="size-8 text-white hover:bg-white/15 hover:text-white" title={label}
-    aria-label={label} disabled={disabled} onClick={onClick}>{children}</Button>
 }
 
 function FullscreenPtz({ cameraId }: { cameraId: number }) {

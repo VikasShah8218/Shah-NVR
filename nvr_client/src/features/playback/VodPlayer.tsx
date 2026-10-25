@@ -1,6 +1,7 @@
 import Hls from "hls.js"
 import { FastForward, Loader2, Maximize, Pause, Play, Rewind, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
+import { DigitalZoom } from "@/components/DigitalZoom"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { fmtDateTime } from "@/lib/time"
@@ -11,7 +12,14 @@ const RATES = [0.5, 1, 2, 4, 8]
  * Plays a recorded HLS VOD playlist. Reports the real recorded wall-clock time of the playhead
  * (from EXT-X-PROGRAM-DATE-TIME via hls.js `playingDate`).
  */
-export function VodPlayer({ src, audioSrc, onTime, onEnded }: { src: string | null; audioSrc: string | null; onTime: (t: Date | null) => void; onEnded?: () => void }) {
+export function VodPlayer({ src, audioSrc, onTime, onEnded, viewKey }: {
+  src: string | null
+  audioSrc: string | null
+  onTime: (t: Date | null) => void
+  onEnded?: () => void
+  /** The digital zoom resets when this changes (camera, profile or day); seeking keeps it. */
+  viewKey?: string
+}) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
   const hlsRef = useRef<Hls | null>(null)
@@ -134,13 +142,15 @@ export function VodPlayer({ src, audioSrc, onTime, onEnded }: { src: string | nu
   return (
     <div ref={wrapRef} className="overflow-hidden rounded-lg border bg-video">
       {/* Height-capped so the timeline below stays on screen. */}
-      <div className="relative mx-auto aspect-video w-full max-w-[calc(55vh*16/9)]">
+      {/* Digital zoom: wheel / drag / keys zoom and pan the video; a click still plays/pauses. */}
+      <DigitalZoom className="aspect-video max-h-[55vh] w-full" onTap={src ? toggle : undefined} resetKey={viewKey}>
+        {(videoStyle) => <>
         <video
           ref={videoRef}
           className="size-full object-contain"
+          style={videoStyle}
           playsInline
           muted
-          onClick={toggle}
           onPlay={() => { setPlaying(true); if (!muted) audioRef.current?.play().catch(() => {}) }}
           onPause={() => { setPlaying(false); audioRef.current?.pause() }}
           onPlaying={() => { setLoading(false); syncAudio(); if (!muted) audioRef.current?.play().catch(() => {}) }}
@@ -165,7 +175,8 @@ export function VodPlayer({ src, audioSrc, onTime, onEnded }: { src: string | nu
             {fmtDateTime(wall)}
           </div>
         )}
-      </div>
+        </>}
+      </DigitalZoom>
       <div className="flex flex-wrap items-center gap-1 border-t bg-card/60 px-2 py-2 sm:gap-1.5 sm:px-3">
         <Button variant="ghost" size="icon" className="size-10 sm:size-8" onClick={() => seekBy(-60)} title="Back 1 min" disabled={!src}>
           <SkipBack className="size-4" />

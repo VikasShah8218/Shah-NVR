@@ -20,7 +20,7 @@ Item {
     readonly property var appWindow: ApplicationWindow.window
 
     function expand(cameraId) {
-        expandedViewport.reset()
+        expandedZoom.reset()
         expandedCamera = Cameras.byId(cameraId)
         expandDialog.open()
     }
@@ -257,7 +257,7 @@ Item {
         width: Math.min(root.width * 0.92, 1600)
         title: (root.expandedCamera ? root.expandedCamera.name : "") + " · main stream"
         onClosed: {
-            expandedViewport.reset()
+            expandedZoom.reset()
             root.expandedCamera = null
         }
 
@@ -271,38 +271,6 @@ Item {
             color: Theme.video
             clip: true
 
-            property real zoom: 1
-            property real panX: 0
-            property real panY: 0
-            readonly property real maxPanX: width * (zoom - 1) / 2
-            readonly property real maxPanY: height * (zoom - 1) / 2
-
-            function clampPan() {
-                panX = Math.max(-maxPanX, Math.min(maxPanX, panX))
-                panY = Math.max(-maxPanY, Math.min(maxPanY, panY))
-            }
-            function setZoom(value) {
-                zoom = Math.max(1, Math.min(4, value))
-                if (zoom === 1) {
-                    panX = 0
-                    panY = 0
-                } else {
-                    clampPan()
-                }
-            }
-            function panBy(dx, dy) {
-                if (zoom <= 1)
-                    return
-                panX += dx
-                panY += dy
-                clampPan()
-            }
-            function reset() {
-                zoom = 1
-                panX = 0
-                panY = 0
-            }
-
             VideoView {
                 id: expandedVideo
                 readonly property var urls: {
@@ -311,11 +279,11 @@ Item {
                 }
                 anchors.fill: parent
                 radius: Theme.radiusSm
-                scale: expandedViewport.zoom
+                scale: expandedZoom.zoom
                 transformOrigin: Item.Center
                 transform: Translate {
-                    x: expandedViewport.panX
-                    y: expandedViewport.panY
+                    x: expandedZoom.panX
+                    y: expandedZoom.panY
                 }
                 source: expandDialog.opened && root.expandedCamera ? urls.source ?? "" : ""
                 fallbackSource: expandDialog.opened && root.expandedCamera ? urls.fallback ?? "" : ""
@@ -324,98 +292,10 @@ Item {
                 waitingText: "Loading stream URLs…"
             }
 
-            MouseArea {
+            DigitalZoom {
+                id: expandedZoom
                 anchors.fill: parent
                 z: 2
-                acceptedButtons: Qt.LeftButton
-                cursorShape: expandedViewport.zoom > 1
-                    ? (pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor) : Qt.ArrowCursor
-                property real lastX: 0
-                property real lastY: 0
-                onPressed: mouse => {
-                    lastX = mouse.x
-                    lastY = mouse.y
-                }
-                onPositionChanged: mouse => {
-                    if (!pressed || expandedViewport.zoom <= 1)
-                        return
-                    expandedViewport.panBy(mouse.x - lastX, mouse.y - lastY)
-                    lastX = mouse.x
-                    lastY = mouse.y
-                }
-                onDoubleClicked: expandedViewport.reset()
-                onWheel: wheel => {
-                    expandedViewport.setZoom(expandedViewport.zoom + (wheel.angleDelta.y > 0 ? 0.25 : -0.25))
-                    wheel.accepted = true
-                }
-            }
-
-            Rectangle {
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.rightMargin: 12
-                z: 3
-                width: 40
-                height: zoomControls.implicitHeight + 12
-                radius: Theme.radiusSm
-                color: Qt.rgba(0, 0, 0, 0.48)
-                border.color: Qt.rgba(1, 1, 1, 0.16)
-
-                Column {
-                    id: zoomControls
-                    anchors.centerIn: parent
-                    spacing: 2
-
-                    AppText {
-                        width: 32
-                        text: expandedViewport.zoom.toFixed(1) + "×"
-                        color: "white"
-                        font.pixelSize: 10
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-                    AppButton {
-                        variant: "ghost"; size: "icon"; iconName: "plus"
-                        implicitWidth: 32; implicitHeight: 30; tip: "Digital zoom in (mouse wheel up)"
-                        enabled: expandedViewport.zoom < 4
-                        onClicked: expandedViewport.setZoom(expandedViewport.zoom + 0.25)
-                    }
-                    AppButton {
-                        variant: "ghost"; size: "icon"; iconName: "chevron-up"
-                        implicitWidth: 32; implicitHeight: 30; tip: "Pan up"
-                        enabled: expandedViewport.zoom > 1
-                        onClicked: expandedViewport.panBy(0, 40)
-                    }
-                    AppButton {
-                        variant: "ghost"; size: "icon"; iconName: "chevron-left"
-                        implicitWidth: 32; implicitHeight: 30; tip: "Pan left"
-                        enabled: expandedViewport.zoom > 1
-                        onClicked: expandedViewport.panBy(40, 0)
-                    }
-                    AppButton {
-                        variant: "ghost"; size: "icon"; iconName: "chevron-right"
-                        implicitWidth: 32; implicitHeight: 30; tip: "Pan right"
-                        enabled: expandedViewport.zoom > 1
-                        onClicked: expandedViewport.panBy(-40, 0)
-                    }
-                    AppButton {
-                        variant: "ghost"; size: "icon"; iconName: "chevron-down"
-                        implicitWidth: 32; implicitHeight: 30; tip: "Pan down"
-                        enabled: expandedViewport.zoom > 1
-                        onClicked: expandedViewport.panBy(0, -40)
-                    }
-                    AppButton {
-                        variant: "ghost"; size: "icon"; iconName: "minus"
-                        implicitWidth: 32; implicitHeight: 30; tip: "Digital zoom out (mouse wheel down)"
-                        enabled: expandedViewport.zoom > 1
-                        onClicked: expandedViewport.setZoom(expandedViewport.zoom - 0.25)
-                    }
-                    AppButton {
-                        variant: "ghost"; size: "icon"; iconName: "rotate-ccw"
-                        implicitWidth: 32; implicitHeight: 30; tip: "Reset digital view (double-click)"
-                        enabled: expandedViewport.zoom > 1
-                        onClicked: expandedViewport.reset()
-                    }
-                }
             }
         }
         RowLayout {

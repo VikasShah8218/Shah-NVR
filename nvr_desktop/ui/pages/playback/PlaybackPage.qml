@@ -137,23 +137,35 @@ PageScroll {
                 anchors.margins: playerFrame.border.color === "transparent" ? 0 : 1
                 spacing: 0
 
-                VideoView {
-                    id: video
+                // viewport: the video is scaled/panned inside it (digital zoom); overlays stay unscaled
+                Item {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    mode: "playback"
-                    source: Playback.playlistUrl
-                    player.muted: !Playback.hasAudio
-                    player.volume: Prefs.playbackVolume
-                    showInfo: false
-                    waitingText: "Click on the timeline to start playback"
+                    clip: true
 
-                    // the real recorded time of the frame on screen → playhead
-                    Connections {
-                        target: video.player
-                        function onTimePosChanged() {
-                            if (root.hasSource && video.player.playState === "playing")
-                                Playback.setPlayhead(video.player.wallClockMs())
+                    VideoView {
+                        id: video
+                        anchors.fill: parent
+                        mode: "playback"
+                        source: Playback.playlistUrl
+                        player.muted: !Playback.hasAudio
+                        player.volume: Prefs.playbackVolume
+                        showInfo: false
+                        waitingText: "Click on the timeline to start playback"
+                        scale: playbackZoom.zoom
+                        transformOrigin: Item.Center
+                        transform: Translate {
+                            x: playbackZoom.panX
+                            y: playbackZoom.panY
+                        }
+
+                        // the real recorded time of the frame on screen → playhead
+                        Connections {
+                            target: video.player
+                            function onTimePosChanged() {
+                                if (root.hasSource && video.player.playState === "playing")
+                                    Playback.setPlayhead(video.player.wallClockMs())
+                            }
                         }
                     }
 
@@ -163,6 +175,7 @@ PageScroll {
                         anchors.top: parent.top
                         anchors.right: parent.right
                         anchors.margins: 8
+                        z: 3
                         radius: 4
                         color: Qt.rgba(0, 0, 0, 0.55)
                         implicitWidth: wallText.implicitWidth + 16
@@ -178,11 +191,21 @@ PageScroll {
                         }
                     }
 
-                    MouseArea {
+                    // click = play/pause, double-click = fullscreen, wheel/drag/keys = digital zoom and pan
+                    DigitalZoom {
+                        id: playbackZoom
+                        objectName: "playbackZoom"
                         anchors.fill: parent
-                        enabled: root.hasSource
+                        z: 2
+                        visible: root.hasSource
+                        doubleClickResets: false
                         onClicked: video.player.paused = !video.player.paused
                         onDoubleClicked: root.appWindow.immersive = !root.appWindow.immersive
+                        onVisibleChanged: if (!visible) reset()
+                    }
+                    Connections {
+                        target: Playback
+                        function onSelectionChanged() { playbackZoom.reset() }
                     }
                 }
 
