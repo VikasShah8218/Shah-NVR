@@ -16,6 +16,7 @@ Rectangle {
     property string mode: "live" // live | playback
     property bool showInfo: true
     property string waitingText: "" // shown while there is no source yet (e.g. "Camera is disabled")
+    property bool suspended: false  // live only: pause (keep the last frame, stop downloading); see MpvPlayer
     readonly property alias player: mpv
     readonly property string protocolLabel: mpv.activeSource.startsWith("rtsp") ? "RTSP"
         : mpv.activeSource.includes(".m3u8") ? (mode === "live" ? "LL-HLS" : "HLS") : ""
@@ -28,6 +29,7 @@ Rectangle {
         mode: view.mode
         hwdec: Prefs.hwdec
         liveBufferSeconds: Prefs.hlsBufferSeconds
+        suspended: view.suspended
         fallbackSource: view.fallbackSource
         source: view.source
     }

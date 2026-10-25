@@ -219,6 +219,8 @@ Item {
                             visible: index < Live.layout
                             cameraId: index < Live.layout ? Live.tiles[index] ?? null : null
                             gridProtocol: root.protocol
+                            // the big main-stream view gets the whole network and decoder
+                            suspended: expandDialog.visible
                             width: grid.cellW
                             height: grid.cellH
                             onExpand: id => root.expand(id)

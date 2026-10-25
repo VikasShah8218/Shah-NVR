@@ -13,6 +13,14 @@ How it works
   mpv's video output (vo=libmpv) needs it before `loadfile`.
 * Live mode reconnects by itself (backoff 2 s, 4 s, 8 s ... max 30 s, reset once frames arrive) and,
   when `fallbackSource` is set (Auto protocol), switches RTSP -> LL-HLS after the first failure.
+  `keep-open=yes` turns a dropped live stream into "paused at the end" instead of an end-file event,
+  so the player also treats `eof-reached` as the end of a live stream.
+* `suspended` (Live View grid behind the main-stream dialog): pausing stops reading, so the network
+  and decoder are free for the big view, and the tile keeps its last frame. The node does not keep a
+  paused reader (MediaMTX drops RTSP readers after ~10 s, idle HLS sessions after ~35 s), so on resume:
+  RTSP paused <= RESUME_UNPAUSE_SECONDS just unpauses (it catches up to live); anything else reloads.
+  For QUIET_RECONNECT_SECONDS after a resume, (re)connecting keeps the frozen frame and no
+  "Connecting/Reconnecting" state; only a stream still without video after that shows "Reconnecting".
 
 Threads
 -------
@@ -34,6 +42,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from collections import deque
 from datetime import timedelta
 from functools import partial
@@ -47,7 +56,10 @@ from app.video.profiles import BASE_OPTIONS, TIMELINE_EPOCH, options_for
 logger = logging.getLogger(__name__)
 
 MAX_BACKOFF_SECONDS = 30
-OBSERVED_PROPERTIES = ("video-params", "hwdec-current", "time-pos", "duration", "pause", "speed")
+RESUME_UNPAUSE_SECONDS = 8      # measured: MediaMTX drops a paused RTSP reader after ~10 s
+QUIET_RECONNECT_SECONDS = 60    # after a resume, reconnect silently behind the frozen frame this long
+QUIET_RETRY_SECONDS = 2
+OBSERVED_PROPERTIES = ("video-params", "hwdec-current", "time-pos", "duration", "pause", "speed", "eof-reached")
 
 
 def _log_mpv_message(level: str, prefix: str, text: str) -> None:
@@ -142,6 +154,7 @@ class MpvPlayer(QObject):
     mutedChanged = Signal()
     volumeChanged = Signal()
     activeSourceChanged = Signal()
+    suspendedChanged = Signal()
     eofReached = Signal()
     # for the surface (GUI thread)
     mpvCreated = Signal()  # the mpv.MPV now exists: create the render context
@@ -169,6 +182,16 @@ class MpvPlayer(QObject):
         self._failures = 0
         self._stopped = True
         self._render_ready = False  # mpv's video output needs the render context before loadfile
+        self._suspended = False
+        self._suspended_at = 0.0
+        self._reload_on_resume = False  # the stream ended/failed (or a load was due) while suspended
+        self._quiet = False             # resumed: reconnect behind the frozen frame, no overlays
+        self._quiet_time_pos: float | None = None
+
+        self._quiet_timer = QTimer(self)
+        self._quiet_timer.setSingleShot(True)
+        self._quiet_timer.setInterval(QUIET_RECONNECT_SECONDS * 1000)
+        self._quiet_timer.timeout.connect(self._quiet_expired)
 
         self._retry_timer = QTimer(self)
         self._retry_timer.setSingleShot(True)
@@ -230,6 +253,7 @@ class MpvPlayer(QObject):
             if w and not self._stopped:
                 self._failures = 0
                 self._set_state("playing")
+                self._end_quiet()
         elif kind == "prop:hwdec-current":
             self._hwdec_current = payload or ""
             self.hwdecCurrentChanged.emit()
@@ -237,6 +261,8 @@ class MpvPlayer(QObject):
             if payload is not None:
                 self._time_pos = float(payload)
                 self.timePosChanged.emit()
+                if self._quiet and self._quiet_time_pos is not None and self._time_pos != self._quiet_time_pos:
+                    self._end_quiet()  # new frames after an unpause
         elif kind == "prop:duration":
             self._duration = float(payload or 0)
             self.durationChanged.emit()
@@ -249,6 +275,11 @@ class MpvPlayer(QObject):
         elif kind == "playback-restart":
             if not self._stopped:
                 self._set_state("playing")
+                self._end_quiet()
+        elif kind == "prop:eof-reached":
+            # keep-open=yes: a dropped live stream pauses at its end instead of sending end-file
+            if payload and self._mode == "live" and not self._stopped and not self._retry_timer.isActive():
+                self._on_end_file(mpv.MpvEventEndFile.EOF)
         elif kind == "end-file":
             self._on_end_file(payload["reason"])
 
@@ -264,10 +295,16 @@ class MpvPlayer(QObject):
                 self.eofReached.emit()
             return
         # Live: the stream ended or failed -> retry with backoff (switching to the fallback if any).
+        if self._suspended:
+            self._reload_on_resume = True  # reconnect when the grid is visible again
+            return
         self._failures += 1
         if self._fallback_source and self._active_source != self._fallback_source:
             logger.info("Live stream failed, falling back to %s", self._fallback_source)
             self._set_active_source(self._fallback_source)
+        if self._quiet:  # behind the frozen frame: retry quickly, show nothing yet
+            self._retry_timer.start(QUIET_RETRY_SECONDS * 1000)
+            return
         delay = min(MAX_BACKOFF_SECONDS, 2 * 2 ** min(self._failures - 1, 4))
         self._error_text = "Stream unavailable. Retrying…"
         self.errorTextChanged.emit()
@@ -301,11 +338,67 @@ class MpvPlayer(QObject):
             except Exception as exc:  # an option unknown to this libmpv build must not break playback
                 logger.warning("mpv option %s=%s rejected: %s", key, value, exc)
 
+    def _end_quiet(self) -> None:
+        if self._quiet:
+            self._quiet = False
+            self._quiet_time_pos = None
+            self._quiet_timer.stop()
+
+    @Slot()
+    def _quiet_expired(self) -> None:
+        """No video QUIET_RECONNECT_SECONDS after a resume: show the reconnecting state from now on."""
+        if not self._quiet:
+            return
+        self._quiet = False
+        self._quiet_time_pos = None
+        if self._stopped:
+            return
+        self._error_text = "Stream unavailable. Retrying…"
+        self.errorTextChanged.emit()
+        self._set_state("reconnecting")
+        if not self._retry_timer.isActive():
+            self._load_active_source()
+
+    def _suspend(self) -> None:
+        self._suspended = True
+        self._suspended_at = time.monotonic()
+        self._end_quiet()
+        if self._retry_timer.isActive():  # failing stream: try again once the grid is visible
+            self._retry_timer.stop()
+            self._reload_on_resume = True
+        if self.mpv is not None:
+            self.mpv["pause"] = True
+
+    def _resume(self) -> None:
+        self._suspended = False
+        if self._stopped or self.mpv is None:
+            return
+        paused_for = time.monotonic() - self._suspended_at
+        is_hls = ".m3u8" in self._active_source.lower()
+        self._quiet = True
+        self._quiet_time_pos = self._time_pos
+        self._quiet_timer.start()
+        if not self._reload_on_resume and not is_hls and paused_for <= RESUME_UNPAUSE_SECONDS:
+            self.mpv["pause"] = False  # RTSP still connected: continues, catching up to live
+            return
+        # The node has dropped the paused reader (or HLS would stay behind live): reconnect from scratch,
+        # keeping the last frame on screen until the new one arrives.
+        self._reload_on_resume = False
+        self._retry_timer.stop()
+        self._failures = 0
+        self._set_active_source(self._source)  # back to the preferred protocol
+        self.mpv["pause"] = False
+        self._load_active_source()
+
     @Slot()
     def _load_active_source(self) -> None:
         if self._stopped or not self._active_source or not self._render_ready:
             return
-        self._set_state("connecting" if self._failures == 0 else "reconnecting")
+        if self._suspended:
+            self._reload_on_resume = True
+            return
+        if not self._quiet:
+            self._set_state("connecting" if self._failures == 0 else "reconnecting")
         self._apply_mode_options()
         logger.debug("Loading %s (%s)", self._active_source, self._mode)
         self.mpv.loadfile(self._active_source)
@@ -413,6 +506,19 @@ class MpvPlayer(QObject):
                 self._retry_timer.stop()
                 self._load_active_source()
 
+    def _get_suspended(self) -> bool:
+        return self._suspended
+
+    def _set_suspended(self, value: bool) -> None:
+        value = bool(value)
+        if value == self._suspended or self._mode != "live":
+            return
+        if value:
+            self._suspend()
+        else:
+            self._resume()
+        self.suspendedChanged.emit()
+
     def _get_paused(self) -> bool:
         return self._paused
 
@@ -456,6 +562,7 @@ class MpvPlayer(QObject):
                                  notify=liveBufferSecondsChanged)
     hwdec = Property(str, _get_hwdec, _set_hwdec, notify=hwdecChanged)
     paused = Property(bool, _get_paused, _set_paused, notify=pausedChanged)
+    suspended = Property(bool, _get_suspended, _set_suspended, notify=suspendedChanged)
     speed = Property(float, _get_speed, _set_speed, notify=speedChanged)
     muted = Property(bool, _get_muted, _set_muted, notify=mutedChanged)
     volume = Property(float, _get_volume, _set_volume, notify=volumeChanged)
