@@ -214,7 +214,7 @@ export function PlaybackPage() {
         </div>
       </div>
 
-      <VodPlayer src={src} audioSrc={audioSrc} onTime={setPlayhead} />
+      <VodPlayer src={src} audioSrc={audioSrc} onTime={setPlayhead} viewKey={`${cameraId}/${profile}/${day.getTime()}`} />
 
       <Card className="gap-3 py-4">
         <CardContent className="space-y-3 px-4">
