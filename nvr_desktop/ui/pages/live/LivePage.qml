@@ -19,6 +19,50 @@ Item {
     readonly property int columns: Math.round(Math.sqrt(Live.layout))
     readonly property var appWindow: ApplicationWindow.window
 
+    // Set by Main.qml: the page is kept loaded but hidden after leaving Live View. Tiles pause (no network,
+    // last frame kept) and resume quietly on return, so page switches are instant both ways.
+    property bool away: false
+    // Tiles [0, releasedTiles) have destroyed their players (keep-alive expired), one per tick so the
+    // UI-thread cost (~100 ms each) never shows up as one long freeze.
+    property int releasedTiles: 0
+    signal playersReleased()
+
+    function releasePlayers() {
+        if (away)
+            releaseTimer.start()
+    }
+
+    onAwayChanged: {
+        if (away) {
+            expandDialog.close()
+            Live.muteAll()
+            Ptz.close()
+            if (appWindow)
+                appWindow.immersive = false
+        } else {
+            releaseTimer.stop()
+            releasedTiles = 0
+        }
+    }
+
+    Timer {
+        id: releaseTimer
+        interval: 150
+        repeat: true
+        onTriggered: {
+            if (root.releasedTiles < 16) {
+                root.releasedTiles++
+                // the hidden page requests no frames: render one so this tile's GL context is freed now,
+                // not together with all the others on the next visible change
+                if (root.appWindow)
+                    root.appWindow.update()
+            } else {
+                stop()
+                root.playersReleased()
+            }
+        }
+    }
+
     function expand(cameraId) {
         expandedZoom.reset()
         expandedCamera = Cameras.byId(cameraId)
@@ -219,8 +263,9 @@ Item {
                             visible: index < Live.layout
                             cameraId: index < Live.layout ? Live.tiles[index] ?? null : null
                             gridProtocol: root.protocol
-                            // the big main-stream view gets the whole network and decoder
-                            suspended: expandDialog.visible
+                            // the big main-stream view gets the whole network and decoder; hidden page: pause
+                            suspended: expandDialog.visible || root.away
+                            released: index < root.releasedTiles
                             width: grid.cellW
                             height: grid.cellH
                             onExpand: id => root.expand(id)
