@@ -86,8 +86,10 @@ export async function nodeGet<T>(apiUrl: string, path: string, query?: Record<st
 export const mediaFileUrl = (apiUrl: string, segmentId: string) =>
   `${apiUrl.replace(/\/+$/, "")}/api/v1/media/${segmentId}/file.mp4`
 
-export function playbackUrl(centralUrl: string, cameraId: number, profile: string, start: Date, end: Date, access: "lan" | "public") {
+/** `videoOnly`: for the browser player. G.711 recordings hold a PCM track MSE refuses; audio comes from audio.m3u8. */
+export function playbackUrl(centralUrl: string, cameraId: number, profile: string, start: Date, end: Date, access: "lan" | "public", videoOnly = false) {
   const q = new URLSearchParams({ profile, start: start.toISOString(), end: end.toISOString(), access })
+  if (videoOnly) q.set("video_only", "true")
   return `${centralUrl}/api/v1/playback/${cameraId}/index.m3u8?${q}`
 }
 

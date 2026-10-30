@@ -16,14 +16,16 @@ def _iso(dt: datetime) -> str:
 
 def build_vod_playlist(
     segments: list[RecordingSegment], nodes: dict[int, MediaNode], start: datetime, end: datetime,
-    access: str = "lan",
+    access: str = "lan", video_only: bool = False,
 ) -> str | None:
     """HLS VOD playlist pointing directly at the media nodes that hold each chunk.
 
     Each chunk = one EXT-X-MAP (init) + N parts. Parts start on keyframes whenever the camera
     GOP lines up with the recorder's fragments; the player can seek to any part.
+    `video_only` asks the nodes for the video track alone (browsers: see media_node recordings/utils.py).
     Returns None when nothing playable is in range.
     """
+    query = "?video_only=true" if video_only else ""
     body: list[str] = []
     max_part = 1.0
     cursor = start
@@ -58,13 +60,13 @@ def build_vod_playlist(
             body.append("#EXT-X-DISCONTINUITY")
         prev_end, prev_codec = chosen[-1][3], seg.codec
         prev_config = config
-        body.append(f'#EXT-X-MAP:URI="{base}/init.mp4"')
+        body.append(f'#EXT-X-MAP:URI="{base}/init.mp4{query}"')
         body.append(f"#EXT-X-PROGRAM-DATE-TIME:{_iso(chosen[0][2])}")
         for index, dur_ms, _, _ in chosen:
             seconds = dur_ms / 1000
             max_part = max(max_part, seconds)
             body.append(f"#EXTINF:{seconds:.3f},")
-            body.append(f"{base}/part/{index}.m4s")
+            body.append(f"{base}/part/{index}.m4s{query}")
 
     if not body:
         return None

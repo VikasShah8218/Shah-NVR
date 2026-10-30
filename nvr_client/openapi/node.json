@@ -138,6 +138,16 @@
               "format": "uuid",
               "title": "Segment Id"
             }
+          },
+          {
+            "name": "video_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Video Only"
+            }
           }
         ],
         "responses": {
@@ -187,6 +197,16 @@
             "schema": {
               "type": "integer",
               "title": "Index"
+            }
+          },
+          {
+            "name": "video_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Video Only"
             }
           }
         ],

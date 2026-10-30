@@ -1276,7 +1276,9 @@ export interface operations {
     };
     media_init_api_v1_media__segment_id__init_mp4_get: {
         parameters: {
-            query?: never;
+            query?: {
+                video_only?: boolean;
+            };
             header?: never;
             path: {
                 segment_id: string;
@@ -1307,7 +1309,9 @@ export interface operations {
     };
     media_part_api_v1_media__segment_id__part__index__m4s_get: {
         parameters: {
-            query?: never;
+            query?: {
+                video_only?: boolean;
+            };
             header?: never;
             path: {
                 segment_id: string;

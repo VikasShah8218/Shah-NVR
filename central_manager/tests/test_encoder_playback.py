@@ -69,3 +69,15 @@ def test_playback_playlist_uses_browser_facing_node_url():
     playlist = build_vod_playlist([segment], {1: node}, start, start + timedelta(seconds=10), "public")
     assert "https://nvr.example.com:17100/api/v1/media/abc" in playlist
     assert "192.168.1.115" not in playlist
+
+
+def test_video_only_is_opt_in_for_browsers():
+    """Browsers ask for it; VLC links, exports and the desktop client keep every track."""
+    start = datetime(2026, 10, 17, tzinfo=timezone.utc)
+    segment = SimpleNamespace(id="abc", node_id=1, codec="h264+lpcm", config_signature=None,
+                              start_time=start, end_time=start + timedelta(seconds=10), parts=[10000])
+    node = SimpleNamespace(api_url="http://node", state=NodeState.ACTIVE)
+    end = start + timedelta(seconds=10)
+    assert "video_only" not in build_vod_playlist([segment], {1: node}, start, end)
+    browser = build_vod_playlist([segment], {1: node}, start, end, video_only=True)
+    assert 'init.mp4?video_only=true"' in browser and "part/0.m4s?video_only=true" in browser

@@ -662,6 +662,18 @@
               "title": "Access"
             },
             "description": "Node addresses embedded in the playlist"
+          },
+          {
+            "name": "video_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Video track alone, for browsers (audio: audio.m3u8)",
+              "default": false,
+              "title": "Video Only"
+            },
+            "description": "Video track alone, for browsers (audio: audio.m3u8)"
           }
         ],
         "responses": {

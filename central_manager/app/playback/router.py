@@ -27,6 +27,7 @@ async def vod_playlist(
     end: datetime | None = Query(default=None, examples=["2026-10-11T11:00:00Z"]),
     minutes: int | None = Query(default=None, ge=1, description="Shortcut: the last N minutes"),
     access: Literal["lan", "public"] = Query(default="lan", description="Node addresses embedded in the playlist"),
+    video_only: bool = Query(default=False, description="Video track alone, for browsers (audio: audio.m3u8)"),
 ):
     if not await Camera.exists(id=camera_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Camera not found")
@@ -34,7 +35,7 @@ async def vod_playlist(
 
     segments = await find_segments(camera_id, profile, start, end)
     nodes = {n.id: n for n in await MediaNode.filter(id__in={s.node_id for s in segments})}
-    playlist = build_vod_playlist(segments, nodes, start, end, access)
+    playlist = build_vod_playlist(segments, nodes, start, end, access, video_only)
     if playlist is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No playable recordings in this range")
     return PlainTextResponse(playlist, media_type=HLS_MEDIA_TYPE, headers={"Cache-Control": "no-cache"})

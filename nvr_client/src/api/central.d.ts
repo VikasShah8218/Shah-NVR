@@ -3462,6 +3462,8 @@ export interface operations {
                 minutes?: number | null;
                 /** @description Node addresses embedded in the playlist */
                 access?: "lan" | "public";
+                /** @description Video track alone, for browsers (audio: audio.m3u8) */
+                video_only?: boolean;
             };
             header?: never;
             path: {
