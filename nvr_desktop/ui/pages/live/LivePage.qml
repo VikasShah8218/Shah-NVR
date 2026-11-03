@@ -65,6 +65,7 @@ Item {
 
     function expand(cameraId) {
         expandedZoom.reset()
+        expandedPtz.active = false  // never carry a PTZ panel over to another (possibly non-PTZ) camera
         expandedCamera = Cameras.byId(cameraId)
         expandDialog.open()
     }
@@ -351,7 +352,7 @@ Item {
                 visible: expandedVideo.urls.audio_state === "available" || expandedVideo.urls.audio_state === "advertised_not_observed"
                 onClicked: if (root.expandedCamera) Live.toggleAudio(root.expandedCamera.id)
             }
-            AppButton { text: "PTZ"; iconName: "crosshair"; variant: "outline"; onClicked: expandedPtz.active = !expandedPtz.active }
+            AppButton { text: "PTZ"; iconName: "crosshair"; variant: "outline"; visible: !!root.expandedCamera && root.expandedCamera.has_ptz; onClicked: expandedPtz.active = !expandedPtz.active }
             Item { Layout.fillWidth: true }
         }
         Loader {

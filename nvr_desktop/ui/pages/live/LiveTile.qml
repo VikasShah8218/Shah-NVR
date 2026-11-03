@@ -192,7 +192,7 @@ Rectangle {
         AppMenuItem { text: "LL-HLS"; radio: true; marked: tile.protocolOverride === "hls"; onTriggered: tile.protocolOverride = "hls" }
         MenuSeparator {}
         AppMenuItem { text: "Open main stream"; iconName: "maximize"; onTriggered: tile.expand(tile.cameraId) }
-        AppMenuItem { text: "PTZ controls"; iconName: "crosshair"; onTriggered: ptzDialog.open() }
+        AppMenuItem { text: "PTZ controls"; iconName: "crosshair"; visible: !!tile.camera && tile.camera.has_ptz; height: visible ? implicitHeight : 0; onTriggered: ptzDialog.open() }
         AppMenuItem {
             text: "Snapshot"
             iconName: "image-down"

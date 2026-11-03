@@ -4545,6 +4545,11 @@
             ],
             "title": "Retention Days"
           },
+          "has_ptz": {
+            "type": "boolean",
+            "title": "Has Ptz",
+            "default": false
+          },
           "streams": {
             "items": {
               "$ref": "#/components/schemas/StreamIn"
@@ -4604,6 +4609,10 @@
           "expose_via_onvif": {
             "type": "boolean",
             "title": "Expose Via Onvif"
+          },
+          "has_ptz": {
+            "type": "boolean",
+            "title": "Has Ptz"
           },
           "retention_days": {
             "anyOf": [
@@ -4778,6 +4787,7 @@
           "has_password",
           "enabled",
           "expose_via_onvif",
+          "has_ptz",
           "retention_days",
           "created_at",
           "updated_at",
@@ -4855,6 +4865,17 @@
               }
             ],
             "title": "Expose Via Onvif"
+          },
+          "has_ptz": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Has Ptz"
           },
           "retention_days": {
             "anyOf": [
@@ -5427,6 +5448,17 @@
             },
             "type": "array",
             "title": "Services"
+          },
+          "has_ptz": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Has Ptz"
           },
           "ntp": {
             "anyOf": [

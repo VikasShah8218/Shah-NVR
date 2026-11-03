@@ -60,6 +60,7 @@ class Camera(ApiModel):
     has_password: bool = False
     enabled: bool = True
     expose_via_onvif: bool = True
+    has_ptz: bool = False  # PTZ-capable; auto-detected over ONVIF, editable in the camera form
     retention_days: int | None = 7  # None = keep until storage is full
     created_at: datetime
     updated_at: datetime

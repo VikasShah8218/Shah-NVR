@@ -108,6 +108,41 @@ def test_add_camera_with_picked_streams_and_keep_until_full(fake_node):
     run(go)
 
 
+def test_add_camera_has_ptz_false_without_ptz_profile(fake_node):
+    async def go():
+        node = await _node()
+        out = await onvif.add_camera(OnvifCameraCreate(node_id=node.id, host="192.168.1.50", username="admin", password="pw"))
+        assert out.has_ptz is False  # exposed on CameraOut
+        assert (await Camera.get(id=out.id)).has_ptz is False
+
+    run(go)
+
+
+def test_add_camera_auto_detects_ptz(monkeypatch):
+    async def go():
+        node = await _node()
+        ptz_probe = {**PROBE, "profiles": [profile("p_main", 1920, 1080),
+                                           {**profile("p_sub", 640, 360), "has_ptz": True}]}
+
+        async def call_node(n, path, json=None, *, timeout=30.0, raw=False):
+            assert path.endswith("/probe")
+            return ptz_probe
+
+        monkeypatch.setattr(onvif, "call_node", call_node)
+        out = await onvif.add_camera(OnvifCameraCreate(node_id=node.id, host="192.168.1.50"))
+        assert out.has_ptz is True
+        assert (await Camera.get(id=out.id)).has_ptz is True
+
+    run(go)
+
+
+def test_device_fields_updates_has_ptz_only_when_known():
+    from app.onvif.services import device_fields
+    assert "has_ptz" not in device_fields("h", 80)              # None -> omitted, preserves a manual override
+    assert device_fields("h", 80, has_ptz=True)["has_ptz"] is True
+    assert device_fields("h", 80, has_ptz=False)["has_ptz"] is False
+
+
 def test_discover_marks_already_added_by_stream_url(fake_node):
     async def go():
         await _node()

@@ -72,6 +72,7 @@ def create_body(form: dict) -> dict:
         "password": form.get("password") or None,
         "retention_days": retention_value(form),
         "enabled": bool(form.get("enabled", True)),
+        "has_ptz": bool(form.get("has_ptz", False)),
         "streams": [_stream_body(s) for s in used_streams(form)],
     }
 
@@ -83,6 +84,7 @@ def update_body(form: dict) -> dict:
         "username": (form.get("username") or "").strip() or None,
         "retention_days": retention_value(form),
         "enabled": bool(form.get("enabled", True)),
+        "has_ptz": bool(form.get("has_ptz", False)),
     }
     if form.get("password"):  # empty = keep the current password
         body["password"] = form["password"]

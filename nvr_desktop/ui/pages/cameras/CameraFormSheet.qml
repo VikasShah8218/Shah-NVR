@@ -27,6 +27,7 @@ Sheet {
         untilFullSwitch.checked = !!cam && (cam.retention_days === null || cam.retention_days === undefined)
         retentionField.text = String(cam && cam.retention_days ? cam.retention_days : 7)
         enabledSwitch.checked = cam ? cam.enabled : true
+        ptzSwitch.checked = cam ? !!cam.has_ptz : false
         streams.clear()
         if (cam) {
             for (const s of cam.streams)
@@ -47,7 +48,7 @@ Sheet {
         return {
             name: nameField.text, description: descField.text, username: userField.text, password: passField.text,
             retention_days: retentionField.text, keep_until_full: untilFullSwitch.checked,
-            enabled: enabledSwitch.checked, streams: list
+            enabled: enabledSwitch.checked, has_ptz: ptzSwitch.checked, streams: list
         }
     }
 
@@ -129,6 +130,26 @@ Sheet {
                 AppText { text: "Off: the camera is not pulled; no live view, no new recording."; variant: "small" }
             }
             AppSwitch { id: enabledSwitch }
+        }
+    }
+    Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: ptzRow.implicitHeight + 20
+        radius: Theme.radiusSm
+        color: "transparent"
+        border.color: Theme.border
+        RowLayout {
+            id: ptzRow
+            anchors.fill: parent
+            anchors.margins: 10
+            anchors.leftMargin: 12
+            ColumnLayout {
+                spacing: 2
+                Layout.fillWidth: true
+                AppText { text: "PTZ camera" }
+                AppText { text: "Auto-detected over ONVIF; turn on to show pan/tilt/zoom controls in Live view."; variant: "small" }
+            }
+            AppSwitch { id: ptzSwitch }
         }
     }
 

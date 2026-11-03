@@ -38,6 +38,7 @@ async def create_camera(body: CameraCreate):
             "username": body.username,
             "password": body.password,
             "enabled": body.enabled,
+            "has_ptz": body.has_ptz,
             # omitted -> default; explicit null -> keep until storage is full
             "retention_days": body.retention_days if "retention_days" in body.model_fields_set
             else settings.DEFAULT_RETENTION_DAYS,

@@ -501,6 +501,8 @@ export interface components {
             };
             /** Services */
             services: string[];
+            /** Has Ptz */
+            has_ptz?: boolean | null;
             ntp: components["schemas"]["NtpOut"] | null;
             /** Hostname */
             hostname: string | null;

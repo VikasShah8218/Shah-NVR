@@ -1182,6 +1182,17 @@
             "type": "array",
             "title": "Services"
           },
+          "has_ptz": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Has Ptz"
+          },
           "ntp": {
             "anyOf": [
               {

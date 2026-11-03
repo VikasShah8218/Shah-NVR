@@ -1336,6 +1336,11 @@ export interface components {
             enabled: boolean;
             /** Retention Days */
             retention_days?: number | null;
+            /**
+             * Has Ptz
+             * @default false
+             */
+            has_ptz: boolean;
             /** Streams */
             streams: components["schemas"]["StreamIn"][];
         };
@@ -1355,6 +1360,8 @@ export interface components {
             enabled: boolean;
             /** Expose Via Onvif */
             expose_via_onvif: boolean;
+            /** Has Ptz */
+            has_ptz: boolean;
             /** Retention Days */
             retention_days: number | null;
             /** Onvif Host */
@@ -1407,6 +1414,8 @@ export interface components {
             enabled?: boolean | null;
             /** Expose Via Onvif */
             expose_via_onvif?: boolean | null;
+            /** Has Ptz */
+            has_ptz?: boolean | null;
             /** Retention Days */
             retention_days?: number | null;
         };
@@ -1624,6 +1633,8 @@ export interface components {
             info: components["schemas"]["DeviceInfoOut"];
             /** Services */
             services: string[];
+            /** Has Ptz */
+            has_ptz?: boolean | null;
             ntp: components["schemas"]["NtpOut"] | null;
             /** Hostname */
             hostname: string | null;
