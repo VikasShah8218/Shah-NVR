@@ -5,6 +5,7 @@ are transient process memory, never returned to clients or written to a journal.
 """
 import time
 from dataclasses import dataclass
+from typing import Literal
 from fastapi import APIRouter, HTTPException
 from app.assignments.models import CameraAssignment
 from app.nodes.models import MediaNode
@@ -13,6 +14,20 @@ from app.onvif.encoder_router import target, payload
 from app.onvif.ptz_schemas import PtzCommand, PtzState, PtzResult
 
 router = APIRouter(prefix="/api/v1/cameras", tags=["PTZ"])
+
+
+class PtzTicket(PtzState):
+    """A ws:// URL the client opens straight to the node for low-latency control."""
+    ws_url: str
+    access: str
+
+
+def node_ws_url(node: MediaNode, access: str, session_id: str) -> str:
+    """The node's own API base (lan or public), scheme swapped http(s)->ws(s)."""
+    base = node.api_url_for(access).rstrip("/")
+    scheme = "wss" if base.lower().startswith("https://") else "ws"
+    host = base.split("://", 1)[-1]
+    return f"{scheme}://{host}/api/v1/onvif/ptz/ws?session={session_id}"
 
 
 @dataclass
@@ -57,6 +72,22 @@ async def open_ptz(camera_id: int, profile: str):
     result = await call_node(assignment.node, "/api/v1/onvif/ptz/open", body, timeout=30)
     pins[result["session_id"]] = Pin(camera_id, profile, assignment.node_id, assignment.generation, body, time.monotonic())
     return result
+
+
+@router.post("/{camera_id}/streams/{profile}/ptz/session", response_model=PtzTicket)
+async def open_ptz_ws(camera_id: int, profile: str, access: Literal["lan", "public"] = "lan"):
+    """Mint a direct-to-node PTZ WebSocket session. Central brokers only the open; all
+    move/stop/pose traffic then flows client<->node over the returned ws_url. No pin is
+    kept: a dropped WS self-heals by re-minting a ticket, and the node auto-stops on close."""
+    camera, stream = await target(camera_id, profile)
+    if not camera.enabled:
+        fail("camera_disabled", "Enable the camera before using PTZ.")
+    if not stream.onvif_profile_token:
+        fail("profile_mapping_required", "Map this stream to its ONVIF profile in the Video tab first.")
+    assignment = await assigned(camera_id)
+    result = await call_node(assignment.node, "/api/v1/onvif/ptz/ws/open",
+                             payload(camera, stream.onvif_profile_token), timeout=30)
+    return {**result, "ws_url": node_ws_url(assignment.node, access, result["session_id"]), "access": access}
 
 
 @router.post("/{camera_id}/streams/{profile}/ptz/command", response_model=PtzResult)
