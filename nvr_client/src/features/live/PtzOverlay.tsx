@@ -120,6 +120,7 @@ export function PtzOverlay({ cameraId }: { cameraId: number }) {
 
   const ready = phase === "ready"
   const hold = (pan: Dir, tilt: Dir, zoom: Dir) => ready && socketRef.current?.hold(pan, tilt, zoom)
+  const focus = (dir: Dir) => ready && socketRef.current?.holdFocus(dir)
   const release = () => socketRef.current?.release()
 
   return (
@@ -133,7 +134,7 @@ export function PtzOverlay({ cameraId }: { cameraId: number }) {
           <Crosshair className="size-4" /> PTZ
         </button>
       ) : (
-        <div className="pointer-events-auto absolute bottom-3 left-3 w-56 select-none rounded-2xl border border-white/15 bg-black/55 p-3 text-white shadow-xl backdrop-blur">
+        <div className="pointer-events-auto absolute bottom-3 left-3 w-64 select-none rounded-2xl border border-white/15 bg-black/55 p-3 text-white shadow-xl backdrop-blur">
           <div className="mb-2 flex items-center justify-between">
             <span className="flex items-center gap-1.5 text-xs font-semibold">
               <Crosshair className="size-3.5" /> PTZ
@@ -166,6 +167,13 @@ export function PtzOverlay({ cameraId }: { cameraId: number }) {
               <HoldButton label="Zoom in" disabled={!caps.zoom || !ready} onHold={() => hold(0, 0, 1)} onRelease={release}><ZoomIn className="size-4" /></HoldButton>
               <HoldButton label="Zoom out" disabled={!caps.zoom || !ready} onHold={() => hold(0, 0, -1)} onRelease={release}><ZoomOut className="size-4" /></HoldButton>
             </div>
+            {/* focus (ONVIF Imaging) */}
+            {caps.focus && (
+              <div className="flex flex-col gap-1">
+                <HoldButton label="Focus near" disabled={!ready} onHold={() => focus(1)} onRelease={release}><span className="text-[11px] font-semibold leading-none">N</span></HoldButton>
+                <HoldButton label="Focus far" disabled={!ready} onHold={() => focus(-1)} onRelease={release}><span className="text-[11px] font-semibold leading-none">F</span></HoldButton>
+              </div>
+            )}
           </div>
 
           {/* auto-speed meter (node-derived from zoom) */}

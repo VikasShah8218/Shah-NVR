@@ -21,6 +21,7 @@ export type PtzStatus = {
 export type PtzCaps = {
   pan_tilt?: boolean
   zoom?: boolean
+  focus?: boolean
   presets?: boolean
   home?: boolean
   home_set?: boolean
@@ -44,7 +45,7 @@ export class PtzSocket {
   private ws: WebSocket
   private handlers: PtzSocketHandlers
   private keepalive: ReturnType<typeof setInterval> | null = null
-  private held: { pan: Dir; tilt: Dir; zoom: Dir } | null = null
+  private held: { move: object; stop: object } | null = null
   private byUser = false
 
   constructor(wsUrl: string, handlers: PtzSocketHandlers) {
@@ -81,19 +82,29 @@ export class PtzSocket {
     }
   }
 
-  hold(pan: Dir, tilt: Dir, zoom: Dir) {
-    this.held = { pan, tilt, zoom }
-    this.send({ t: "move", pan, tilt, zoom })
+  // Hold any motion: send it now, re-send every KEEPALIVE_MS while held, send its stop on release.
+  private begin(move: object, stop: object) {
+    this.held = { move, stop }
+    this.send(move)
     this.clearKeepalive()
     this.keepalive = setInterval(() => {
-      if (this.held) this.send({ t: "move", ...this.held })
+      if (this.held) this.send(this.held.move)
     }, KEEPALIVE_MS)
   }
 
+  hold(pan: Dir, tilt: Dir, zoom: Dir) {
+    this.begin({ t: "move", pan, tilt, zoom }, { t: "stop" })
+  }
+
+  holdFocus(dir: Dir) {
+    this.begin({ t: "focus", dir }, { t: "focus_stop" })
+  }
+
   release() {
+    const held = this.held
     this.held = null
     this.clearKeepalive()
-    this.send({ t: "stop" })
+    if (held) this.send(held.stop)
   }
 
   refresh() {
@@ -102,9 +113,9 @@ export class PtzSocket {
 
   close() {
     this.byUser = true
-    this.held = null
-    this.clearKeepalive()
+    this.release()
     this.send({ t: "stop" })
+    this.send({ t: "focus_stop" })
     this.ws.close()
   }
 }

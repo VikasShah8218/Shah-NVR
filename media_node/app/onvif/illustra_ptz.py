@@ -4,6 +4,7 @@ The camera's own web UI uses this documented CGI. RelativeMove is deliberately
 used for pulses: it is finite even if the node dies before its final Stop.
 """
 import math
+import re
 
 import httpx
 
@@ -93,3 +94,20 @@ async def move(dev, pan: float, tilt: float, zoom: float) -> None:
     result = await get(dev, "RelativeMove", **params)
     if result != "OK":
         raise Fault("Illustra PTZ movement was not acknowledged")
+
+
+async def continuous(dev, pansp: float, tiltsp: float, zoomsp: float) -> None:
+    """Native velocity move (what the camera's web UI uses for press-and-hold). Speeds are
+    percentages in [-100, 100]. Unlike RelativeMove this is open-ended, so the WS keepalive +
+    node watchdog + explicit Stop on release/close are what bound the motion (the vendor API
+    has no camera-side timeout)."""
+    result = await get(dev, "ContinuousMove",
+                       pansp=f"{pansp:.1f}", tiltsp=f"{tiltsp:.1f}", zoomsp=f"{zoomsp:.1f}")
+    if result != "OK":
+        raise Fault("Illustra PTZ movement was not acknowledged")
+
+
+async def zoom_range(dev) -> tuple[float, float] | None:
+    """Advertised optical zoom position range (e.g. 1.00..20.00), for zoom-adaptive speed."""
+    match = re.search(r"zoom\.Valid=\[\s*([-\d.]+)\s*\.\.\s*([-\d.]+)\s*\]", await get(dev, "Explain"))
+    return (float(match.group(1)), float(match.group(2))) if match else None

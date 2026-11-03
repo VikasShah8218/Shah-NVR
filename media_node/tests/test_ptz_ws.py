@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from lxml import etree
 
-from app.onvif import ptz, ptz_ws, ptz_router
+from app.onvif import illustra_ptz, imaging, ptz, ptz_ws, ptz_router
 
 
 def xml(text):
@@ -101,6 +101,48 @@ def test_do_stop_sends_stop(monkeypatch):
         monkeypatch.setattr(ptz, "call", call)
         await ptz_ws.do_stop(make_session())
         assert log == ["Stop"]
+    asyncio.run(run())
+
+
+# --- Illustra iAPI backend: native continuous velocity ----------------------
+def test_do_move_iapi_uses_continuous_velocity(monkeypatch):
+    async def run():
+        calls = []
+        async def continuous(dev, pansp, tiltsp, zoomsp):
+            calls.append((pansp, tiltsp, zoomsp))
+        monkeypatch.setattr(illustra_ptz, "continuous", continuous)
+        s = make_session(backend="illustra_iapi")        # wide end -> SPEED_MAX
+        await ptz_ws.do_move(s, pan=0, tilt=0, zoom=-1)   # zoom out only
+        assert calls[-1] == (0.0, 0.0, -ptz_ws.ZOOM_FIXED * 100)
+        await ptz_ws.do_move(s, pan=1, tilt=0, zoom=0)    # pan right, zoom axis untouched
+        assert calls[-1] == (ptz_ws.SPEED_MAX * 100, 0.0, 0.0)
+    asyncio.run(run())
+
+
+# --- focus over ONVIF Imaging -----------------------------------------------
+def test_do_focus_uses_imaging_with_signed_speed(monkeypatch):
+    async def run():
+        calls = []
+        async def focus_move(dev, xaddr, token, speed):
+            calls.append((xaddr, token, speed))
+        monkeypatch.setattr(imaging, "focus_move", focus_move)
+        s = make_session()
+        s.focus_xaddr, s.focus_token = "http://cam/imaging", "VS1"
+        await ptz_ws.do_focus(s, 1)
+        assert calls[-1] == ("http://cam/imaging", "VS1", ptz_ws.FOCUS_SPEED)
+        await ptz_ws.do_focus(s, -1)
+        assert calls[-1][2] == -ptz_ws.FOCUS_SPEED
+    asyncio.run(run())
+
+
+def test_do_focus_noop_when_unsupported(monkeypatch):
+    async def run():
+        calls = []
+        async def focus_move(*a):
+            calls.append(a)
+        monkeypatch.setattr(imaging, "focus_move", focus_move)
+        await ptz_ws.do_focus(make_session(), 1)   # focus_xaddr is None
+        assert calls == []
     asyncio.run(run())
 
 

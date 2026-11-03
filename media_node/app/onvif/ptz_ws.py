@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from lxml import etree
 
-from app.onvif import illustra_ptz, ptz
+from app.onvif import illustra_ptz, imaging, ptz
 from app.onvif.services import OnvifDevice
 from app.onvif.soap import NS, OnvifError
 
@@ -45,6 +45,7 @@ logger = logging.getLogger("node.ptz_ws")
 SPEED_MAX = 0.5        # pan/tilt velocity at wide end (0% zoom); within every advertised space
 SPEED_MIN = 0.08       # pan/tilt velocity at full tele (100% zoom)
 ZOOM_FIXED = 0.4       # fixed zoom velocity for the zoom in/out buttons
+FOCUS_SPEED = 0.7      # fixed ONVIF Imaging focus speed (-1..1; positive = near)
 POSE_INTERVAL = 0.4    # seconds between status pushes (pan/tilt/zoom + derived speed)
 WATCHDOG_CHECK = 0.3   # how often the watchdog runs
 WATCHDOG_STOP = 0.9    # stop the camera if no move keepalive for this long (> client keepalive)
@@ -79,6 +80,8 @@ class WsSession:
     last_zoom: float | None = None
     zoom_lo: float | None = None
     zoom_hi: float | None = None
+    focus_xaddr: str | None = None   # ONVIF Imaging service (None = focus unsupported)
+    focus_token: str | None = None   # video source token for focus Move/Stop
 
 
 # --- helpers (pure; unit-tested) --------------------------------------------
@@ -156,11 +159,13 @@ async def do_move(session: WsSession, pan: int, tilt: int, zoom: int) -> None:
         return  # requested axis is unsupported, or a bare zero: ignore (release uses stop)
 
     if session.backend == "illustra_iapi":
-        # No continuous velocity on this firmware's native API: a finite relative step,
-        # repeated by the client's keepalive, approximates a hold.
-        await illustra_ptz.move(session.dev, (pan * speed) if pan_tilt else 0.0,
-                                (tilt * speed) if pan_tilt else 0.0,
-                                (zoom * ZOOM_FIXED) if use_zoom else 0.0)
+        # The vendor API's ContinuousMove takes percent speeds (-100..100) and is what the
+        # camera's own web UI uses for press-and-hold; it holds smoothly where repeated finite
+        # RelativeMove steps stalled (esp. zoom). The keepalive + watchdog + Stop bound it.
+        await illustra_ptz.continuous(session.dev,
+                                      pan * speed * 100 if pan_tilt else 0.0,
+                                      tilt * speed * 100 if pan_tilt else 0.0,
+                                      zoom * ZOOM_FIXED * 100 if use_zoom else 0.0)
         return
 
     req = ptz.request("ContinuousMove", session.profile)
@@ -175,6 +180,25 @@ async def do_move(session: WsSession, pan: int, tilt: int, zoom: int) -> None:
     if timeout:
         etree.SubElement(req, etree.QName(ptz.PTZ, "Timeout")).text = f"PT{timeout:g}S"
     await ptz.call(session.dev, session.url, req)
+
+
+async def do_focus(session: WsSession, direction: int) -> None:
+    """Continuous manual focus over ONVIF Imaging (positive = near). No-op if unsupported."""
+    if session.focus_xaddr and session.focus_token:
+        await imaging.focus_move(session.dev, session.focus_xaddr, session.focus_token, direction * FOCUS_SPEED)
+
+
+async def do_focus_stop(session: WsSession) -> None:
+    if session.focus_xaddr and session.focus_token:
+        await imaging.focus_stop(session.dev, session.focus_xaddr, session.focus_token)
+
+
+async def stop_all(session: WsSession) -> None:
+    """Stop every kind of motion (PTZ and focus). Used on release-safety paths."""
+    try:
+        await do_stop(session)
+    finally:
+        await do_focus_stop(session)
 
 
 # --- session lifecycle -------------------------------------------------------
@@ -192,7 +216,7 @@ async def close_session(session: WsSession, *, stop: bool) -> None:
         try:
             async with session.lock:
                 if session.moving:
-                    await do_stop(session)
+                    await stop_all(session)
                 session.moving = False
         except Exception:
             pass
@@ -226,8 +250,25 @@ async def open_ws_session(host: str, port: int, username: str, password: str, pr
         await close_session_dev(dev)
         raise HTTPException(500, {"code": "ptz_open_failed", "message": "PTZ session could not be established."})
     sid = secrets.token_urlsafe(24)
-    ws_sessions[sid] = WsSession(sid, dev, profile, rest.url, rest.spaces, rest.caps, rest.backend)
-    return {**state, "session_id": sid}
+    session = WsSession(sid, dev, profile, rest.url, rest.spaces, dict(rest.caps), rest.backend)
+    ws_sessions[sid] = session
+    # Focus rides ONVIF Imaging (healthy even when ONVIF PTZ is 503). Best-effort; hide if absent.
+    session.caps["focus"] = False
+    try:
+        xaddr, token = await imaging.discover(dev)
+        if xaddr and token:
+            session.focus_xaddr, session.focus_token, session.caps["focus"] = xaddr, token, True
+    except Exception:  # discovery must never fail the PTZ session
+        pass
+    # Seed the zoom-adaptive speed from the advertised range so it's correct from the first frame.
+    if session.backend == "illustra_iapi":
+        try:
+            span = await illustra_ptz.zoom_range(dev)
+            if span:
+                session.zoom_lo, session.zoom_hi = span
+        except Exception:
+            pass
+    return {**state, "session_id": sid, "capabilities": session.caps}
 
 
 async def close_session_dev(dev: OnvifDevice) -> None:
@@ -295,6 +336,19 @@ async def _handle(websocket: WebSocket, session: WsSession, msg) -> None:
                     await do_stop(session)
                 session.moving = False
             await websocket.send_json({"t": "stopped"})
+        elif action == "focus":
+            direction = sign(msg.get("dir"))
+            if not direction or not session.focus_xaddr:
+                return
+            async with session.lock:
+                await do_focus(session, direction)
+                session.moving = True
+                session.last_move = time.monotonic()
+        elif action == "focus_stop":
+            async with session.lock:
+                await do_focus_stop(session)
+                session.moving = False
+            await websocket.send_json({"t": "stopped"})
         elif action == "refresh":
             async with session.lock:
                 status = await read_status(session)
@@ -334,7 +388,7 @@ async def _watchdog_loop(session: WsSession) -> None:
                 try:
                     async with session.lock:
                         if session.moving:
-                            await do_stop(session)
+                            await stop_all(session)
                         session.moving = False
                 except Exception:
                     session.moving = False
