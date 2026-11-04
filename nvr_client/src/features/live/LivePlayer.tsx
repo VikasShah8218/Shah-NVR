@@ -1,5 +1,5 @@
 import Hls from "hls.js"
-import { Loader2, VideoOff, Volume2, VolumeX } from "lucide-react"
+import { Loader2, Pause, VideoOff, Volume2, VolumeX } from "lucide-react"
 import type { CSSProperties } from "react"
 import { useEffect, useId, useRef, useState } from "react"
 import { useLive } from "@/api/queries"
@@ -39,6 +39,7 @@ export function LivePlayer({
   videoStyle,
   onVideo,
   overlay = true,
+  suspended = false,
 }: {
   cameraId: number
   profile: string
@@ -47,6 +48,8 @@ export function LivePlayer({
   videoStyle?: CSSProperties
   onVideo?: (video: HTMLVideoElement | null) => void
   overlay?: boolean
+  /** The expand / main-stream dialog is open: tear the stream down (no network, no decode) until it closes. */
+  suspended?: boolean
 }) {
   const { settings } = useSettings()
   const hlsBufferSeconds = Math.max(2, Math.min(10, Number(settings.hlsBufferSeconds) || 5))
@@ -106,7 +109,7 @@ export function LivePlayer({
 
   useEffect(() => {
     const video = videoRef.current
-    if (!video || !webrtcUrl || !hlsUrl || !active) return
+    if (!video || !webrtcUrl || !hlsUrl || !active || suspended) return
     let cancelled = false
     let whep: WhepSession | null = null
     let hls: Hls | null = null
@@ -228,7 +231,7 @@ export function LivePlayer({
       video.srcObject = null
     }
     // `attempt` re-runs the effect for reconnects; URLs change when the camera moves node.
-  }, [webrtcUrl, hlsUrl, protocol, attempt, active, hlsBufferSeconds])
+  }, [webrtcUrl, hlsUrl, protocol, attempt, active, suspended, hlsBufferSeconds])
 
   const showAudio = stream?.audio_state === "available" || stream?.audio_state === "advertised_not_observed" || stream?.audio_state === "unsupported"
   const audioPlayable = showAudio && stream?.audio_state !== "unsupported" && (info.protocol !== "HLS" || stream.audio_codec === "aac")
@@ -248,8 +251,8 @@ export function LivePlayer({
     setInfo((i) => ({ ...i, width: videoRef.current?.videoWidth ?? 0, height: videoRef.current?.videoHeight ?? 0 }))
 
   const liveError = live.error ? (live.error as Error).message : null
-  const showSpinner = !liveError && info.phase === "loading"
-  const errorText = liveError ?? (info.phase === "error" ? info.error : null)
+  const showSpinner = !liveError && info.phase === "loading" && !suspended
+  const errorText = suspended ? null : (liveError ?? (info.phase === "error" ? info.error : null))
 
   return (
     <div ref={containerRef} className={cn("relative overflow-hidden bg-video", className)}>
@@ -279,13 +282,20 @@ export function LivePlayer({
           </span>
         </div>
       )}
-      {overlay && info.phase === "playing" && (
+      {suspended && (
+        <div className="absolute inset-0 grid place-items-center bg-video/60 text-xs text-white/85">
+          <span className="flex items-center gap-1.5 rounded bg-black/55 px-2 py-1">
+            <Pause className="size-3.5" /> Paused
+          </span>
+        </div>
+      )}
+      {overlay && info.phase === "playing" && !suspended && (
         <div className="pointer-events-none absolute bottom-1.5 left-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white/85 tabular-nums">
           {info.width}×{info.height} · {info.protocol}
           {info.delayMs != null && ` · ${info.delayMs} ms`}
         </div>
       )}
-      {showAudio && (
+      {showAudio && !suspended && (
         <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded bg-black/60 p-1 text-white">
           <button
             type="button"
