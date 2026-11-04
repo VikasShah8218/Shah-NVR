@@ -37,6 +37,7 @@ Item {
             expandDialog.close()
             Live.muteAll()
             Ptz.close()
+            PtzWs.close()
             if (appWindow)
                 appWindow.immersive = false
         } else {
@@ -65,13 +66,12 @@ Item {
 
     function expand(cameraId) {
         expandedZoom.reset()
-        expandedPtz.active = false  // never carry a PTZ panel over to another (possibly non-PTZ) camera
-        expandedCamera = Cameras.byId(cameraId)
+        expandedCamera = Cameras.byId(cameraId)  // PtzOverlay resets itself on cameraId change
         expandDialog.open()
     }
 
     Component.onCompleted: { for (const id of Live.onView) Live.ensureUrls(id) }
-    Component.onDestruction: { Live.muteAll(); Ptz.close(); if (appWindow) appWindow.immersive = false }
+    Component.onDestruction: { Live.muteAll(); Ptz.close(); PtzWs.close(); if (appWindow) appWindow.immersive = false }
     Connections {
         target: Qt.application
         function onStateChanged() { if (Qt.application.state !== Qt.ApplicationActive) Live.muteAll() }
@@ -303,6 +303,7 @@ Item {
         width: Math.min(root.width * 0.92, 1600)
         title: (root.expandedCamera ? root.expandedCamera.name : "") + " · main stream"
         onClosed: {
+            ptzOverlay.open = false   // stops the camera and closes the WS session
             expandedZoom.reset()
             root.expandedCamera = null
         }
@@ -343,6 +344,15 @@ Item {
                 anchors.fill: parent
                 z: 2
             }
+
+            PtzOverlay {
+                id: ptzOverlay
+                anchors.fill: parent
+                z: 3
+                visible: !!root.expandedCamera && root.expandedCamera.has_ptz
+                cameraId: root.expandedCamera ? root.expandedCamera.id : 0
+                profile: "main"
+            }
         }
         RowLayout {
             Layout.fillWidth: true
@@ -352,14 +362,7 @@ Item {
                 visible: expandedVideo.urls.audio_state === "available" || expandedVideo.urls.audio_state === "advertised_not_observed"
                 onClicked: if (root.expandedCamera) Live.toggleAudio(root.expandedCamera.id)
             }
-            AppButton { text: "PTZ"; iconName: "crosshair"; variant: "outline"; visible: !!root.expandedCamera && root.expandedCamera.has_ptz; onClicked: expandedPtz.active = !expandedPtz.active }
             Item { Layout.fillWidth: true }
-        }
-        Loader {
-            id: expandedPtz
-            active: false
-            Layout.fillWidth: true
-            sourceComponent: PtzPanel { cameraId: root.expandedCamera ? root.expandedCamera.id : 0; profile: "main" }
         }
         }
     }
