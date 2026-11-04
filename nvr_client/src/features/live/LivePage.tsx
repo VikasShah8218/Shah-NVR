@@ -204,6 +204,7 @@ export function LivePage() {
                       // Fixed policy: one-up uses main; every multi-camera grid uses sub when present.
                       profile={state.layout > 1 && cam.streams.some((s) => s.profile === "sub") ? "sub" : "main"}
                       protocol={protocol}
+                      suspended={fullscreenCam != null}
                       onRemove={() => clearTile(i)}
                       onExpand={() => setFullscreenCam(cam.id)}
                     />
@@ -261,12 +262,15 @@ function LiveTile({
   camera,
   profile,
   protocol: gridProtocol,
+  suspended,
   onRemove,
   onExpand,
 }: {
   camera: Camera
   profile: string
   protocol: LiveProtocol
+  /** The main-stream dialog is open: freeze this tile (no network, no decode). */
+  suspended: boolean
   onRemove: () => void
   onExpand: () => void
 }) {
@@ -288,7 +292,7 @@ function LiveTile({
 
   return (
     <div className="group relative size-full" onDoubleClick={onExpand}>
-      <LivePlayer cameraId={camera.id} profile={profile} protocol={protocol} className="size-full" onVideo={setVideo} />
+      <LivePlayer cameraId={camera.id} profile={profile} protocol={protocol} suspended={suspended} className="size-full" onVideo={setVideo} />
       <div className="pointer-events-none absolute inset-x-0 top-0 flex min-w-0 items-center gap-2 overflow-hidden bg-gradient-to-b from-black/60 to-transparent px-2 py-1.5 text-xs text-white">
         <span className="min-w-0 flex-1 truncate font-medium">{camera.name}</span>
         {recording && (
