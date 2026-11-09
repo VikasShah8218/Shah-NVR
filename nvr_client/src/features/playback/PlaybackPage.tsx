@@ -1,5 +1,5 @@
 import { BookmarkPlus, CalendarDays, ChevronLeft, ChevronRight, Copy, Crosshair, Download, FileVideo, Film, X } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router"
 import { toast } from "sonner"
 import { exportDownloadUrl, mediaFileUrl, playbackAudioUrl, playbackUrl } from "@/api/client"
@@ -21,6 +21,7 @@ import { nodeApiUrl, playbackAccess, selectedNodeAccess, useNodeAccessMap } from
 import { DAY, HOUR, fmtDay, fmtTime, startOfLocalDay } from "@/lib/time"
 import { BookmarkDialog, BookmarksPanel } from "./BookmarksPanel"
 import { bookmarkMarker } from "./markers"
+import { thumbnailUrl, thumbTarget } from "./thumbs"
 import { Timeline } from "./Timeline"
 import { VodPlayer } from "./VodPlayer"
 import { ExportDialog } from "./ExportDialog"
@@ -70,7 +71,7 @@ export function PlaybackPage() {
   const timeline = useTimeline(cameraId, profile, new Date(dayStart), new Date(dayEnd), isToday ? 20_000 : 0)
   const exports = useExports(cameraId)
   const cancelExport = useCancelExport()
-  const segments: Segment[] = timeline.data?.segments ?? []
+  const segments: Segment[] = useMemo(() => timeline.data?.segments ?? [], [timeline.data])
   // This camera's bookmarks for the day (incl. camera-wide ones) -> timeline markers.
   const dayBookmarks = useBookmarks(
     { cameraId, profile, start: new Date(dayStart), end: new Date(dayEnd), limit: 1000 },
@@ -84,6 +85,13 @@ export function PlaybackPage() {
     () => new Map((nodes.data ?? []).map((n) => [n.id, nodeApiUrl(n, selectedNodeAccess(n, settings.nodeAccess, detected.data))])),
     [nodes.data, settings.nodeAccess, detected.data],
   )
+
+  // Timeline hover preview: the picture comes straight from the node holding that chunk.
+  const thumbAt = useCallback((t: number) => {
+    const target = thumbTarget(segments, t)
+    const apiUrl = target && nodeUrl.get(target.nodeId)
+    return target && apiUrl ? { url: thumbnailUrl(apiUrl, target.segmentId, target.atMs), at: target.slotStart } : null
+  }, [segments, nodeUrl])
 
   const viewEnd = viewStart + zoom
   // The browser plays the video track alone (audio: audioSrc); the VLC link keeps every track.
@@ -286,6 +294,7 @@ export function PlaybackPage() {
               onSeek={seek}
               onPan={zoom < DAY ? setViewStart : undefined}
               markers={markers}
+              thumbAt={thumbAt}
               height={64}
             />
           )}

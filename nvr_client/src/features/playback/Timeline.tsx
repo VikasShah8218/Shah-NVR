@@ -1,8 +1,9 @@
 import { format } from "date-fns"
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { Segment } from "@/api/types"
 import { cn } from "@/lib/utils"
 import { placeMarkers, type TimelineMarker } from "./markers"
+import { THUMB_DEBOUNCE_MS } from "./thumbs"
 
 const MIN = 60_000
 
@@ -39,6 +40,7 @@ export function Timeline({
   onSeek,
   onPan,
   markers = [],
+  thumbAt,
   height = 56,
 }: {
   segments: Segment[]
@@ -50,11 +52,22 @@ export function Timeline({
   onPan?: (newViewStart: number) => void
   /** Bookmarks today; motion / ONVIF events later. Clicking one seeks to its start. */
   markers?: TimelineMarker[]
+  /** Hover preview: picture URL + the time it shows for a hovered time, or null (gap / unknown node). */
+  thumbAt?: (t: number) => { url: string; at: number } | null
   height?: number
 }) {
   const ref = useRef<SVGSVGElement>(null)
   const drag = useRef<{ x: number; start: number; moved: boolean } | null>(null)
   const [hover, setHover] = useState<number | null>(null)
+  // Debounced hover time for the preview picture (see thumbs.ts).
+  const [settled, setSettled] = useState<number | null>(null)
+  const [dragging, setDragging] = useState(false)
+  useEffect(() => {
+    if (hover == null || !thumbAt) return
+    const id = window.setTimeout(() => setSettled(hover), THUMB_DEBOUNCE_MS)
+    return () => window.clearTimeout(id)
+  }, [hover, thumbAt])
+  const thumb = hover != null && settled != null && !dragging ? thumbAt?.(settled) ?? null : null
   const span = viewEnd - viewStart
   const ranges = useMemo(() => mergeRanges(segments.filter((segment) => segment.origin !== "CAMERA_SD")), [segments])
   const backfillRanges = useMemo(() => mergeRanges(segments.filter((segment) => segment.origin === "CAMERA_SD")), [segments])
@@ -82,7 +95,7 @@ export function Timeline({
     const d = drag.current
     if (!d || !onPan) return
     const dx = e.clientX - d.x
-    if (Math.abs(dx) > 3) d.moved = true
+    if (Math.abs(dx) > 3 && !d.moved) { d.moved = true; setDragging(true) }
     if (d.moved) {
       const width = ref.current!.getBoundingClientRect().width
       const next = d.start - (dx / width) * span
@@ -92,6 +105,7 @@ export function Timeline({
   const onPointerUp = (e: React.PointerEvent) => {
     const d = drag.current
     drag.current = null
+    setDragging(false)
     if (!d || d.moved) return
     // A click on a marker seeks exactly to its start, not to the pixel under the pointer.
     const markerT = (e.target as Element).closest?.("[data-marker-t]")?.getAttribute("data-marker-t")
@@ -100,7 +114,8 @@ export function Timeline({
   }
 
   return (
-    <div className="select-none py-1">
+    <div className="relative select-none py-1">
+      {thumb && hover != null && <ThumbPopover key={thumb.url} url={thumb.url} at={thumb.at} x={pct(hover)} />}
       <svg
         ref={ref}
         className={cn("w-full touch-none", onPan ? "cursor-grab active:cursor-grabbing" : "cursor-pointer")}
@@ -108,8 +123,8 @@ export function Timeline({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={() => { drag.current = null }}
-        onPointerLeave={() => setHover(null)}
+        onPointerCancel={() => { drag.current = null; setDragging(false) }}
+        onPointerLeave={() => { setHover(null); setSettled(null) }}
       >
         <defs>
           <pattern id="camera-sd-backfill" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -204,6 +219,26 @@ export function Timeline({
         <span>{hover != null ? format(hover, "HH:mm:ss") : ""}</span>
         <span>{format(viewEnd, "dd MMM HH:mm")}</span>
       </div>
+    </div>
+  )
+}
+
+/** Small preview frame above the timeline. Keyed by URL, so a new slot starts in the loading state. */
+function ThumbPopover({ url, at, x }: { url: string; at: number; x: number }) {
+  const [state, setState] = useState<"loading" | "ok" | "error">("loading")
+  const shift = x < 12 ? "0%" : x > 88 ? "-100%" : "-50%"
+  return (
+    <div className="pointer-events-none absolute bottom-full z-20 mb-1 w-40 overflow-hidden rounded-md border bg-card shadow-lg"
+      style={{ left: `${x}%`, transform: `translateX(${shift})` }}>
+      <div className="grid aspect-video place-items-center bg-video text-[11px] text-muted-foreground">
+        {state !== "error" && (
+          <img src={url} alt="" className={cn("size-full object-cover", state === "loading" && "opacity-0")}
+            onLoad={() => setState("ok")} onError={() => setState("error")} />
+        )}
+        {state === "loading" && <span className="absolute">Loading…</span>}
+        {state === "error" && <span>No preview</span>}
+      </div>
+      <div className="px-1.5 py-0.5 text-center text-[11px] tabular-nums text-muted-foreground">{format(at, "HH:mm:ss")}</div>
     </div>
   )
 }

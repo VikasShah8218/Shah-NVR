@@ -143,6 +143,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/media/{segment_id}/thumb.jpg": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Small preview frame for the playback timeline
+         * @description `at_ms` (offset in the chunk) snaps to THUMBNAIL_GRID_SECONDS; every time in a slot gets the same
+         *     cached JPEG. A miss decodes one keyframe with ffmpeg; the video itself is never re-encoded.
+         */
+        get: operations["media_thumb_api_v1_media__segment_id__thumb_jpg_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/segments": {
         parameters: {
             query?: never;
@@ -1396,6 +1417,40 @@ export interface operations {
             query?: {
                 start_ms?: number;
                 duration_ms?: number | null;
+            };
+            header?: never;
+            path: {
+                segment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    media_thumb_api_v1_media__segment_id__thumb_jpg_get: {
+        parameters: {
+            query?: {
+                at_ms?: number;
+                w?: number | null;
             };
             header?: never;
             path: {

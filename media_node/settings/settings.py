@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     # Used only to make browser-compatible AAC for recorded listening. Video is never transcoded.
     FFMPEG_BIN: str = "ffmpeg"
     FFPROBE_BIN: str = "ffprobe"
+    # Timeline hover previews (app/recordings/thumbnails.py): one JPEG per grid slot, made on demand.
+    THUMBNAIL_GRID_SECONDS: int = 30
+    THUMBNAIL_WIDTH: int = 240
+    THUMBNAIL_CACHE_MAX: int = 2000  # in-memory LRU entries (~10 KB each)
+    THUMBNAIL_JOBS: int = 2  # ffmpeg thumbnail runs allowed at once
     MEDIAMTX_API_PORT: int = 9997
     MEDIAMTX_METRICS_PORT: int = 9998
     RTSP_PORT: int = 8554
