@@ -147,6 +147,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bookmarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List / search bookmarks */
+        get: operations["list_bookmarks_api_v1_bookmarks_get"];
+        put?: never;
+        /** Create Bookmark */
+        post: operations["create_bookmark_api_v1_bookmarks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookmarks/{bookmark_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Bookmark */
+        get: operations["get_bookmark_api_v1_bookmarks__bookmark_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Bookmark */
+        delete: operations["delete_bookmark_api_v1_bookmarks__bookmark_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Bookmark */
+        patch: operations["update_bookmark_api_v1_bookmarks__bookmark_id__patch"];
+        trace?: never;
+    };
     "/api/v1/nodes": {
         parameters: {
             query?: never;
@@ -1321,6 +1358,84 @@ export interface components {
          * @enum {string}
          */
         BackfillState: "QUEUED" | "CLAIMED" | "DOWNLOADING" | "INDEXING" | "COMPLETED" | "PARTIAL" | "FAILED" | "CANCELLED";
+        /** BookmarkCreate */
+        BookmarkCreate: {
+            /** Camera Id */
+            camera_id: number;
+            /** Profile */
+            profile?: string | null;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /** End Time */
+            end_time?: string | null;
+            /** Note */
+            note: string;
+            /** Label */
+            label?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Author */
+            author?: string | null;
+        };
+        /** BookmarkOut */
+        BookmarkOut: {
+            /** Id */
+            id: number;
+            /** Camera Id */
+            camera_id: number;
+            /** Camera Name */
+            camera_name: string;
+            /** Profile */
+            profile: string | null;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /** End Time */
+            end_time: string | null;
+            /** Note */
+            note: string;
+            /** Label */
+            label: string | null;
+            /** Color */
+            color: string | null;
+            /** Author */
+            author: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * BookmarkUpdate
+         * @description Only the fields sent are changed. Send end_time=null to turn a range into a point.
+         */
+        BookmarkUpdate: {
+            /** Profile */
+            profile?: string | null;
+            /** Start Time */
+            start_time?: string | null;
+            /** End Time */
+            end_time?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Label */
+            label?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Author */
+            author?: string | null;
+        };
         /** CameraAssignmentOut */
         CameraAssignmentOut: {
             /** Camera Id */
@@ -3580,6 +3695,175 @@ export interface operations {
                 };
                 content: {
                     "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_bookmarks_api_v1_bookmarks_get: {
+        parameters: {
+            query?: {
+                camera_id?: number | null;
+                /** @description Also includes camera-wide bookmarks (no profile) */
+                profile?: string | null;
+                /** @description Text search in the note and label */
+                q?: string | null;
+                /** @description Only bookmarks overlapping [start, end) */
+                start?: string | null;
+                end?: string | null;
+                /** @description By start time; desc = newest first */
+                order?: "asc" | "desc";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_bookmark_api_v1_bookmarks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookmarkCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_bookmark_api_v1_bookmarks__bookmark_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookmark_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_bookmark_api_v1_bookmarks__bookmark_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookmark_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_bookmark_api_v1_bookmarks__bookmark_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookmark_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookmarkUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkOut"];
                 };
             };
             /** @description Validation Error */

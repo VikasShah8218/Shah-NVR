@@ -2,6 +2,7 @@ import { format } from "date-fns"
 import { useMemo, useRef, useState } from "react"
 import type { Segment } from "@/api/types"
 import { cn } from "@/lib/utils"
+import { placeMarkers, type TimelineMarker } from "./markers"
 
 const MIN = 60_000
 
@@ -37,6 +38,7 @@ export function Timeline({
   playhead,
   onSeek,
   onPan,
+  markers = [],
   height = 56,
 }: {
   segments: Segment[]
@@ -46,6 +48,8 @@ export function Timeline({
   playhead: number | null
   onSeek: (t: number) => void
   onPan?: (newViewStart: number) => void
+  /** Bookmarks today; motion / ONVIF events later. Clicking one seeks to its start. */
+  markers?: TimelineMarker[]
   height?: number
 }) {
   const ref = useRef<SVGSVGElement>(null)
@@ -54,6 +58,7 @@ export function Timeline({
   const span = viewEnd - viewStart
   const ranges = useMemo(() => mergeRanges(segments.filter((segment) => segment.origin !== "CAMERA_SD")), [segments])
   const backfillRanges = useMemo(() => mergeRanges(segments.filter((segment) => segment.origin === "CAMERA_SD")), [segments])
+  const placed = useMemo(() => placeMarkers(markers, viewStart, viewEnd), [markers, viewStart, viewEnd])
   const now = Date.now()
 
   const pct = (t: number) => ((t - viewStart) / span) * 100
@@ -87,7 +92,11 @@ export function Timeline({
   const onPointerUp = (e: React.PointerEvent) => {
     const d = drag.current
     drag.current = null
-    if (d && !d.moved) onSeek(Math.max(bounds[0], Math.min(bounds[1], timeAt(e.clientX))))
+    if (!d || d.moved) return
+    // A click on a marker seeks exactly to its start, not to the pixel under the pointer.
+    const markerT = (e.target as Element).closest?.("[data-marker-t]")?.getAttribute("data-marker-t")
+    const t = markerT != null ? Number(markerT) : timeAt(e.clientX)
+    onSeek(Math.max(bounds[0], Math.min(bounds[1], t)))
   }
 
   return (
@@ -153,6 +162,25 @@ export function Timeline({
             </text>
           </g>
         ))}
+        {/* markers (bookmarks, later events): ranges as a band under the bar, points as a pin */}
+        {placed.map((m) => {
+          const color = m.color ?? "var(--primary)"
+          return (
+            <g key={m.id} data-marker-t={m.t} className="cursor-pointer">
+              <title>{m.label ?? m.kind}</title>
+              {m.width != null ? (
+                <rect x={`${m.x}%`} y={height - 12} width={`${m.width}%`} height="5" rx="2" fill={color} opacity="0.85" />
+              ) : (
+                <>
+                  <line x1={`${m.x}%`} x2={`${m.x}%`} y1="16" y2={height - 6} stroke={color} strokeWidth="2" />
+                  <circle cx={`${m.x}%`} cy={height - 7} r="3.5" fill={color} />
+                  {/* wider invisible hit area so a 2px pin is easy to click */}
+                  <line x1={`${m.x}%`} x2={`${m.x}%`} y1="14" y2={height} stroke="transparent" strokeWidth="10" />
+                </>
+              )}
+            </g>
+          )
+        })}
         {/* now */}
         {now > viewStart && now < viewEnd && (
           <line x1={`${pct(now)}%`} x2={`${pct(now)}%`} y1="14" y2={height - 4} stroke="var(--info)" strokeDasharray="3 3" />

@@ -1,10 +1,10 @@
-import { CalendarDays, ChevronLeft, ChevronRight, Copy, Crosshair, Download, FileVideo, Film, X } from "lucide-react"
+import { BookmarkPlus, CalendarDays, ChevronLeft, ChevronRight, Copy, Crosshair, Download, FileVideo, Film, X } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router"
 import { toast } from "sonner"
 import { exportDownloadUrl, mediaFileUrl, playbackAudioUrl, playbackUrl } from "@/api/client"
-import { useCameras, useCancelExport, useExports, useNodes, useTimeline } from "@/api/queries"
-import type { Segment } from "@/api/types"
+import { useBookmarks, useCameras, useCancelExport, useExports, useNodes, useTimeline } from "@/api/queries"
+import type { Bookmark, Segment } from "@/api/types"
 import { EmptyState, ErrorState, PageHeader } from "@/components/common"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -19,6 +19,8 @@ import { formatBytes, formatDuration } from "@/lib/format"
 import { useSettings } from "@/lib/settings"
 import { nodeApiUrl, playbackAccess, selectedNodeAccess, useNodeAccessMap } from "@/lib/nodeAccess"
 import { DAY, HOUR, fmtDay, fmtTime, startOfLocalDay } from "@/lib/time"
+import { BookmarkDialog, BookmarksPanel } from "./BookmarksPanel"
+import { bookmarkMarker } from "./markers"
 import { Timeline } from "./Timeline"
 import { VodPlayer } from "./VodPlayer"
 import { ExportDialog } from "./ExportDialog"
@@ -49,6 +51,7 @@ export function PlaybackPage() {
   const [playhead, setPlayhead] = useState<Date | null>(null)
   const [goto, setGoto] = useState("")
   const [exportOpen, setExportOpen] = useState(false)
+  const [bookmarkOpen, setBookmarkOpen] = useState(false)
 
   // Default to the first camera once the list loads.
   useEffect(() => {
@@ -68,6 +71,12 @@ export function PlaybackPage() {
   const exports = useExports(cameraId)
   const cancelExport = useCancelExport()
   const segments: Segment[] = timeline.data?.segments ?? []
+  // This camera's bookmarks for the day (incl. camera-wide ones) -> timeline markers.
+  const dayBookmarks = useBookmarks(
+    { cameraId, profile, start: new Date(dayStart), end: new Date(dayEnd), limit: 1000 },
+    cameraId != null,
+  )
+  const markers = useMemo(() => (dayBookmarks.data ?? []).map(bookmarkMarker), [dayBookmarks.data])
   const access = playbackAccess(
     nodes.data ?? [], [...new Set(segments.map((segment) => segment.node_id))], settings.nodeAccess, detected.data,
   )
@@ -118,6 +127,20 @@ export function PlaybackPage() {
     setPlayFrom(new Date(t))
     setPlayTo(new Date(Math.min(dayEnd, Date.now())))
     setPlayhead(new Date(t))
+  }
+
+  /** Open a bookmark from the search panel: switch camera/profile/day if needed and play from its start. */
+  const openBookmark = (b: Bookmark) => {
+    const t = new Date(b.start_time)
+    if (b.camera_id !== cameraId) setCameraId(b.camera_id)
+    const cam = cameras.data?.find((c) => c.id === b.camera_id)
+    if (b.profile && cam?.streams.some((s) => s.profile === b.profile)) setProfile(b.profile)
+    const d = startOfLocalDay(t)
+    if (d.getTime() !== dayStart) changeDay(d)
+    // Not seek(): that caps the playlist at the *current* day's end, which may be another day.
+    setPlayFrom(t)
+    setPlayTo(new Date(Math.min(d.getTime() + DAY, Date.now())))
+    setPlayhead(t)
   }
 
   // Keep the playhead visible while zoomed in.
@@ -207,6 +230,10 @@ export function PlaybackPage() {
           </Button>
         </div>
         <div className="col-span-2 flex items-center gap-2 sm:col-span-1 sm:ml-auto">
+          <Button variant="outline" className="w-full sm:w-auto" onClick={() => setBookmarkOpen(true)} disabled={cameraId == null}
+            title="Bookmark the moment at the playhead">
+            <BookmarkPlus className="size-4" /> Bookmark
+          </Button>
           <Button className="w-full sm:w-auto" onClick={() => setExportOpen(true)} disabled={cameraId == null || segments.length === 0}>
             <FileVideo className="size-4" /> Export
           </Button>
@@ -258,11 +285,14 @@ export function PlaybackPage() {
               playhead={playhead?.getTime() ?? null}
               onSeek={seek}
               onPan={zoom < DAY ? setViewStart : undefined}
+              markers={markers}
               height={64}
             />
           )}
         </CardContent>
       </Card>
+
+      <BookmarksPanel cameraId={cameraId} onOpen={openBookmark} />
 
       <Card className="gap-2">
         <CardHeader>
@@ -354,6 +384,10 @@ export function PlaybackPage() {
         </CardContent>
       </Card>}
 
+      {cameraId != null && bookmarkOpen && (
+        <BookmarkDialog open onOpenChange={setBookmarkOpen} cameraId={cameraId} profile={profile}
+          at={playhead ?? playFrom ?? undefined} />
+      )}
       {cameraId != null && exportOpen && <ExportDialog open={exportOpen} onOpenChange={setExportOpen} cameraId={cameraId} profile={profile}
         initialStart={exportStart} initialEnd={exportEnd} />}
     </div>

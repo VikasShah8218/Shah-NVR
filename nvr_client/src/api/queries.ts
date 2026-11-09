@@ -12,6 +12,9 @@ import type {
   BackfillJob,
   BackfillJobCreate,
   BackfillProbe,
+  Bookmark,
+  BookmarkCreate,
+  BookmarkUpdate,
   Camera,
   CameraCreate,
   CameraUpdate,
@@ -218,6 +221,56 @@ export function useCancelExport() {
     onError: (error: Error) => toast.error(error.message),
   })
 }
+
+export interface BookmarkQuery {
+  cameraId?: number | null
+  /** also returns camera-wide bookmarks (no profile) */
+  profile?: string
+  q?: string
+  start?: Date
+  end?: Date
+  /** by start time; "desc" = newest first (search lists) */
+  order?: "asc" | "desc"
+  limit?: number
+}
+
+export function useBookmarks(params: BookmarkQuery, enabled = true) {
+  const { url, api } = useCentral()
+  const query = {
+    camera_id: params.cameraId ?? undefined,
+    profile: params.profile || undefined,
+    q: params.q?.trim() || undefined,
+    start: params.start?.toISOString(),
+    end: params.end?.toISOString(),
+    order: params.order,
+    limit: params.limit,
+  }
+  return useQuery({
+    queryKey: [url, "bookmarks", query],
+    enabled,
+    placeholderData: keepPreviousData,
+    queryFn: () => unwrap<Bookmark[]>(api.GET("/api/v1/bookmarks", { params: { query } })),
+  })
+}
+
+export const useCreateBookmark = () =>
+  useCentralMutation((api, body: BookmarkCreate) => unwrap<Bookmark>(api.POST("/api/v1/bookmarks", { body })), {
+    success: "Bookmark added",
+    invalidate: ["bookmarks"],
+  })
+
+export const useUpdateBookmark = () =>
+  useCentralMutation(
+    (api, { id, body }: { id: number; body: BookmarkUpdate }) =>
+      unwrap<Bookmark>(api.PATCH("/api/v1/bookmarks/{bookmark_id}", { params: { path: { bookmark_id: id } }, body })),
+    { success: "Bookmark updated", invalidate: ["bookmarks"] },
+  )
+
+export const useDeleteBookmark = () =>
+  useCentralMutation(
+    (api, id: number) => unwrap(api.DELETE("/api/v1/bookmarks/{bookmark_id}", { params: { path: { bookmark_id: id } } })),
+    { success: "Bookmark deleted", invalidate: ["bookmarks"] },
+  )
 
 export function useAssignments() {
   const { url, api, poll } = useCentral()
