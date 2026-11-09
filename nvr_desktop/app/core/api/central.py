@@ -19,6 +19,7 @@ from app.core.api.models import (
     BackfillConfig,
     BackfillJob,
     BackfillProbe,
+    Bookmark,
     ExportJob,
     Camera,
     ClusterHealth,
@@ -184,6 +185,33 @@ class CentralApi:
 
     def export_download_url(self, export_id: str, access: str = "lan") -> str:
         return f"{self.base_url}/api/v1/exports/{export_id}/download?{urlencode({'access': access})}"
+
+    # ------------------------------------------------------------------ bookmarks
+    def bookmarks(self, *, camera_id: int | None = None, profile: str | None = None, q: str | None = None,
+                  start: datetime | None = None, end: datetime | None = None, order: str = "asc",
+                  limit: int = 200) -> list[Bookmark]:
+        """Search bookmarks. `start`/`end` = overlap with the window; `profile` also matches camera-wide ones."""
+        params: dict = {"order": order, "limit": limit}
+        if camera_id:
+            params["camera_id"] = camera_id
+        if profile:
+            params["profile"] = profile
+        if q and q.strip():
+            params["q"] = q.strip()
+        if start is not None:
+            params["start"] = start.isoformat()
+        if end is not None:
+            params["end"] = end.isoformat()
+        return [Bookmark.model_validate(row) for row in self._request("GET", "/api/v1/bookmarks", params=params)]
+
+    def create_bookmark(self, body: dict) -> Bookmark:
+        return Bookmark.model_validate(self._request("POST", "/api/v1/bookmarks", json=body))
+
+    def update_bookmark(self, bookmark_id: int, body: dict) -> Bookmark:
+        return Bookmark.model_validate(self._request("PATCH", f"/api/v1/bookmarks/{bookmark_id}", json=body))
+
+    def delete_bookmark(self, bookmark_id: int) -> None:
+        self._request("DELETE", f"/api/v1/bookmarks/{bookmark_id}")
 
     # ------------------------------------------------------------------ ONVIF H1
     def onvif_discover(self, node_id: int | None = None, seconds: float = 3.0) -> list[OnvifDiscovered]:

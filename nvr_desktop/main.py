@@ -96,6 +96,7 @@ def build_app():
     from app.features.nodes.store import NodesStore
     from app.features.onvif.store import DiscoverStore
     from app.features.encoder.store import EncoderStore
+    from app.features.playback.bookmarks_store import BookmarksStore
     from app.features.playback.store import PlaybackStore
     from app.features.settings.store import SettingsStore
     from app.video import register_video_types
@@ -109,6 +110,7 @@ def build_app():
     cluster = ClusterStore(ctx)
     cameras = CamerasStore(ctx)
     nodes = NodesStore(ctx)
+    playback = PlaybackStore(ctx, cameras, nodes)
     singletons = {
         "Prefs": prefs,
         "Toasts": toasts,
@@ -129,7 +131,8 @@ def build_app():
         "Live": LiveStore(ctx, cameras, nodes),
         "Ptz": PtzStore(ctx),
         "PtzWs": PtzWsStore(ctx, cameras, nodes),
-        "Playback": PlaybackStore(ctx, cameras, nodes),
+        "Playback": playback,
+        "Bookmarks": BookmarksStore(ctx, playback),
         "SettingsPage": SettingsStore(ctx),
     }
     for name, instance in singletons.items():

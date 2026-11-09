@@ -1,10 +1,12 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
 // Recording timeline (port of nvr_client/src/features/playback/Timeline.tsx): recorded ranges vs gaps
-// for the visible window, local-time ticks, a "now" marker, a hover line and the playhead.
-// Click to seek; drag to pan (when `pannable`). All times are epoch milliseconds.
+// for the visible window, local-time ticks, a "now" marker, markers (bookmarks), a hover line with a
+// preview picture, and the playhead. Click to seek (a click on a marker seeks to its exact start);
+// drag to pan (when `pannable`). All times are epoch milliseconds.
 ColumnLayout {
     id: timeline
 
@@ -17,6 +19,11 @@ ColumnLayout {
     property double boundsEnd: viewEnd
     property double playhead: -1   // < 0 = no playhead
     property bool pannable: false
+    // Placed markers [{id, t, x, width, color, label}] (features/playback/markers.py): x/width are 0..1,
+    // width null = a point in time.
+    property var markers: []
+    // Hover preview: function(ms) -> {url, at} or {} (gap); null = no previews.
+    property var thumbAt: null
     property int barHeight: 56
     signal seek(double ms)
     signal pan(double viewStart)
@@ -24,14 +31,31 @@ ColumnLayout {
     readonly property double span: Math.max(1, viewEnd - viewStart)
     property double now: Date.now()
     property double hover: -1
+    property var hoverMarker: null
+    // Debounced hover time for the preview (150 ms after the pointer settles, none while dragging).
+    property double thumbTime: -1
+    readonly property var thumb: thumbTime >= 0 && thumbAt ? thumbAt(thumbTime) : null
 
     function xOf(t) { return (t - viewStart) / span * track.width }
     function timeAt(x) { return viewStart + x / track.width * span }
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
+    // The marker under the pointer: a point within 5 px, or a range band under the bar.
+    function markerAt(x, y) {
+        for (let i = markers.length - 1; i >= 0; i--) {
+            const m = markers[i], mx = m.x * track.width
+            if (m.width === null || m.width === undefined) {
+                if (Math.abs(x - mx) <= 5) return m
+            } else if (x >= mx && x <= mx + m.width * track.width && y >= timeline.barHeight - 14) {
+                return m
+            }
+        }
+        return null
+    }
 
     spacing: 4
 
     Timer { interval: 5000; running: timeline.visible; repeat: true; onTriggered: timeline.now = Date.now() }
+    Timer { id: thumbTimer; interval: 150; onTriggered: timeline.thumbTime = timeline.hover }
 
     Item {
         id: track
@@ -104,6 +128,28 @@ ColumnLayout {
             }
         }
 
+        // markers (bookmarks; motion / ONVIF events later): a range is a band under the bar, a point a pin
+        Repeater {
+            model: timeline.markers
+            delegate: Item {
+                required property var modelData
+                readonly property color tint: modelData.color ? modelData.color : Theme.primary
+                readonly property bool isRange: modelData.width !== null && modelData.width !== undefined
+                x: modelData.x * track.width
+                Rectangle {
+                    visible: parent.isRange
+                    y: timeline.barHeight - 12
+                    width: parent.isRange ? modelData.width * track.width : 0
+                    height: 5
+                    radius: 2
+                    color: parent.tint
+                    opacity: 0.85
+                }
+                Rectangle { visible: !parent.isRange; x: -1; y: 16; width: 2; height: timeline.barHeight - 22; color: parent.tint }
+                Rectangle { visible: !parent.isRange; x: -3.5; y: timeline.barHeight - 10.5; width: 7; height: 7; radius: 3.5; color: parent.tint }
+            }
+        }
+
         // now
         Column {
             visible: timeline.now > timeline.viewStart && timeline.now < timeline.viewEnd
@@ -147,21 +193,35 @@ ColumnLayout {
             onPressed: mouse => { pressX = mouse.x; pressStart = timeline.viewStart; moved = false }
             onPositionChanged: mouse => {
                 timeline.hover = timeline.timeAt(mouse.x)
+                timeline.hoverMarker = timeline.markerAt(mouse.x, mouse.y)
+                if (!moved)
+                    thumbTimer.restart()
                 if (!pressed || !timeline.pannable)
                     return
                 const dx = mouse.x - pressX
-                if (Math.abs(dx) > 3)
+                if (Math.abs(dx) > 3 && !moved) {
                     moved = true
+                    thumbTimer.stop()
+                    timeline.thumbTime = -1
+                }
                 if (moved) {
                     const next = pressStart - dx / track.width * timeline.span
                     timeline.pan(timeline.clamp(next, timeline.boundsStart, timeline.boundsEnd - timeline.span))
                 }
             }
             onReleased: mouse => {
-                if (!moved)
-                    timeline.seek(timeline.clamp(timeline.timeAt(mouse.x), timeline.boundsStart, timeline.boundsEnd))
+                if (moved)
+                    return
+                const marker = timeline.markerAt(mouse.x, mouse.y)
+                const t = marker ? marker.t : timeline.timeAt(mouse.x)
+                timeline.seek(timeline.clamp(t, timeline.boundsStart, timeline.boundsEnd))
             }
-            onExited: timeline.hover = -1
+            onExited: {
+                timeline.hover = -1
+                timeline.hoverMarker = null
+                thumbTimer.stop()
+                timeline.thumbTime = -1
+            }
         }
     }
 
@@ -170,12 +230,70 @@ ColumnLayout {
         Text { text: Qt.formatDateTime(new Date(timeline.viewStart), "dd MMM HH:mm"); color: Theme.mutedForeground; font.family: Theme.font; font.pixelSize: 11 }
         Item { Layout.fillWidth: true }
         Text {
-            text: timeline.hover >= 0 ? Qt.formatDateTime(new Date(timeline.hover), "HH:mm:ss") : ""
+            text: timeline.hover < 0 ? "" : Qt.formatDateTime(new Date(timeline.hover), "HH:mm:ss")
+                  + (timeline.hoverMarker ? "  ·  " + timeline.hoverMarker.label : "")
+            elide: Text.ElideRight
+            Layout.maximumWidth: track.width * 0.6
             color: Theme.mutedForeground
             font.family: Theme.font
             font.pixelSize: 11
         }
         Item { Layout.fillWidth: true }
         Text { text: Qt.formatDateTime(new Date(timeline.viewEnd), "dd MMM HH:mm"); color: Theme.mutedForeground; font.family: Theme.font; font.pixelSize: 11 }
+    }
+
+    // Hover preview. A Popup lives in the window overlay, so the track's clip and the page Card can't
+    // cut it off (the bug the web client had); it sits just above the hover point, inside the window.
+    Popup {
+        id: thumbPopup
+        readonly property bool wanted: !!timeline.thumb && !!timeline.thumb.url && timeline.hover >= 0
+        readonly property point anchor: wanted && parent
+            ? track.mapToItem(parent, timeline.xOf(timeline.hover), 0) : Qt.point(0, 0)
+        parent: Overlay.overlay
+        visible: wanted
+        width: 168
+        padding: 4
+        modal: false
+        focus: false
+        closePolicy: Popup.NoAutoClose
+        x: parent ? timeline.clamp(anchor.x - width / 2, 8, parent.width - width - 8) : 0
+        y: anchor.y - height - 6
+        background: Rectangle { color: Theme.card; radius: Theme.radiusSm + 2; border.color: Theme.border }
+        contentItem: Column {
+            spacing: 3
+            Rectangle {
+                width: 160
+                height: 90
+                radius: 3
+                color: Theme.video
+                clip: true
+                Image {
+                    id: thumbImage
+                    anchors.fill: parent
+                    source: thumbPopup.wanted ? timeline.thumb.url : ""
+                    asynchronous: true
+                    cache: true
+                    fillMode: Image.PreserveAspectCrop
+                    sourceSize.width: 240
+                    visible: status === Image.Ready
+                }
+                Text {
+                    anchors.centerIn: parent
+                    visible: thumbImage.status !== Image.Ready
+                    text: thumbImage.status === Image.Error ? "No preview" : "Loading…"
+                    color: Theme.mutedForeground
+                    font.family: Theme.font
+                    font.pixelSize: 11
+                }
+            }
+            Text {
+                width: 160
+                horizontalAlignment: Text.AlignHCenter
+                text: thumbPopup.wanted ? Qt.formatDateTime(new Date(timeline.thumb.at), "HH:mm:ss") : ""
+                color: Theme.mutedForeground
+                font.family: Theme.font
+                font.pixelSize: 11
+            }
+        }
     }
 }

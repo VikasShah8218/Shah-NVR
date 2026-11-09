@@ -22,6 +22,7 @@ from app.core.poller import Poller
 from app.core.store import BaseStore
 from app.features.cameras.store import CamerasStore
 from app.features.nodes.store import NodesStore
+from app.features.playback.thumbs import thumb_target, thumbnail_url
 from app.features.playback.timeline import DAY, local_midnight, merge_ranges, parse_clock, ticks, to_ms
 
 
@@ -91,6 +92,11 @@ class PlaybackStore(BaseStore):
         self.setCamera(camera_id)
         if epoch_ms > 0:
             self.seek(epoch_ms)
+
+    @Slot(int, str, float)
+    def openBookmark(self, camera_id: int, profile: str, start_ms: float) -> None:
+        """Bookmarks panel: switch camera / profile / day as needed and play from the bookmark."""
+        self.openAt(camera_id, profile, start_ms)
 
     @Slot(str)
     def setProfile(self, profile: str) -> None:
@@ -224,6 +230,17 @@ class PlaybackStore(BaseStore):
             return False
         self.seek(self._day + offset)
         return True
+
+    @Slot(float, result="QVariant")
+    def thumbAt(self, epoch_ms: float) -> dict:
+        """Timeline hover preview: {url, at} for the chunk recorded at `epoch_ms`, or {} (gap / unknown node).
+
+        The picture comes straight from the node that holds the chunk (app/features/playback/thumbs.py)."""
+        target = thumb_target(self._timeline.get("segments", []), epoch_ms)
+        api_url = target and self._nodes.api_url(target["node_id"])
+        if not target or not api_url:
+            return {}
+        return {"url": thumbnail_url(api_url, target["segment_id"], target["at_ms"]), "at": target["slot_start"]}
 
     @Slot(float)
     def setPlayhead(self, epoch_ms: float) -> None:

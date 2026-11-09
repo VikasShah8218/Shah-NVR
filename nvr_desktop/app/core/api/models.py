@@ -467,3 +467,19 @@ class ExportJob(ApiModel):
     finished_at: datetime | None = None
     expires_at: datetime | None = None
     updated_at: datetime
+
+
+# ---------------------------------------------------------------- bookmarks (central /api/v1/bookmarks)
+class Bookmark(ApiModel):
+    id: int
+    camera_id: int
+    camera_name: str = ""
+    profile: str | None = None
+    start_time: datetime
+    end_time: datetime | None = None
+    note: str
+    label: str | None = None
+    color: str | None = None
+    author: str | None = None
+    created_at: datetime
+    updated_at: datetime

@@ -8,7 +8,8 @@ import "../../video"
 
 // Port of nvr_client/src/features/playback/PlaybackPage.tsx (+ VodPlayer.tsx):
 // camera / profile / day pickers, HH:MM:SS go-to, VLC URL, the recording player with its wall clock,
-// the day timeline (zoom, pan, click-to-play) and the chunks in view (click to play, download MP4).
+// frame step / reverse / speed, the day timeline (zoom, pan, click-to-play, bookmark markers, hover
+// previews), bookmarks (add, search, open) and the chunks in view (click to play, download MP4).
 PageScroll {
     id: root
     objectName: "playbackPage"
@@ -29,6 +30,18 @@ PageScroll {
     }
 
     Component.onCompleted: openFromRouter()
+
+    // , / . step one frame, K / Space play-pause (text fields keep their own typing). Arrows stay with zoom.
+    Shortcut { sequence: ","; enabled: root.hasSource; onActivated: video.player.frameBackStep() }
+    Shortcut { sequence: "."; enabled: root.hasSource; onActivated: video.player.frameStep() }
+    Shortcut { sequences: ["K", "Space"]; enabled: root.hasSource; onActivated: root.togglePlay() }
+
+    function togglePlay() {
+        if (video.player.reversing)
+            video.player.stopReverse()
+        else
+            video.player.paused = !video.player.paused
+    }
     Component.onDestruction: if (appWindow) appWindow.immersive = false
     Connections {
         target: Router
@@ -97,6 +110,14 @@ PageScroll {
         AppButton { text: "Go"; variant: "outline"; onClicked: Playback.goTo(gotoField.text) }
 
         Item { Layout.fillWidth: true }
+        AppButton {
+            objectName: "addBookmarkButton"
+            text: "Bookmark"
+            iconName: "bookmark-plus"
+            variant: "outline"
+            enabled: Playback.cameraId > 0
+            onClicked: bookmarkDialog.openAdd(root.hasSource ? Playback.playhead : 0)
+        }
         AppButton {
             text: "Export"
             iconName: "download"
@@ -199,7 +220,7 @@ PageScroll {
                         z: 2
                         visible: root.hasSource
                         doubleClickResets: false
-                        onClicked: video.player.paused = !video.player.paused
+                        onClicked: root.togglePlay()
                         onDoubleClicked: root.appWindow.immersive = !root.appWindow.immersive
                         onVisibleChanged: if (!visible) reset()
                     }
@@ -225,14 +246,25 @@ PageScroll {
                         AppButton { variant: "ghost"; size: "icon"; iconName: "skip-back"; tip: "Back 1 min"; enabled: root.hasSource; onClicked: video.player.seekRelative(-60) }
                         AppButton { variant: "ghost"; size: "icon"; iconName: "rewind"; tip: "Back 10 s"; enabled: root.hasSource; onClicked: video.player.seekRelative(-10) }
                         AppButton {
+                            objectName: "reverseButton"
+                            variant: video.player.reversing ? "secondary" : "ghost"
                             size: "icon"
-                            iconName: video.player.paused ? "play" : "pause"
+                            iconName: "undo-2"
+                            tip: video.player.reversing ? "Stop reverse play" : "Play backwards (" + video.player.speed + "×)"
+                            enabled: root.hasSource
+                            onClicked: video.player.reversing ? video.player.stopReverse() : video.player.startReverse(Playback.playFrom)
+                        }
+                        AppButton { variant: "ghost"; size: "icon"; iconName: "chevron-left"; tip: "Previous frame ( , )"; enabled: root.hasSource; onClicked: video.player.frameBackStep() }
+                        AppButton {
+                            size: "icon"
+                            iconName: video.player.paused && !video.player.reversing ? "play" : "pause"
                             implicitWidth: 36
                             implicitHeight: 36
                             radius: 18
                             enabled: root.hasSource
-                            onClicked: video.player.paused = !video.player.paused
+                            onClicked: root.togglePlay()
                         }
+                        AppButton { variant: "ghost"; size: "icon"; iconName: "chevron-right"; tip: "Next frame ( . )"; enabled: root.hasSource; onClicked: video.player.frameStep() }
                         AppButton { variant: "ghost"; size: "icon"; iconName: "fast-forward"; tip: "Forward 10 s"; enabled: root.hasSource; onClicked: video.player.seekRelative(10) }
                         AppButton { variant: "ghost"; size: "icon"; iconName: "skip-forward"; tip: "Forward 1 min"; enabled: root.hasSource; onClicked: video.player.seekRelative(60) }
                         AppText {
@@ -289,7 +321,7 @@ PageScroll {
                         AppSelect {
                             implicitWidth: 84
                             implicitHeight: 30
-                            options: [0.5, 1, 2, 4, 8].map(r => ({ value: r, label: r + "×" }))
+                            options: [0.5, 1, 2, 4, 8, 16].map(r => ({ value: r, label: (video.player.reversing ? "−" : "") + r + "×" }))
                             value: video.player.speed
                             onPicked: v => video.player.speed = v
                         }
@@ -353,9 +385,18 @@ PageScroll {
             boundsEnd: Playback.day + 86400000
             playhead: root.hasSource ? Playback.playhead : -1
             pannable: Playback.zoom < 86400000
+            markers: Bookmarks.markers
+            thumbAt: ms => Playback.thumbAt(ms)
             onSeek: ms => Playback.seek(ms)
             onPan: start => Playback.pan(start)
         }
+    }
+
+    // ================================================================= bookmarks
+    BookmarksPanel {
+        visible: Cameras.listModel.count > 0
+        Layout.fillWidth: true
+        dialog: bookmarkDialog
     }
 
     // ================================================================= chunks in view
@@ -472,4 +513,5 @@ PageScroll {
     }
 
     ExportDialog { id: exportDialog }
+    BookmarkDialog { id: bookmarkDialog }
 }

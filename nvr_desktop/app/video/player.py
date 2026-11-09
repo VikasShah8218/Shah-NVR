@@ -21,6 +21,10 @@ How it works
   RTSP paused <= RESUME_UNPAUSE_SECONDS just unpauses (it catches up to live); anything else reloads.
   For QUIET_RECONNECT_SECONDS after a resume, (re)connecting keeps the frozen frame and no
   "Connecting/Reconnecting" state; only a stream still without video after that shows "Reconnecting".
+* Playback extras: `frameStep()` / `frameBackStep()` use mpv's exact frame stepping. Reverse play
+  (`startReverse` / `stopReverse`) pauses and chains seeks backwards from a QTimer, anchored to wall
+  time (maths in app/features/playback/transport.py); a tick waits for the previous seek to finish
+  ("playback-restart"), so a slow decoder shows fewer frames instead of queueing seeks.
 
 Threads
 -------
@@ -50,6 +54,9 @@ from functools import partial
 import mpv
 from PySide6.QtCore import Property, QObject, Qt, QTimer, Signal, Slot
 
+from app.features.playback.transport import (
+    REVERSE_TICK_MS, ReverseAnchor, reverse_done, reverse_target, seek_precision,
+)
 from app.video import render_mode
 from app.video.profiles import BASE_OPTIONS, TIMELINE_EPOCH, options_for
 
@@ -59,6 +66,7 @@ MAX_BACKOFF_SECONDS = 30
 RESUME_UNPAUSE_SECONDS = 8      # measured: MediaMTX drops a paused RTSP reader after ~10 s
 QUIET_RECONNECT_SECONDS = 60    # after a resume, reconnect silently behind the frozen frame this long
 QUIET_RETRY_SECONDS = 2
+REVERSE_SEEK_TIMEOUT = 1.0      # give up waiting for a seek to finish after this (s) and seek again
 OBSERVED_PROPERTIES = ("video-params", "hwdec-current", "time-pos", "duration", "pause", "speed", "eof-reached")
 
 
@@ -156,6 +164,7 @@ class MpvPlayer(QObject):
     activeSourceChanged = Signal()
     suspendedChanged = Signal()
     eofReached = Signal()
+    reversingChanged = Signal()
     # for the surface (GUI thread)
     mpvCreated = Signal()  # the mpv.MPV now exists: create the render context
     frameReady = Signal()  # a new frame can be drawn
@@ -203,6 +212,14 @@ class MpvPlayer(QObject):
         self._play_timer.setSingleShot(True)
         self._play_timer.setInterval(0)
         self._play_timer.timeout.connect(self.play)
+
+        self._reversing = False
+        self._reverse_anchor: ReverseAnchor | None = None
+        self._reverse_floor = 0.0           # playlist start (player seconds): reverse stops here
+        self._reverse_seek_at: float | None = None  # monotonic time of the pending seek, None = none
+        self._reverse_timer = QTimer(self)
+        self._reverse_timer.setInterval(REVERSE_TICK_MS)
+        self._reverse_timer.timeout.connect(self._reverse_tick)
 
         self.bridge = MpvBridge(self)
         self.bridge.wake.connect(self._drain, Qt.ConnectionType.QueuedConnection)
@@ -269,10 +286,15 @@ class MpvPlayer(QObject):
         elif kind == "prop:pause":
             self._paused = bool(payload)
             self.pausedChanged.emit()
+            if not self._paused and self._reversing:
+                self.stopReverse()  # play pressed: forward again
         elif kind == "prop:speed":
             self._speed = float(payload or 1)
             self.speedChanged.emit()
+            if self._reversing:  # new rate: re-anchor so the speed changes from here
+                self._reverse_anchor = ReverseAnchor(self._time_pos, time.monotonic(), self._speed)
         elif kind == "playback-restart":
+            self._reverse_seek_at = None
             if not self._stopped:
                 self._set_state("playing")
                 self._end_quiet()
@@ -408,6 +430,7 @@ class MpvPlayer(QObject):
     def play(self) -> None:
         """(Re)start the current source from scratch."""
         self._play_timer.stop()
+        self.stopReverse()
         if not self._source:
             self.stop()
             return
@@ -420,6 +443,7 @@ class MpvPlayer(QObject):
 
     @Slot()
     def stop(self) -> None:
+        self.stopReverse()
         self._stopped = True
         self._retry_timer.stop()
         if self.mpv is not None:
@@ -435,6 +459,59 @@ class MpvPlayer(QObject):
     def seekRelative(self, seconds: float) -> None:
         if self.mpv is not None:
             self.mpv.seek(seconds, reference="relative", precision="exact")
+
+    @Slot()
+    def frameStep(self) -> None:
+        """Pause and show the exact next frame."""
+        self.stopReverse()
+        if self.mpv is not None:
+            self.mpv.command("frame-step")
+
+    @Slot()
+    def frameBackStep(self) -> None:
+        """Pause and show the exact previous frame (mpv decodes from the previous keyframe)."""
+        self.stopReverse()
+        if self.mpv is not None:
+            self.mpv.command("frame-back-step")
+
+    @Slot(float)
+    def startReverse(self, floor_epoch_ms: float) -> None:
+        """Playback only: play backwards at the current speed until the playlist start (`floor_epoch_ms`)."""
+        if self.mpv is None or self._mode != "playback" or self._reversing:
+            return
+        self._reverse_floor = max(0.0, floor_epoch_ms / 1000 - TIMELINE_EPOCH.timestamp())
+        if reverse_done(self._time_pos, self._reverse_floor):
+            return
+        self.mpv["pause"] = True
+        self._reverse_anchor = ReverseAnchor(self._time_pos, time.monotonic(), self._speed)
+        self._reverse_seek_at = None
+        self._reversing = True
+        self._reverse_timer.start()
+        self.reversingChanged.emit()
+
+    @Slot()
+    def stopReverse(self) -> None:
+        if not self._reversing:
+            return
+        self._reversing = False
+        self._reverse_timer.stop()
+        self._reverse_anchor = None
+        self.reversingChanged.emit()
+
+    @Slot()
+    def _reverse_tick(self) -> None:
+        anchor = self._reverse_anchor
+        if anchor is None or self.mpv is None:
+            self.stopReverse()
+            return
+        now = time.monotonic()
+        if self._reverse_seek_at is not None and now - self._reverse_seek_at < REVERSE_SEEK_TIMEOUT:
+            return  # the previous seek is still decoding
+        target = reverse_target(anchor, now, self._reverse_floor)
+        self._reverse_seek_at = now
+        self.mpv.seek(target, reference="absolute", precision=seek_precision(anchor.rate))
+        if reverse_done(target, self._reverse_floor):
+            self.stopReverse()
 
     @Slot(str, result=bool)
     def screenshot(self, path: str) -> bool:
@@ -463,6 +540,7 @@ class MpvPlayer(QObject):
 
     def _set_source(self, value: str) -> None:
         if value != self._source:
+            self.stopReverse()
             self._source = value
             self.sourceChanged.emit()
             self._play_timer.start()
@@ -562,6 +640,7 @@ class MpvPlayer(QObject):
                                  notify=liveBufferSecondsChanged)
     hwdec = Property(str, _get_hwdec, _set_hwdec, notify=hwdecChanged)
     paused = Property(bool, _get_paused, _set_paused, notify=pausedChanged)
+    reversing = Property(bool, lambda self: self._reversing, notify=reversingChanged)
     suspended = Property(bool, _get_suspended, _set_suspended, notify=suspendedChanged)
     speed = Property(float, _get_speed, _set_speed, notify=speedChanged)
     muted = Property(bool, _get_muted, _set_muted, notify=mutedChanged)
