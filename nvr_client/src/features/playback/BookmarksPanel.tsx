@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { fmtDateTime } from "@/lib/time"
 import { cn } from "@/lib/utils"
+import { Pager } from "@/components/Pager"
+import { useClampPage, usePaged } from "@/lib/usePaged"
 
 const COLORS = ["#f59e0b", "#ef4444", "#22c55e", "#3b82f6", "#8b5cf6"]
 const DURATIONS = [
@@ -132,18 +134,21 @@ export function BookmarkDialog({
   )
 }
 
+const BOOKMARKS_PER_PAGE = 25
+
 /** Searchable bookmark list: this camera or all cameras, newest first. Clicking one opens it in the player. */
 export function BookmarksPanel({ cameraId, onOpen }: { cameraId: number | null; onOpen: (b: Bookmark) => void }) {
   const [scope, setScope] = useState<"camera" | "all">("camera")
-  const [q, setQ] = useState("")
+  const paged = usePaged({ size: BOOKMARKS_PER_PAGE })
   const [editing, setEditing] = useState<Bookmark | null>(null)
   const [deleting, setDeleting] = useState<Bookmark | null>(null)
   const del = useDeleteBookmark()
   const list = useBookmarks(
-    { cameraId: scope === "camera" ? cameraId : undefined, q, order: "desc", limit: 100 },
+    { cameraId: scope === "camera" ? cameraId : undefined, q: paged.query, order: "desc", limit: paged.limit, offset: paged.offset },
     scope === "all" || cameraId != null,
   )
-  const rows = list.data ?? []
+  useClampPage(paged, list.data?.total)
+  const rows = list.data?.items ?? []
 
   return (
     <Card className="gap-2">
@@ -155,9 +160,9 @@ export function BookmarksPanel({ cameraId, onOpen }: { cameraId: number | null; 
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-0 flex-1 sm:w-56 sm:flex-none">
             <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
-            <Input className="pl-8" placeholder="Search notes" value={q} onChange={(e) => setQ(e.target.value)} />
+            <Input className="pl-8" placeholder="Search notes" value={paged.search} onChange={(e) => paged.setSearch(e.target.value)} />
           </div>
-          <ToggleGroup type="single" variant="outline" size="sm" value={scope} onValueChange={(v) => v && setScope(v as typeof scope)}>
+          <ToggleGroup type="single" variant="outline" size="sm" value={scope} onValueChange={(v) => { if (v) { setScope(v as typeof scope); paged.setPage(1) } }}>
             <ToggleGroupItem value="camera" className="px-3">This camera</ToggleGroupItem>
             <ToggleGroupItem value="all" className="px-3">All cameras</ToggleGroupItem>
           </ToggleGroup>
@@ -167,7 +172,7 @@ export function BookmarksPanel({ cameraId, onOpen }: { cameraId: number | null; 
         {list.error && <ErrorState error={list.error} />}
         {!list.error && rows.length === 0 && (
           <p className="py-2 text-sm text-muted-foreground">
-            {q.trim() ? "No bookmarks match." : "No bookmarks yet. Use “Bookmark” above the player to mark a moment."}
+            {paged.query ? "No bookmarks match." : "No bookmarks yet. Use “Bookmark” above the player to mark a moment."}
           </p>
         )}
         {rows.map((b) => (
@@ -197,6 +202,9 @@ export function BookmarksPanel({ cameraId, onOpen }: { cameraId: number | null; 
           </div>
         ))}
       </CardContent>
+      {list.data && (
+        <Pager className="px-6" page={paged.page} pageSize={paged.pageSize} total={list.data.total} onPage={paged.setPage} />
+      )}
       {editing && <BookmarkDialog open existing={editing} onOpenChange={(o) => !o && setEditing(null)} />}
       <ConfirmDialog
         open={deleting != null}

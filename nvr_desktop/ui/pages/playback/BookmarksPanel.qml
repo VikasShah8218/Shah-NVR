@@ -118,6 +118,15 @@ Card {
         }
     }
 
+    Pager {
+        objectName: "bookmarksPager"
+        Layout.fillWidth: true
+        page: Bookmarks.page
+        pageSize: Bookmarks.pageSize
+        total: Bookmarks.total
+        onPaged: p => Bookmarks.setPage(p)
+    }
+
     ConfirmDialog {
         id: confirmDelete
         title: "Delete this bookmark?"

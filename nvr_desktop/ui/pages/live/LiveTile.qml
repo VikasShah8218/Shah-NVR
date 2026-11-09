@@ -20,7 +20,7 @@ Rectangle {
     signal expand(int cameraId)
 
     readonly property var camera: {
-        Cameras.all // subscribe to camera updates, not just changes of the tile ID
+        Cameras.revision // re-evaluate when the camera cache changes (tiles are tracked by LiveStore)
         return cameraId ? Cameras.byId(cameraId) : null
     }
     readonly property bool selected: Live.selected === index

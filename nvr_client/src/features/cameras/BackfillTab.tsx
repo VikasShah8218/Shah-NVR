@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { useBackfill, useBackfillJobs, useCreateBackfillJob, useProbeBackfill, useUpdateBackfill } from "@/api/queries"
 import type { Camera } from "@/api/types"
 import { ErrorState, Field } from "@/components/common"
+import { Pager } from "@/components/Pager"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,9 +14,12 @@ import { fmtDateTime } from "@/lib/time"
 
 const ACTIVE = new Set(["QUEUED", "CLAIMED", "DOWNLOADING", "INDEXING"])
 
+const JOBS_PER_PAGE = 10
+
 export function BackfillTab({ camera: c, active }: { camera: Camera; active: boolean }) {
   const config = useBackfill(c.id, active)
-  const jobs = useBackfillJobs(c.id, active)
+  const [jobPage, setJobPage] = useState(1)
+  const jobs = useBackfillJobs(c.id, active, { limit: JOBS_PER_PAGE, offset: (jobPage - 1) * JOBS_PER_PAGE })
   const probe = useProbeBackfill()
   const update = useUpdateBackfill()
   const create = useCreateBackfillJob()
@@ -121,9 +125,9 @@ export function BackfillTab({ camera: c, active }: { camera: Camera; active: boo
       <Card>
         <CardHeader><CardTitle className="text-sm font-medium">Backfill jobs</CardTitle></CardHeader>
         <CardContent>
-          {!jobs.data?.length ? <p className="text-sm text-muted-foreground">No jobs yet.</p> : (
+          {!jobs.data?.total ? <p className="text-sm text-muted-foreground">No jobs yet.</p> : (
             <>
-            <div className="space-y-2 md:hidden">{jobs.data.map((job) => (
+            <div className="space-y-2 md:hidden">{jobs.data.items.map((job) => (
               <div key={job.id} className="space-y-2 rounded-lg border p-3">
                 <div className="flex items-center justify-between gap-2"><span className={job.state === "FAILED" ? "text-danger" : ACTIVE.has(job.state) ? "text-warning" : "text-success"}>{job.state}</span><span className="text-xs text-muted-foreground">{job.imported_seconds ? `${job.imported_seconds.toFixed(1)} s imported` : "—"}</span></div>
                 <div className="text-xs">{fmtDateTime(new Date(job.start_time))}<br />to {fmtDateTime(new Date(job.end_time))}</div>
@@ -133,7 +137,7 @@ export function BackfillTab({ camera: c, active }: { camera: Camera; active: boo
             ))}</div>
             <div className="hidden md:block"><Table>
               <TableHeader><TableRow><TableHead>Range</TableHead><TableHead>Status</TableHead><TableHead>Progress</TableHead><TableHead>Imported</TableHead><TableHead>Detail</TableHead></TableRow></TableHeader>
-              <TableBody>{jobs.data.map((job) => (
+              <TableBody>{jobs.data.items.map((job) => (
                 <TableRow key={job.id}>
                   <TableCell className="text-xs">{fmtDateTime(new Date(job.start_time))}<br />to {fmtDateTime(new Date(job.end_time))}</TableCell>
                   <TableCell className={job.state === "FAILED" ? "text-danger" : ACTIVE.has(job.state) ? "text-warning" : "text-success"}>{job.state}</TableCell>
@@ -143,6 +147,7 @@ export function BackfillTab({ camera: c, active }: { camera: Camera; active: boo
                 </TableRow>
               ))}</TableBody>
             </Table></div>
+            <Pager className="mt-2" page={jobPage} pageSize={JOBS_PER_PAGE} total={jobs.data.total} onPage={setJobPage} />
             </>
           )}
         </CardContent>

@@ -1,14 +1,13 @@
-"""Dashboard alerts derived from current state. Port of DashboardPage.tsx::buildAlerts (same rules)."""
+"""Dashboard alerts. Node alerts are built here from the node list (port of DashboardPage.tsx::buildNodeAlerts);
+camera alerts are built by central and paged (GET /api/v1/cluster/alerts), `camera_alert` turns one into a row."""
 
 from __future__ import annotations
 
 from app.core.format import format_bytes, format_percent, time_ago
-from app.core.status import tone_of
 from app.features.nodes.resources import node_resources
-from app.features.onvif.helpers import CLOCK_DRIFT_ALERT_SECONDS, format_offset
 
 
-def build_alerts(cameras: list[dict], nodes: list[dict]) -> list[dict]:
+def build_node_alerts(nodes: list[dict]) -> list[dict]:
     alerts: list[dict] = []
     for n in nodes:
         r = node_resources(n)
@@ -31,32 +30,15 @@ def build_alerts(cameras: list[dict], nodes: list[dict]) -> list[dict]:
             alerts.append({"level": "warning",
                            "title": f"{n['name']}: {format_percent(r['storagePercent'])} of storage caps used",
                            "detail": f"{format_bytes(r['recordings'])} of {format_bytes(r['quota'])}", **link})
-    for c in cameras:
-        if not c.get("enabled"):
-            continue
-        link = {"page": "camera", "id": c["id"]}
-        assignment = c.get("assignment") or {}
-        if not assignment.get("node_id"):
-            alerts.append({"level": "danger", "title": f"{c['name']} is not assigned to any node",
-                           "detail": "No node with free capacity", **link})
-            continue
-        if c.get("onvif_reachable") is False:
-            alerts.append({"level": "danger", "title": f"{c['name']}: ONVIF is not answering",
-                           "detail": "Open Device to check the camera address and connection.",
-                           "page": "camera", "id": c["id"], "tab": "device"})
-        offset = c.get("clock_offset_seconds")
-        if offset is not None and abs(offset) > CLOCK_DRIFT_ALERT_SECONDS:
-            alerts.append({"level": "warning", "title": f"{c['name']}: camera clock is off",
-                           "detail": f"Offset from its media node: {format_offset(offset)}",
-                           "page": "camera", "id": c["id"], "tab": "device"})
-        for s in c.get("streams", []):
-            if s.get("record") and s.get("status") not in ("RECORDING", "ASSIGNED"):
-                status = s.get("status") or "UNKNOWN"
-                alerts.append({"level": "danger" if tone_of(status) == "danger" else "warning",
-                               "title": f"{c['name']} ({s['profile']}) is {status.replace('_', ' ').lower()}",
-                               "detail": s.get("status_detail") or "Recording is not running", **link})
     alerts.sort(key=lambda a: 0 if a["level"] == "danger" else 1)
     for i, a in enumerate(alerts):
         a["key"] = i
         a.setdefault("tab", "")
     return alerts
+
+
+def camera_alert(a: dict, key: int) -> dict:
+    """A central camera alert as a dashboard row; ONVIF and clock alerts open the camera's Device tab."""
+    detail = f"{a['detail']} {time_ago(a['since'])}" if a.get("since") else a["detail"]
+    return {"key": key, "level": a["level"], "title": a["title"], "detail": detail, "page": "camera",
+            "id": a["camera_id"], "tab": "device" if a["kind"] in ("onvif", "clock") else ""}

@@ -138,7 +138,7 @@ class FakeApi:
 
     def bookmarks(self, **kw):
         self.calls.append(kw)
-        return [_bookmark(1, 60), _bookmark(2, 720)]
+        return [_bookmark(1, 60), _bookmark(2, 720)], 2
 
     def create_bookmark(self, body):
         self.created.append(body)
@@ -180,7 +180,8 @@ def test_day_markers_follow_the_selection_and_view(store):
 def test_panel_scope_and_newest_first(store):
     s, api, _playback = store
     s.refreshList()
-    assert api.calls[-1] == {"camera_id": 1, "q": "", "order": "desc", "limit": bm.PANEL_LIMIT}
+    assert api.calls[-1] == {"camera_id": 1, "q": "", "order": "desc", "limit": bm.PANEL_LIMIT, "offset": 0}
+    assert s.total == 2 and s.page == 1
     assert s.rows[0]["startMs"] > 0 and s.rows[0]["camera_name"] == "Gate"
     s.setScope("all")
     assert api.calls[-1]["camera_id"] is None

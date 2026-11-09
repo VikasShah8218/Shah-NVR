@@ -1,4 +1,5 @@
 import { ArrowLeft, Download } from "lucide-react"
+import { useState } from "react"
 import { Link, useParams } from "react-router"
 import { mediaFileUrl } from "@/api/client"
 import { useNode, useNodeAssignments, useNodePaths, useNodeSegments, useNodeStatus } from "@/api/queries"
@@ -22,6 +23,7 @@ import { ResourceCharts, useNodeHistory } from "./ResourceCharts"
 import { StorageTab } from "./StorageTab"
 import { OnvifServerTab } from "./OnvifServerTab"
 import { ConnectivityTab } from "./ConnectivityTab"
+import { Pager } from "@/components/Pager"
 
 export function NodeDetailPage() {
   const nodeId = Number(useParams().id)
@@ -270,14 +272,17 @@ function NodePaths({ apiUrl }: { apiUrl: string }) {
   )
 }
 
+const CHUNKS_PER_PAGE = 50
+
 function NodeChunks({ apiUrl }: { apiUrl: string }) {
-  const q = useNodeSegments(apiUrl, 100)
+  const [page, setPage] = useState(1)
+  const q = useNodeSegments(apiUrl, CHUNKS_PER_PAGE, (page - 1) * CHUNKS_PER_PAGE)
   if (q.error) return <ErrorState error={q.error} />
   if (!q.data) return <Loading />
-  if (!q.data.length) return <EmptyState title="No recorded chunks yet" />
+  if (!q.data.total) return <EmptyState title="No recorded chunks yet" />
   return (
     <Card className="py-0">
-      <div className="space-y-2 p-3 md:hidden">{q.data.map((s) => <div key={s.id} className="flex items-center gap-3 rounded-lg border p-3"><div className="min-w-0 flex-1"><div className="text-sm tabular-nums">{fmtDateTime(new Date(s.start_time))}</div><Link to={`/cameras/${s.camera_id}`} className="text-xs text-primary">cam-{s.camera_id}/{s.profile}</Link><div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground"><span>{formatDuration(s.duration_ms)}</span><span>{formatBytes(s.size_bytes)}</span><span>{s.codec ?? "—"}</span><span>{s.uploaded ? "In catalog" : "Pending"}</span></div></div><Button variant="ghost" size="icon" className="size-11 shrink-0" asChild><a href={mediaFileUrl(apiUrl, s.id)} download title="Download MP4"><Download className="size-4" /></a></Button></div>)}</div>
+      <div className="space-y-2 p-3 md:hidden">{q.data.items.map((s) => <div key={s.id} className="flex items-center gap-3 rounded-lg border p-3"><div className="min-w-0 flex-1"><div className="text-sm tabular-nums">{fmtDateTime(new Date(s.start_time))}</div><Link to={`/cameras/${s.camera_id}`} className="text-xs text-primary">cam-{s.camera_id}/{s.profile}</Link><div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground"><span>{formatDuration(s.duration_ms)}</span><span>{formatBytes(s.size_bytes)}</span><span>{s.codec ?? "—"}</span><span>{s.uploaded ? "In catalog" : "Pending"}</span></div></div><Button variant="ghost" size="icon" className="size-11 shrink-0" asChild><a href={mediaFileUrl(apiUrl, s.id)} download title="Download MP4"><Download className="size-4" /></a></Button></div>)}</div>
       <div className="hidden md:block"><Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -292,7 +297,7 @@ function NodeChunks({ apiUrl }: { apiUrl: string }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {q.data.map((s) => (
+          {q.data.items.map((s) => (
             <TableRow key={s.id}>
               <TableCell className="tabular-nums">{fmtDateTime(new Date(s.start_time))}</TableCell>
               <TableCell>
@@ -322,6 +327,7 @@ function NodeChunks({ apiUrl }: { apiUrl: string }) {
           ))}
         </TableBody>
       </Table></div>
+      <Pager className="px-4 py-2" page={page} pageSize={CHUNKS_PER_PAGE} total={q.data.total} onPage={setPage} />
     </Card>
   )
 }

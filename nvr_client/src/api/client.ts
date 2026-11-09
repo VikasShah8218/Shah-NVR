@@ -1,4 +1,5 @@
 import createClient from "openapi-fetch"
+import type { Paged } from "@/lib/pager"
 import type { paths as CentralPaths } from "./central"
 import type { paths as NodePaths } from "./node"
 import type { ExportCreate, ExportJob } from "./types"
@@ -117,8 +118,8 @@ async function exportFetch<T>(centralUrl: string, path: string, init?: RequestIn
   return response.json() as Promise<T>
 }
 
-export const listExports = (centralUrl: string, cameraId: number) =>
-  exportFetch<ExportJob[]>(centralUrl, `/api/v1/exports?camera_id=${cameraId}&limit=50`)
+export const listExports = (centralUrl: string, cameraId: number, limit = 10, offset = 0) =>
+  exportFetch<Paged<ExportJob>>(centralUrl, `/api/v1/exports?camera_id=${cameraId}&limit=${limit}&offset=${offset}`)
 export const createExport = (centralUrl: string, body: ExportCreate) =>
   exportFetch<ExportJob>(centralUrl, "/api/v1/exports", { method: "POST", body: JSON.stringify(body) })
 export const cancelExport = (centralUrl: string, id: string) =>

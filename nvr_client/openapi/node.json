@@ -414,7 +414,7 @@
         "tags": [
           "Recorded media"
         ],
-        "summary": "Chunks stored on this node (debug)",
+        "summary": "Chunks stored on this node, newest first (paged)",
         "operationId": "list_local_segments_api_v1_segments_get",
         "parameters": [
           {
@@ -439,8 +439,21 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
             }
           }
         ],
@@ -450,11 +463,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/LocalSegmentOut"
-                  },
-                  "title": "Response List Local Segments Api V1 Segments Get"
+                  "$ref": "#/components/schemas/LocalSegmentPage"
                 }
               }
             }
@@ -2113,6 +2122,38 @@
           "uploaded"
         ],
         "title": "LocalSegmentOut"
+      },
+      "LocalSegmentPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LocalSegmentOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "LocalSegmentPage",
+        "description": "One page of GET /api/v1/segments (same shape as central's paged lists)."
       },
       "NetworkOut": {
         "properties": {

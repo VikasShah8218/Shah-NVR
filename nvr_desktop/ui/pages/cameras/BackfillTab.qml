@@ -71,5 +71,12 @@ ColumnLayout {
                 AppText { text: modelData.error_message ?? ("Attempt " + modelData.attempt_count); variant: "small"; Layout.preferredWidth: 220 }
             }
         }
+        Pager {
+            Layout.fillWidth: true
+            page: Backfill.jobPage
+            pageSize: Backfill.jobPageSize
+            total: Backfill.jobTotal
+            onPaged: p => Backfill.setJobPage(p)
+        }
     }
 }

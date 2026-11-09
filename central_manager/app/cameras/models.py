@@ -61,6 +61,7 @@ class Camera(Model):
 
     class Meta:
         table = "cameras"
+        indexes = (("name", "id"),)  # paged camera list is ordered by name, id
         ordering = ["id"]
 
 
@@ -98,6 +99,7 @@ class CameraStream(Model):
     class Meta:
         table = "camera_streams"
         unique_together = (("camera", "profile"),)
+        indexes = (("status",),)  # camera list "status" filter
         ordering = ["id"]
 
     def path_name(self) -> str:

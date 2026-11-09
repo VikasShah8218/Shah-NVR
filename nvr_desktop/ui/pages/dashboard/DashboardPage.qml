@@ -80,11 +80,27 @@ PageScroll {
                 spacing: 8
                 Icon { name: "triangle-alert"; color: Theme.warning; size: 16 }
                 AppText { text: "Alerts"; font.pixelSize: Theme.textLg; font.weight: Font.Medium }
-                AppText { text: "(" + Dashboard.alerts.count + ")"; variant: "muted" }
+                AppText { text: "(" + Dashboard.alertCounts.all + ")"; variant: "muted" }
+                Item { Layout.fillWidth: true }
+                ToggleGroup {
+                    objectName: "alertLevel"
+                    visible: Dashboard.alertCounts.all > 0
+                    options: [{ value: "all", label: "All" },
+                              { value: "danger", label: "Danger (" + Dashboard.alertCounts.danger + ")" },
+                              { value: "warning", label: "Warning (" + Dashboard.alertCounts.warning + ")" }]
+                    value: Dashboard.level
+                    onPicked: v => Dashboard.setLevel(v)
+                }
+            }
+
+            AppText {
+                visible: Dashboard.alertCounts.all > 0 && Dashboard.alerts.count === 0
+                text: "No " + Dashboard.level + " alerts."
+                variant: "muted"
             }
 
             Rectangle {
-                visible: Dashboard.alerts.count === 0
+                visible: Dashboard.alertCounts.all === 0
                 Layout.fillWidth: true
                 implicitHeight: 48
                 radius: Theme.radius
@@ -133,6 +149,16 @@ PageScroll {
                         onClicked: Router.go(page, model.id, tab ? { tab: tab } : {})
                     }
                 }
+            }
+
+            // node alerts stay on top of every page; camera alerts are paged by central
+            Pager {
+                objectName: "alertsPager"
+                Layout.fillWidth: true
+                page: Dashboard.alertPage
+                pageSize: Dashboard.alertPageSize
+                total: Dashboard.cameraAlertTotal
+                onPaged: p => Dashboard.setAlertPage(p)
             }
         }
 

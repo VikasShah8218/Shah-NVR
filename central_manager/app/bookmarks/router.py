@@ -12,6 +12,7 @@ from tortoise.expressions import Q
 from app.bookmarks.models import Bookmark
 from app.bookmarks.schemas import BookmarkCreate, BookmarkOut, BookmarkUpdate, _utc
 from app.cameras.models import Camera
+from utilities.pagination import Page
 
 router = APIRouter(prefix="/api/v1/bookmarks", tags=["Bookmarks"])
 
@@ -39,7 +40,7 @@ async def create_bookmark(body: BookmarkCreate):
     return _out(await _get(b.id))
 
 
-@router.get("", response_model=list[BookmarkOut], summary="List / search bookmarks")
+@router.get("", response_model=Page[BookmarkOut], summary="List / search bookmarks (paged)")
 async def list_bookmarks(
     camera_id: int | None = None,
     profile: str | None = Query(default=None, description="Also includes camera-wide bookmarks (no profile)"),
@@ -47,7 +48,8 @@ async def list_bookmarks(
     start: datetime | None = Query(default=None, description="Only bookmarks overlapping [start, end)"),
     end: datetime | None = None,
     order: Literal["asc", "desc"] = Query(default="asc", description="By start time; desc = newest first"),
-    limit: int = Query(default=200, ge=1, le=1000),
+    limit: int = Query(default=200, ge=1, le=1000, description="Up to 1000 (a whole day of timeline markers)"),
+    offset: int = Query(default=0, ge=0),
 ):
     qs = Bookmark.all()
     if camera_id is not None:
@@ -66,8 +68,9 @@ async def list_bookmarks(
         # A range overlaps when it ends at/after `start`; a point when it is at/after `start`.
         qs = qs.filter(Q(end_time__gte=start) | Q(end_time__isnull=True, start_time__gte=start))
     ordering = ("start_time", "id") if order == "asc" else ("-start_time", "-id")
-    rows = await qs.order_by(*ordering).limit(limit).prefetch_related("camera")
-    return [_out(b) for b in rows]
+    total = await qs.count()
+    rows = await qs.order_by(*ordering).offset(offset).limit(limit).prefetch_related("camera")
+    return Page(items=[_out(b) for b in rows], total=total, limit=limit, offset=offset)
 
 
 @router.get("/{bookmark_id}", response_model=BookmarkOut)

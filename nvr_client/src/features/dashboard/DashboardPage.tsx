@@ -1,13 +1,15 @@
 import { AlertTriangle, CheckCircle2, CircleAlert, Database, HardDrive, Server, Video } from "lucide-react"
+import { useState } from "react"
 import { Link } from "react-router"
-import { useCameras, useClusterHealth, useNodes } from "@/api/queries"
-import type { Camera, MediaNode } from "@/api/types"
+import { useAlerts, useClusterHealth, useNodes } from "@/api/queries"
+import type { CameraAlert, MediaNode } from "@/api/types"
 import { ErrorState, KpiCard, Loading, PageHeader } from "@/components/common"
-import { StatusBadge, toneOf } from "@/components/StatusBadge"
+import { Pager } from "@/components/Pager"
+import { StatusBadge } from "@/components/StatusBadge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { UsageBar, UsageMeter } from "@/components/UsageBar"
 import { formatBytes, formatMbps, formatPercent, timeAgo } from "@/lib/format"
-import { CLOCK_DRIFT_ALERT_SECONDS, formatOffset } from "@/lib/onvif"
 import { cn } from "@/lib/utils"
 import { isNodeHealthy, nodeResources } from "../nodes/nodeUtils"
 
@@ -18,7 +20,8 @@ interface Alert {
   to: string
 }
 
-function buildAlerts(cameras: Camera[], nodes: MediaNode[]): Alert[] {
+/** Node alerts (tens of nodes, built here from the node list). Camera alerts come from central, paged. */
+function buildNodeAlerts(nodes: MediaNode[]): Alert[] {
   const alerts: Alert[] = []
   for (const n of nodes) {
     const r = nodeResources(n)
@@ -33,44 +36,42 @@ function buildAlerts(cameras: Camera[], nodes: MediaNode[]): Alert[] {
     else if (r.quota != null && r.storagePercent != null && r.storagePercent >= 85)
       alerts.push({ level: "warning", title: `${n.name}: ${formatPercent(r.storagePercent)} of storage caps used`, detail: `${formatBytes(r.recordings)} of ${formatBytes(r.quota)}`, to: `/nodes/${n.id}` })
   }
-  for (const c of cameras) {
-    if (!c.enabled) continue
-    if (!c.assignment?.node_id) {
-      alerts.push({ level: "danger", title: `${c.name} is not assigned to any node`, detail: "No node with free capacity", to: `/cameras/${c.id}` })
-      continue
-    }
-    for (const s of c.streams) {
-      if (s.record && s.status !== "RECORDING" && s.status !== "ASSIGNED")
-        alerts.push({
-          level: toneOf(s.status) === "danger" ? "danger" : "warning",
-          title: `${c.name} (${s.profile}) is ${s.status.replace(/_/g, " ").toLowerCase()}`,
-          detail: s.status_detail ?? "Recording is not running",
-          to: `/cameras/${c.id}`,
-        })
-    }
-    if (c.onvif_reachable === false)
-      alerts.push({ level: "warning", title: `${c.name}: ONVIF not answering`, detail: `last check ${timeAgo(c.onvif_checked_at)}`, to: `/cameras/${c.id}` })
-    else if (c.clock_offset_seconds != null && Math.abs(c.clock_offset_seconds) > CLOCK_DRIFT_ALERT_SECONDS)
-      alerts.push({ level: "warning", title: `${c.name}: camera clock ${formatOffset(c.clock_offset_seconds)} off`, detail: "Open the Device tab to sync the time or set NTP", to: `/cameras/${c.id}` })
-  }
   return alerts.sort((a, b) => (a.level === b.level ? 0 : a.level === "danger" ? -1 : 1))
 }
+
+const cameraAlert = (a: CameraAlert): Alert => ({
+  level: a.level,
+  title: a.title,
+  detail: a.since ? `${a.detail} ${timeAgo(a.since)}` : a.detail,
+  to: `/cameras/${a.camera_id}`,
+})
+
+const ALERTS_PER_PAGE = 10
 
 export function DashboardPage() {
   const health = useClusterHealth()
   const nodes = useNodes()
-  const cameras = useCameras()
+  const [level, setLevel] = useState<"all" | "danger" | "warning">("all")
+  const [alertPage, setAlertPage] = useState(1)
+  const cameraAlerts = useAlerts({
+    level: level === "all" ? undefined : level, limit: ALERTS_PER_PAGE, offset: (alertPage - 1) * ALERTS_PER_PAGE,
+  })
 
-  if (health.isLoading || nodes.isLoading || cameras.isLoading) return <Loading />
-  const error = health.error ?? nodes.error ?? cameras.error
+  if (health.isLoading || nodes.isLoading || cameraAlerts.isLoading) return <Loading />
+  const error = health.error ?? nodes.error ?? cameraAlerts.error
   if (error) return <ErrorState error={error} />
 
   const h = health.data!
   const nodeList = nodes.data ?? []
-  const cameraList = cameras.data ?? []
-  const alerts = buildAlerts(cameraList, nodeList)
+  const nodeAlerts = buildNodeAlerts(nodeList)
+  const shownNodeAlerts = nodeAlerts.filter((a) => level === "all" || a.level === level)
+  const camPage = cameraAlerts.data!
+  // Node alerts (few) stay on top of every page; camera alerts are paged by central.
+  const alerts = [...shownNodeAlerts, ...camPage.items.map(cameraAlert)]
+  const alertCount = nodeAlerts.length + camPage.counts.danger + camPage.counts.warning
+  const dangerCount = nodeAlerts.filter((a) => a.level === "danger").length + camPage.counts.danger
   const recording = h.streams_by_status.RECORDING ?? 0
-  const recordStreams = cameraList.filter((c) => c.enabled).flatMap((c) => c.streams.filter((s) => s.record)).length
+  const recordStreams = h.record_streams
   const healthy = nodeList.filter(isNodeHealthy).length
   const rs = nodeList.map(nodeResources)
   const storage = rs.reduce((a, r) => a + (r.recordings ?? 0), 0)
@@ -96,14 +97,22 @@ export function DashboardPage() {
 
       <div className="grid gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2">
-          <CardHeader>
+          <CardHeader className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <AlertTriangle className="size-4 text-warning" /> Alerts
-              <span className="text-sm font-normal text-muted-foreground">({alerts.length})</span>
+              <span className="text-sm font-normal text-muted-foreground">({alertCount})</span>
             </CardTitle>
+            {alertCount > 0 && (
+              <ToggleGroup type="single" variant="outline" size="sm" value={level}
+                onValueChange={(v) => { if (v) { setLevel(v as typeof level); setAlertPage(1) } }}>
+                <ToggleGroupItem value="all" className="px-3">All</ToggleGroupItem>
+                <ToggleGroupItem value="danger" className="px-3">Danger ({dangerCount})</ToggleGroupItem>
+                <ToggleGroupItem value="warning" className="px-3">Warning ({alertCount - dangerCount})</ToggleGroupItem>
+              </ToggleGroup>
+            )}
           </CardHeader>
           <CardContent>
-            {alerts.length === 0 ? (
+            {alertCount === 0 ? (
               <div className="flex items-center gap-2 rounded-lg bg-success/10 p-4 text-sm text-success">
                 <CheckCircle2 className="size-4" /> All cameras are recording and all nodes are healthy.
               </div>
@@ -120,8 +129,11 @@ export function DashboardPage() {
                     </Link>
                   </li>
                 ))}
+                {alerts.length === 0 && <li className="py-2.5 text-sm text-muted-foreground">No {level} alerts.</li>}
               </ul>
             )}
+            <Pager className="mt-2 border-t pt-2" page={alertPage} pageSize={ALERTS_PER_PAGE} total={camPage.total}
+              onPage={setAlertPage} />
           </CardContent>
         </Card>
 

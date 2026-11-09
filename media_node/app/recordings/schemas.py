@@ -24,3 +24,12 @@ class LocalSegmentOut(BaseModel):
     backfill_job_id: UUID | None = None
     part_count: int
     uploaded: bool
+
+
+class LocalSegmentPage(BaseModel):
+    """One page of GET /api/v1/segments (same shape as central's paged lists)."""
+
+    items: list[LocalSegmentOut]
+    total: int
+    limit: int
+    offset: int

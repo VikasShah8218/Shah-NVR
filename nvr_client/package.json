@@ -13,6 +13,7 @@
     "test:markers": "node --experimental-strip-types --test tests/markers.test.ts",
     "test:transport": "node --experimental-strip-types --test tests/transport.test.ts",
     "test:thumbs": "node --experimental-strip-types --test tests/thumbs.test.ts",
+    "test:pager": "node --experimental-strip-types --test tests/pager.test.ts",
     "preview": "vite preview",
     "gen:api": "openapi-typescript openapi/central.json -o src/api/central.d.ts && openapi-typescript openapi/node.json -o src/api/node.d.ts"
   },

@@ -117,6 +117,18 @@ class CameraOut(BaseModel):
     assignment: AssignmentInfo | None
 
 
+class CameraOption(BaseModel):
+    """One row of a camera picker / live sidebar (GET /api/v1/cameras/options)."""
+
+    id: int
+    name: str
+    enabled: bool
+    has_ptz: bool
+    profiles: list[str]  # stream profiles, e.g. ["main", "sub"]
+    status: StreamStatus  # the recording stream's state (first stream if none records); DISABLED when disabled
+    node_id: int | None  # assigned media node, if any
+
+
 class LiveStreamUrls(BaseModel):
     profile: str
     codec_note: str = "Codec is passed through from the camera (no transcoding)."

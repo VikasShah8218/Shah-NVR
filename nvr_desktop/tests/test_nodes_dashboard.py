@@ -1,4 +1,4 @@
-from app.features.dashboard.alerts import build_alerts
+from app.features.dashboard.alerts import build_node_alerts, camera_alert
 from app.features.nodes.resources import cluster_totals, is_healthy, node_resources
 
 GB = 1024**3
@@ -55,27 +55,22 @@ def test_cluster_totals():
     assert is_healthy(nodes[0]) and not is_healthy(nodes[1])
 
 
-def test_alerts_rules_and_order():
+def test_node_alerts_rules_and_order():
     node = make_node(state="UNREACHABLE")
     node["metrics"]["recordings_bytes"] = 90 * GB  # 90% of quota
-    cameras = [
-        {"id": 1, "name": "Gate", "enabled": True, "assignment": {"node_id": 1},
-         "streams": [{"profile": "main", "record": True, "status": "NOT_RECORDING", "status_detail": "timeout"}]},
-        {"id": 2, "name": "Lobby", "enabled": True, "assignment": None, "streams": []},
-        {"id": 3, "name": "Off", "enabled": False, "assignment": None, "streams": []},
-        {"id": 4, "name": "Fine", "enabled": True, "assignment": {"node_id": 1},
-         "streams": [{"profile": "main", "record": True, "status": "RECORDING"}]},
-    ]
-    alerts = build_alerts(cameras, [node])
+    alerts = build_node_alerts([node, make_node(id=2, name="node-2")])
     titles = [a["title"] for a in alerts]
-    assert "node-1 is unreachable" in titles
-    assert "node-1: 90% of storage caps used" in titles
-    assert "Gate (main) is not recording" in titles
-    assert "Lobby is not assigned to any node" in titles
-    assert not any("Off" in t or "Fine" in t for t in titles)
-    levels = [a["level"] for a in alerts]
-    assert levels == sorted(levels, key=lambda lv: 0 if lv == "danger" else 1)  # danger first
+    assert titles == ["node-1 is unreachable", "node-1: 90% of storage caps used"]  # danger first, healthy node silent
     assert [a["key"] for a in alerts] == list(range(len(alerts)))
+    assert alerts[0]["page"] == "node" and alerts[0]["id"] == 1
+
+
+def test_camera_alert_rows_from_central():
+    """Camera rules run on central (GET /api/v1/cluster/alerts); the client only turns rows into links."""
+    stream = camera_alert({"level": "danger", "kind": "stream", "title": "Gate (main) is not recording",
+                           "detail": "timeout", "since": None, "camera_id": 1, "camera_name": "Gate"}, 3)
+    assert stream == {"key": 3, "level": "danger", "title": "Gate (main) is not recording", "detail": "timeout",
+                      "page": "camera", "id": 1, "tab": ""}
 
 
 
@@ -104,7 +99,7 @@ def test_resources_add_up_storage_volumes():
 def test_all_full_and_offline_storage_alerts():
     node = make_node(volumes=[vol(1, "FULL", quota=10 * GB, used=10 * GB), vol(2, "ERROR", quota=10 * GB)])
     node["volumes"][1]["state_detail"] = "Access denied"
-    titles = {a["title"]: a for a in build_alerts([], [node])}
+    titles = {a["title"]: a for a in build_node_alerts([node])}
     assert "node-1: storage error" in titles and "Access denied" in titles["node-1: storage error"]["detail"]
     node["volumes"][1]["state"] = "FULL"
-    assert "node-1: all storage full" in {a["title"] for a in build_alerts([], [node])}
+    assert "node-1: all storage full" in {a["title"] for a in build_node_alerts([node])}

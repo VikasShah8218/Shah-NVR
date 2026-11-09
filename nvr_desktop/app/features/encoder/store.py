@@ -56,6 +56,7 @@ class EncoderStore(QObject):
         if (camera_id, profile) == (self._cid, self._profile):
             return
         self._cid, self._profile = camera_id, profile
+        self._cameras.track("encoder", [camera_id])  # the camera's streams (audio bitrate) for the view
         self._reset()
         self.targetChanged.emit()
         self.changed.emit()
@@ -250,11 +251,12 @@ class EncoderStore(QObject):
         values = changed_values(self._state.get("current") or {}, self._draft)
         if not values:
             return
-        targets = deepcopy([c for c in self._cameras.cameras() if c["id"] in self._selected])[:20]
+        selected = sorted(self._selected)[:20]
         self._invalidate_review()
         profile = self._profile
         def work(api, cid, p, cancel):
             ready, results = [], []
+            targets = [c.to_qml() for c in api.cameras_by_ids(selected)]  # full rows of just the picked cameras
             for camera in targets:
                 if cancel.is_set():
                     break

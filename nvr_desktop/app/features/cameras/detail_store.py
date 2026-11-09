@@ -20,6 +20,8 @@ from app.features.playback.timeline import DAY, merge_ranges, ticks
 from app.features.nodes.store import NodesStore
 
 
+HISTORY_PER_PAGE = 10
+
 class CameraDetailStore(BaseStore):
     cameraIdChanged = Signal()
     cameraChanged = Signal()
@@ -37,6 +39,8 @@ class CameraDetailStore(BaseStore):
         self._live: dict = {}
         self._live_error = ""
         self._history: list[dict] = []
+        self._history_page = 1
+        self._history_total = 0
         self._recordings: dict = {}
         self._recordings_profile = ""
         self._device: dict = {}
@@ -62,6 +66,7 @@ class CameraDetailStore(BaseStore):
         self._camera_id = value
         self._device_generation += 1
         self._camera, self._live, self._history, self._recordings = {}, {}, [], {}
+        self._history_page, self._history_total = 1, 0
         self._recordings_profile, self._live_error = "", ""
         self._device, self._device_error, self._device_busy = {}, "", False
         self._set_loading(True)
@@ -88,8 +93,23 @@ class CameraDetailStore(BaseStore):
         if not cid:
             return
         self.fetch("camera", lambda: self.api.camera(cid).to_qml(), lambda c: self._apply_camera(cid, c))
-        self.fetch("history", lambda: [h.to_qml() for h in self.api.assignment_history(cid)],
-                   lambda h: self._apply_history(cid, h), track_error=False)
+        self._refresh_history()
+
+    def _refresh_history(self) -> None:
+        cid, page = self._camera_id, self._history_page
+
+        def load():
+            rows, total = self.api.assignment_history(cid, limit=HISTORY_PER_PAGE, offset=(page - 1) * HISTORY_PER_PAGE)
+            return [h.to_qml() for h in rows], total
+
+        self.fetch("history", load, lambda result: self._apply_history(cid, page, *result), track_error=False)
+
+    @Slot(int)
+    def setHistoryPage(self, page: int) -> None:
+        if page >= 1 and page != self._history_page:
+            self._history_page = page
+            self.historyChanged.emit()
+            self._refresh_history()
 
     def _refresh_slow(self) -> None:
         cid = self._camera_id
@@ -120,7 +140,10 @@ class CameraDetailStore(BaseStore):
             self._live, self._live_error = live, error
             self.liveChanged.emit()
 
-    def _apply_history(self, cid: int, history: list[dict]) -> None:
+    def _apply_history(self, cid: int, page: int, history: list[dict], total: int) -> None:
+        if page != self._history_page:
+            return
+        self._history_total = total
         if cid == self._camera_id:
             self._history = history
             self.historyChanged.emit()
@@ -252,6 +275,9 @@ class CameraDetailStore(BaseStore):
     live = Property("QVariant", lambda self: self._live, notify=liveChanged)
     liveError = Property(str, lambda self: self._live_error, notify=liveChanged)
     history = Property("QVariantList", lambda self: self._history, notify=historyChanged)
+    historyPage = Property(int, lambda self: self._history_page, notify=historyChanged)
+    historyTotal = Property(int, lambda self: self._history_total, notify=historyChanged)
+    historyPageSize = Property(int, lambda self: HISTORY_PER_PAGE, constant=True)
     recordings = Property("QVariant", lambda self: self._recordings, notify=recordingsChanged)
     recordingsProfile = Property(str, lambda self: self._recordings_profile, notify=recordingsChanged)
     device = Property("QVariant", lambda self: self._device, notify=deviceChanged)

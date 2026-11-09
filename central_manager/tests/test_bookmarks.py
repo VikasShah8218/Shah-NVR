@@ -29,9 +29,10 @@ def run(fn):
 
 async def search(**kw):
     """list_bookmarks with its Query() defaults filled in (called directly, not through HTTP)."""
-    args = {"camera_id": None, "profile": None, "q": None, "start": None, "end": None, "order": "asc", "limit": 200}
+    args = {"camera_id": None, "profile": None, "q": None, "start": None, "end": None, "order": "asc", "limit": 200,
+            "offset": 0}
     args.update(kw)
-    return await list_bookmarks(**args)
+    return (await list_bookmarks(**args)).items
 
 
 def at(minutes: float) -> datetime:

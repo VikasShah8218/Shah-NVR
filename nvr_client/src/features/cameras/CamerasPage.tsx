@@ -1,9 +1,10 @@
 import { Camera as CameraIcon, History, MonitorPlay, MoreHorizontal, Pencil, Plus, Radar, Search, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { Link, useNavigate } from "react-router"
-import { useCameras, useDeleteCamera, useUpdateCamera } from "@/api/queries"
+import { type CameraQuery, useDeleteCamera, usePagedCameras, useUpdateCamera } from "@/api/queries"
 import type { Camera } from "@/api/types"
 import { ConfirmDialog, EmptyState, ErrorState, Loading, PageHeader } from "@/components/common"
+import { Pager } from "@/components/Pager"
 import { StatusBadge } from "@/components/StatusBadge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -15,19 +16,30 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { retentionLabel, timeAgo } from "@/lib/format"
+import { useClampPage, usePaged } from "@/lib/usePaged"
 import { CameraFormSheet } from "./CameraFormSheet"
 
-export function CamerasPage() {
-  const cameras = useCameras()
-  const [search, setSearch] = useState("")
-  const [editing, setEditing] = useState<Camera | "new" | null>(null)
+/** Server-side filters of the camera list (one select). */
+const FILTERS: Record<string, { label: string; query: Partial<CameraQuery> }> = {
+  all: { label: "All cameras", query: {} },
+  enabled: { label: "Enabled", query: { enabled: true } },
+  disabled: { label: "Disabled", query: { enabled: false } },
+  not_recording: { label: "Not recording", query: { enabled: true, status: "NOT_RECORDING" } },
+  connecting: { label: "Connecting", query: { enabled: true, status: "CONNECTING" } },
+}
 
-  const list = (cameras.data ?? []).filter(
-    (c) => c.name.toLowerCase().includes(search.toLowerCase()) || String(c.id) === search.trim(),
-  )
+export function CamerasPage() {
+  const paged = usePaged({ sizeKey: "cameras" })
+  const [filter, setFilter] = useState("all")
+  const [editing, setEditing] = useState<Camera | "new" | null>(null)
+  const cameras = usePagedCameras({ q: paged.query, ...FILTERS[filter].query, limit: paged.limit, offset: paged.offset })
+  useClampPage(paged, cameras.data?.total)
+  const list = cameras.data?.items ?? []
+  const filtered = paged.query !== "" || filter !== "all"
 
   return (
     <div>
@@ -38,8 +50,14 @@ export function CamerasPage() {
           <>
             <div className="relative w-full sm:w-60">
               <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
-              <Input className="pl-8" placeholder="Search cameras" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input className="pl-8" placeholder="Search name or #id" value={paged.search} onChange={(e) => paged.setSearch(e.target.value)} />
             </div>
+            <Select value={filter} onValueChange={(v) => { setFilter(v); paged.setPage(1) }}>
+              <SelectTrigger className="w-full sm:w-40" aria-label="Filter cameras"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(FILTERS).map(([k, f]) => <SelectItem key={k} value={k}>{f.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <Button variant="outline" asChild>
               <Link to="/discover">
                 <Radar className="size-4" /> Discover
@@ -53,7 +71,10 @@ export function CamerasPage() {
       />
       {cameras.isLoading && <Loading />}
       {cameras.error && <ErrorState error={cameras.error} />}
-      {cameras.data && cameras.data.length === 0 && (
+      {cameras.data && cameras.data.total === 0 && filtered && (
+        <EmptyState icon={Search} title="No cameras match">Change the search or the filter.</EmptyState>
+      )}
+      {cameras.data && cameras.data.total === 0 && !filtered && (
         <EmptyState icon={CameraIcon} title="No cameras yet">
           Use <b>Discover</b> to find ONVIF cameras on the network, or click <b>Add camera</b> and enter an RTSP URL.
         </EmptyState>
@@ -85,6 +106,10 @@ export function CamerasPage() {
           </Table>
         </Card>
         </>
+      )}
+      {cameras.data && (
+        <Pager className="mt-3" page={paged.page} pageSize={paged.pageSize} total={cameras.data.total}
+          onPage={paged.setPage} onPageSize={paged.setPageSize} />
       )}
       {editing && (
         <CameraFormSheet camera={editing === "new" ? undefined : editing} open onOpenChange={(o) => !o && setEditing(null)} />

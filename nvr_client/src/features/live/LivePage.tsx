@@ -1,5 +1,7 @@
 import {
   Camera as CameraIcon,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   ExternalLink,
   ImageDown,
@@ -7,14 +9,17 @@ import {
   MoreVertical,
   Plus,
   Search,
+  Loader2,
   Trash2,
   X,
 } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
 import { useCallback, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
-import { useCameras, useLive } from "@/api/queries"
-import type { Camera } from "@/api/types"
+import { unwrap } from "@/api/client"
+import { useCameraOptions, useCamerasByIds, useCentral, useLive } from "@/api/queries"
+import type { Camera, CameraOption } from "@/api/types"
 import { EmptyState, ErrorState, Loading } from "@/components/common"
 import { DigitalZoom } from "@/components/DigitalZoom"
 import { StatusDot } from "@/components/StatusBadge"
@@ -34,8 +39,10 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { type Paged, pageCount } from "@/lib/pager"
 import { type LiveProtocol, readStored, useSettings, writeStored } from "@/lib/settings"
 import { useMediaQuery } from "@/lib/useMediaQuery"
+import { useDebounced } from "@/lib/usePaged"
 import { cn } from "@/lib/utils"
 import { LivePlayer, pickStream, saveSnapshot } from "./LivePlayer"
 import { PtzOverlay } from "./PtzOverlay"
@@ -48,12 +55,28 @@ const MOBILE_STORAGE_KEY = "shah-nvr.live.mobile"
 interface LiveState {
   layout: Layout
   tiles: (number | null)[]
+  /** grid page last filled with ‹ › (enabled cameras by name, `layout` per page) */
+  page?: number
 }
 
-const recordStatus = (c: Camera) => (c.enabled ? (c.streams.find((s) => s.record) ?? c.streams[0])?.status ?? "UNKNOWN" : "DISABLED")
+type OptionsPage = Paged<CameraOption>
+
+/** Enabled cameras by name, one grid page at a time: ‹ › fill the grid with the next 4 / 9 / 16 cameras. */
+function useGridPages() {
+  const { url, api, poll } = useCentral()
+  const count = useQuery({
+    queryKey: [url, "cameras", "options", "enabled-count"],
+    queryFn: () => unwrap<OptionsPage>(api.GET("/api/v1/cameras/options", { params: { query: { enabled: true, limit: 1 } } })),
+    refetchInterval: poll,
+  })
+  const fetchPage = (page: number, layout: number) =>
+    unwrap<OptionsPage>(api.GET("/api/v1/cameras/options", {
+      params: { query: { enabled: true, limit: layout, offset: (page - 1) * layout } },
+    }))
+  return { total: count.data?.total, fetchPage }
+}
 
 export function LivePage() {
-  const cameras = useCameras()
   const { settings } = useSettings()
   const isMobile = useMediaQuery("(max-width: 767px)")
   const [desktopState, setDesktopState] = useState<LiveState>(() => readStored(STORAGE_KEY, { layout: 4, tiles: Array(16).fill(null) }))
@@ -76,16 +99,40 @@ export function LivePage() {
     }
   }, [isMobile])
 
-  const byId = useMemo(() => new Map((cameras.data ?? []).map((c) => [c.id, c])), [cameras.data])
   const visible = state.tiles.slice(0, state.layout)
   const cols = Math.sqrt(state.layout)
+  // Only the cameras on screen are loaded in full (never the whole camera list).
+  const tileCameras = useCamerasByIds(visible.filter((id): id is number => id != null))
+  const byId = useMemo(() => new Map((tileCameras.data ?? []).map((c) => [c.id, c])), [tileCameras.data])
+  const options = useCameraOptions(useDebounced(search))
+  const optionRows = useMemo(() => options.data?.pages.flatMap((p) => p.items) ?? [], [options.data])
+  const optionTotal = options.data?.pages[0]?.total
+  const grid = useGridPages()
+  const gridPages = grid.total != null ? pageCount(grid.total, state.layout) : null
+  const [paging, setPaging] = useState(false)
+  const showGridPage = async (page: number) => {
+    if (gridPages == null) return
+    const target = ((page - 1 + gridPages) % gridPages) + 1 // wraps around: last page › first page
+    setPaging(true)
+    try {
+      const rows = await grid.fetchPage(target, state.layout)
+      const tiles = Array(16).fill(null)
+      rows.items.forEach((c, i) => { tiles[i] = c.id })
+      save({ ...state, tiles, page: target })
+      setSelected(0)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error))
+    } finally {
+      setPaging(false)
+    }
+  }
 
   const place = (cameraId: number, index?: number) => {
     const tiles = [...state.tiles]
     let target = index ?? (visible[selected] == null ? selected : visible.findIndex((t) => t == null))
     if (target < 0) target = selected
     tiles[target] = cameraId
-    save({ ...state, tiles })
+    save({ ...state, tiles, page: undefined })
     setCameraPicker(false)
     setSelected(Math.min(state.layout - 1, target + 1))
   }
@@ -95,7 +142,11 @@ export function LivePage() {
     save({ ...state, tiles })
   }
 
-  const filtered = (cameras.data ?? []).filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
+  const cameraList = (big: boolean) => (
+    <CameraOptionList rows={optionRows} total={optionTotal} visible={visible} big={big} onPick={(id) => place(id)}
+      loading={options.isLoading} error={options.error} hasMore={!!options.hasNextPage}
+      loadingMore={options.isFetchingNextPage} onMore={() => void options.fetchNextPage()} searching={search.trim() !== ""} />
+  )
 
   return (
     <div className="-m-3 flex min-h-full sm:-m-4 lg:-m-5 lg:h-[calc(100dvh-3.5rem)]">
@@ -107,26 +158,7 @@ export function LivePage() {
             <Input className="pl-8" placeholder="Search cameras" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
-        <div className="flex-1 overflow-auto px-2 pb-3">
-          {cameras.isLoading && <Loading />}
-          {cameras.error && <ErrorState error={cameras.error} />}
-          {filtered.map((c) => (
-            <button
-              key={c.id}
-              draggable
-              onDragStart={(e) => e.dataTransfer.setData("text/camera-id", String(c.id))}
-              onClick={() => place(c.id)}
-              disabled={!c.enabled}
-              className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm hover:bg-accent disabled:opacity-50"
-              title="Click or drag onto a tile"
-            >
-              <StatusDot status={recordStatus(c)} />
-              <span className="min-w-0 flex-1 truncate">{c.name}</span>
-              {visible.includes(c.id) && <span className="text-[10px] text-primary">on view</span>}
-            </button>
-          ))}
-          {cameras.data && filtered.length === 0 && <div className="p-3 text-sm text-muted-foreground">No cameras.</div>}
-        </div>
+        <div className="flex-1 overflow-auto px-2 pb-3">{cameraList(false)}</div>
       </aside>
 
       {/* grid */}
@@ -142,7 +174,7 @@ export function LivePage() {
             spacing={2}
             className="gap-2"
             value={String(state.layout)}
-            onValueChange={(v) => v && save({ ...state, layout: Number(v) as Layout })}
+            onValueChange={(v) => v && save({ ...state, layout: Number(v) as Layout, page: undefined })}
           >
             {(isMobile ? LAYOUTS.slice(0, 2) : LAYOUTS).map((l) => (
               <ToggleGroupItem key={l} value={String(l)} className="px-3">
@@ -160,8 +192,19 @@ export function LivePage() {
               <SelectItem value="hls">LL-HLS only</SelectItem>
             </SelectContent>
           </Select>
+          {gridPages != null && grid.total! > 0 && (
+            <div className="flex items-center gap-0.5 rounded-lg border px-0.5" title="Fill the grid with the next cameras (by name)">
+              <Button variant="ghost" size="icon-sm" aria-label="Previous cameras" disabled={paging}
+                onClick={() => void showGridPage((state.page ?? 1) - 1)}><ChevronLeft /></Button>
+              <span className="min-w-[4.5rem] text-center text-xs tabular-nums text-muted-foreground">
+                {paging ? <Loader2 className="mx-auto size-3.5 animate-spin" /> : state.page ? `Page ${state.page} / ${gridPages}` : `${gridPages} pages`}
+              </span>
+              <Button variant="ghost" size="icon-sm" aria-label="Next cameras" disabled={paging}
+                onClick={() => void showGridPage(state.page ? state.page + 1 : 1)}><ChevronRight /></Button>
+            </div>
+          )}
           <div className="ml-auto flex gap-1 sm:gap-2">
-            <Button variant="outline" size="sm" onClick={() => save({ ...state, tiles: Array(16).fill(null) })}>
+            <Button variant="outline" size="sm" onClick={() => save({ ...state, tiles: Array(16).fill(null), page: undefined })}>
               <Trash2 className="size-4" /> <span className="hidden sm:inline">Clear</span>
             </Button>
             <Button variant="outline" size="sm" onClick={() => gridRef.current?.requestFullscreen?.()}>
@@ -170,7 +213,7 @@ export function LivePage() {
           </div>
         </div>
 
-        {cameras.data && cameras.data.length === 0 ? (
+        {grid.total === 0 && !search && optionTotal === 0 ? (
           <div className="p-6">
             <EmptyState icon={CameraIcon} title="No cameras yet">
               Add a camera on the Cameras page, then come back here to watch it live.
@@ -208,6 +251,8 @@ export function LivePage() {
                       onRemove={() => clearTile(i)}
                       onExpand={() => setFullscreenCam(cam.id)}
                     />
+                  ) : camId != null && tileCameras.isFetching ? (
+                    <div className="grid size-full place-items-center bg-video"><Loading /></div>
                   ) : (
                     <div className="grid size-full place-items-center bg-video text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
@@ -229,15 +274,7 @@ export function LivePage() {
             <SheetDescription>Camera will be placed in selected tile {selected + 1}.</SheetDescription>
           </SheetHeader>
           <div className="px-4"><div className="relative"><Search className="absolute top-3 left-3 size-4 text-muted-foreground" /><Input className="h-11 pl-9" placeholder="Search cameras" value={search} onChange={(e) => setSearch(e.target.value)} /></div></div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
-            {cameras.isLoading && <Loading />}
-            {cameras.error && <ErrorState error={cameras.error} />}
-            {filtered.map((c) => (
-              <button key={c.id} type="button" onClick={() => place(c.id)} disabled={!c.enabled} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left hover:bg-accent disabled:opacity-50">
-                <StatusDot status={recordStatus(c)} /><span className="min-w-0 flex-1 truncate">{c.name}</span>{visible.includes(c.id) && <span className="text-xs text-primary">On view</span>}
-              </button>
-            ))}
-          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">{cameraList(true)}</div>
         </SheetContent>
       </Sheet>
 
@@ -255,6 +292,57 @@ export function LivePage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+/** Searchable camera list (sidebar and mobile sheet): small rows from the server, 50 at a time. */
+function CameraOptionList({
+  rows, total, visible, big, onPick, loading, error, hasMore, loadingMore, onMore, searching,
+}: {
+  rows: CameraOption[]
+  total: number | undefined
+  visible: (number | null)[]
+  big: boolean
+  onPick: (id: number) => void
+  loading: boolean
+  error: unknown
+  hasMore: boolean
+  loadingMore: boolean
+  onMore: () => void
+  searching: boolean
+}) {
+  return (
+    <>
+      {loading && <Loading />}
+      {error != null && <ErrorState error={error} />}
+      {rows.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          draggable={!big}
+          onDragStart={(e) => e.dataTransfer.setData("text/camera-id", String(c.id))}
+          onClick={() => onPick(c.id)}
+          disabled={!c.enabled}
+          className={cn(
+            "flex w-full items-center text-left hover:bg-accent disabled:opacity-50",
+            big ? "min-h-12 gap-3 rounded-lg px-3" : "gap-2.5 rounded-md px-2.5 py-2 text-sm",
+          )}
+          title={big ? undefined : "Click or drag onto a tile"}
+        >
+          <StatusDot status={c.status} />
+          <span className="min-w-0 flex-1 truncate">{c.name}</span>
+          {visible.includes(c.id) && <span className={cn("text-primary", big ? "text-xs" : "text-[10px]")}>on view</span>}
+        </button>
+      ))}
+      {!loading && total === 0 && (
+        <div className="p-3 text-sm text-muted-foreground">{searching ? "No cameras match." : "No cameras."}</div>
+      )}
+      {hasMore && (
+        <Button variant="ghost" size="sm" className="mt-1 w-full text-muted-foreground" disabled={loadingMore} onClick={onMore}>
+          {loadingMore ? <Loader2 className="size-3.5 animate-spin" /> : `Load more (${rows.length} of ${total})`}
+        </Button>
+      )}
+    </>
   )
 }
 

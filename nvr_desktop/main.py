@@ -86,6 +86,7 @@ def build_app():
     from app.features.assignments.store import AssignmentsStore
     from app.features.cameras.detail_store import CameraDetailStore
     from app.features.cameras.backfill_store import BackfillStore
+    from app.features.cameras.options_store import EncoderCamerasStore, LiveCamerasStore, PlaybackCamerasStore
     from app.features.cameras.store import CamerasStore
     from app.features.dashboard.cluster_store import ClusterStore
     from app.features.dashboard.store import DashboardStore
@@ -110,7 +111,8 @@ def build_app():
     cluster = ClusterStore(ctx)
     cameras = CamerasStore(ctx)
     nodes = NodesStore(ctx)
-    playback = PlaybackStore(ctx, cameras, nodes)
+    playback_cameras = PlaybackCamerasStore(ctx)
+    playback = PlaybackStore(ctx, cameras, nodes, playback_cameras)
     singletons = {
         "Prefs": prefs,
         "Toasts": toasts,
@@ -120,9 +122,12 @@ def build_app():
         "Utils": Utils(toasts),
         "Cluster": cluster,
         "Cameras": cameras,
+        "LiveCameras": LiveCamerasStore(ctx),
+        "PlaybackCameras": playback_cameras,
+        "EncoderCameras": EncoderCamerasStore(ctx),
         "Nodes": nodes,
         "Discover": DiscoverStore(ctx, cameras, nodes),
-        "Dashboard": DashboardStore(ctx, cluster, cameras, nodes),
+        "Dashboard": DashboardStore(ctx, cluster, nodes),
         "CameraDetail": CameraDetailStore(ctx, nodes),
         "Backfill": BackfillStore(ctx),
         "Encoder": EncoderStore(ctx, cameras),

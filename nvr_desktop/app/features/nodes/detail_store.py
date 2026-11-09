@@ -37,6 +37,9 @@ def log_level(line: str) -> str:
     return "info"
 
 
+CHUNKS_PER_PAGE = 50
+ONVIF_CAMERAS_PER_PAGE = 25
+
 class NodeDetailStore(BaseStore):
     nodeIdChanged = Signal()
     nodeChanged = Signal()
@@ -59,9 +62,11 @@ class NodeDetailStore(BaseStore):
         self._logs: list[dict] = []
         self._logs_paused = False
         self._onvif: dict = {}
+        self._onvif_cameras: list[dict] = []  # one page of this node's cameras (ONVIF exposure)
+        self._onvif_camera_page, self._onvif_camera_total = 1, 0
+        self._chunk_page, self._chunk_total = 1, 0  # node chunk list: 50 per page
         self._route, self._resolved_url = "lan", ""
         self._poller = Poller(self.refresh, 3, self)
-        cameras.camerasChanged.connect(self.onvifChanged)
         ctx.prefs.nodeAccessChanged.connect(self.nodeChanged)
 
     # ------------------------------------------------------------------ selection
@@ -88,6 +93,7 @@ class NodeDetailStore(BaseStore):
     def _set_active_tab(self, tab: str) -> None:
         if tab != self._active_tab:
             self._active_tab = tab
+            self._chunk_page = self._onvif_camera_page = 1
             self._tab_data, self._tab_error = [], ""
             self.tabDataChanged.emit()
             self._refresh_tab()
@@ -175,13 +181,54 @@ class NodeDetailStore(BaseStore):
         elif tab == "paths":
             run_task(lambda: [_path_row(p) for p in node_api.mediamtx_paths(self._resolved_api_url())], ok, fail)
         elif tab == "chunks":
-            run_task(lambda: [s.to_qml() for s in node_api.segments(self._resolved_api_url(), 100)], ok, fail)
+            page = self._chunk_page
+
+            def load_chunks():
+                rows, total = node_api.segments(self._resolved_api_url(), CHUNKS_PER_PAGE, (page - 1) * CHUNKS_PER_PAGE)
+                return [s.to_qml() for s in rows], total
+
+            def chunks_ok(result):
+                if page == self._chunk_page:
+                    self._chunk_total = result[1]
+                    ok(result[0])
+
+            run_task(load_chunks, chunks_ok, fail)
         elif tab == "logs" and not self._logs_paused:
             source = self._log_source
             run_task(lambda: node_api.logs(self._resolved_api_url(), source), lambda lines: self._apply_logs(nid, source, lines), fail)
         elif tab == "onvif":
             self.fetch("onvif-server", lambda: self.api.onvif_server(nid).to_qml(),
                        lambda value: self._apply_onvif(nid, value), track_error=False, on_err=fail)
+            self._refresh_onvif_cameras()
+
+    def _refresh_onvif_cameras(self) -> None:
+        nid, page = self._node_id, self._onvif_camera_page
+
+        def load():
+            rows, total = self.api.cameras(node_id=nid, limit=ONVIF_CAMERAS_PER_PAGE,
+                                           offset=(page - 1) * ONVIF_CAMERAS_PER_PAGE)
+            return [c.to_qml() for c in rows], total
+
+        def apply(result):
+            if nid == self._node_id and page == self._onvif_camera_page:
+                self._onvif_cameras, self._onvif_camera_total = result
+                self.onvifChanged.emit()
+
+        self.fetch("onvif-cameras", load, apply, track_error=False)
+
+    @Slot(int)
+    def setChunkPage(self, page: int) -> None:
+        if page >= 1 and page != self._chunk_page:
+            self._chunk_page = page
+            self.tabDataChanged.emit()
+            self._refresh_tab()
+
+    @Slot(int)
+    def setOnvifCameraPage(self, page: int) -> None:
+        if page >= 1 and page != self._onvif_camera_page:
+            self._onvif_camera_page = page
+            self.onvifChanged.emit()
+            self._refresh_onvif_cameras()
 
     def _apply_onvif(self, nid: int, value: dict) -> None:
         if nid == self._node_id:
@@ -210,7 +257,7 @@ class NodeDetailStore(BaseStore):
     @Slot(int, bool)
     def setCameraExposure(self, camera_id: int, exposed: bool) -> None:
         self.act(lambda: self.api.update_camera(camera_id, {"expose_via_onvif": exposed}).to_qml(),
-                 success="ONVIF exposure updated", after=lambda _value: (self._cameras.refresh(), self._refresh_tab()))
+                 success="ONVIF exposure updated", after=lambda _value: (self._refresh_onvif_cameras(), self._refresh_tab()))
 
     def _apply_logs(self, nid: int, source: str, lines: list[str]) -> None:
         if nid == self._node_id and source == self._log_source:
@@ -271,9 +318,13 @@ class NodeDetailStore(BaseStore):
     tabError = Property(str, lambda self: self._tab_error, notify=tabDataChanged)
     logs = Property("QVariantList", lambda self: self._logs, notify=logsChanged)
     onvif = Property("QVariant", lambda self: self._onvif, notify=onvifChanged)
-    assignedCameras = Property("QVariantList", lambda self: [c for c in self._cameras.cameras()
-                                                              if (c.get("assignment") or {}).get("node_id") == self._node_id],
-                               notify=onvifChanged)
+    assignedCameras = Property("QVariantList", lambda self: self._onvif_cameras, notify=onvifChanged)
+    assignedCameraPage = Property(int, lambda self: self._onvif_camera_page, notify=onvifChanged)
+    assignedCameraTotal = Property(int, lambda self: self._onvif_camera_total, notify=onvifChanged)
+    assignedCameraPageSize = Property(int, lambda self: ONVIF_CAMERAS_PER_PAGE, constant=True)
+    chunkPage = Property(int, lambda self: self._chunk_page, notify=tabDataChanged)
+    chunkTotal = Property(int, lambda self: self._chunk_total, notify=tabDataChanged)
+    chunkPageSize = Property(int, lambda self: CHUNKS_PER_PAGE, constant=True)
     route = Property(str, lambda self: self._route, notify=nodeChanged)
     resolvedApiUrl = Property(str, lambda self: self._resolved_url or self._node.get("api_url", ""), notify=nodeChanged)
 

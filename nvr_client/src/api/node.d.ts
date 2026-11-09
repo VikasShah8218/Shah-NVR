@@ -171,7 +171,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Chunks stored on this node (debug) */
+        /** Chunks stored on this node, newest first (paged) */
         get: operations["list_local_segments_api_v1_segments_get"];
         put?: never;
         post?: never;
@@ -807,6 +807,20 @@ export interface components {
             part_count: number;
             /** Uploaded */
             uploaded: boolean;
+        };
+        /**
+         * LocalSegmentPage
+         * @description One page of GET /api/v1/segments (same shape as central's paged lists).
+         */
+        LocalSegmentPage: {
+            /** Items */
+            items: components["schemas"]["LocalSegmentOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
         };
         /** NetworkOut */
         NetworkOut: {
@@ -1485,6 +1499,7 @@ export interface operations {
             query?: {
                 camera_id?: number | null;
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -1498,7 +1513,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["LocalSegmentOut"][];
+                    "application/json": components["schemas"]["LocalSegmentPage"];
                 };
             };
             /** @description Validation Error */

@@ -1,7 +1,8 @@
+from collections.abc import Sequence
 from urllib.parse import quote, urlsplit, urlunsplit
 
-from app.cameras.models import Camera, CameraStream
-from app.cameras.schemas import AssignmentInfo, CameraOut, StreamOut
+from app.cameras.models import Camera, CameraStream, StreamStatus
+from app.cameras.schemas import AssignmentInfo, CameraOption, CameraOut, StreamOut
 
 
 DEVICE_FIELDS = ("onvif_host", "onvif_port", "manufacturer", "model", "firmware", "serial", "mac", "onvif_services",
@@ -23,11 +24,48 @@ def build_source_url(stream: CameraStream, camera: Camera) -> str:
 
 
 async def camera_to_out(camera: Camera) -> CameraOut:
+    return (await cameras_to_out([camera]))[0]
+
+
+async def cameras_to_out(cameras: Sequence[Camera]) -> list[CameraOut]:
+    """Convert a page of cameras with 2 queries in total (streams + assignments/nodes), not ~3 per camera."""
     from app.assignments.models import CameraAssignment
 
-    await camera.fetch_related("streams")
+    if not cameras:
+        return []
+    ids = [c.id for c in cameras]
+    streams: dict[int, list[CameraStream]] = {i: [] for i in ids}
+    for s in await CameraStream.filter(camera_id__in=ids).order_by("id"):
+        streams[s.camera_id].append(s)
+    assignments = {a.camera_id: a for a in await CameraAssignment.filter(camera_id__in=ids).prefetch_related("node")}
+    return [_camera_out(c, streams[c.id], assignments.get(c.id)) for c in cameras]
+
+
+async def camera_options_out(cameras: Sequence[Camera]) -> list[CameraOption]:
+    """Picker rows for a page of cameras: 2 small queries (profiles + node ids)."""
+    from app.assignments.models import CameraAssignment
+
+    if not cameras:
+        return []
+    ids = [c.id for c in cameras]
+    profiles: dict[int, list[str]] = {i: [] for i in ids}
+    status: dict[int, StreamStatus] = {}
+    recording: set[int] = set()  # cameras whose status already comes from a recording stream
+    for camera_id, profile, record, stream_status in await CameraStream.filter(camera_id__in=ids).order_by(
+            "id").values_list("camera_id", "profile", "record", "status"):
+        profiles[camera_id].append(profile)
+        if camera_id not in status or (record and camera_id not in recording):
+            status[camera_id] = stream_status
+        if record:
+            recording.add(camera_id)
+    nodes = dict(await CameraAssignment.filter(camera_id__in=ids).values_list("camera_id", "node_id"))
+    return [CameraOption(id=c.id, name=c.name, enabled=c.enabled, has_ptz=c.has_ptz, profiles=profiles[c.id],
+                         status=status.get(c.id, StreamStatus.UNKNOWN) if c.enabled else StreamStatus.DISABLED,
+                         node_id=nodes.get(c.id)) for c in cameras]
+
+
+def _camera_out(camera: Camera, streams: list[CameraStream], a) -> CameraOut:
     assignment = None
-    a = await CameraAssignment.get_or_none(camera_id=camera.id).prefetch_related("node")
     if a is not None:
         node = a.node
         assignment = AssignmentInfo(
@@ -72,7 +110,7 @@ async def camera_to_out(camera: Camera) -> CameraOut:
                 audio_bitrate_kbps=s.audio_bitrate_kbps,
                 audio_last_observed_at=s.audio_last_observed_at,
             )
-            for s in camera.streams
+            for s in streams
         ],
         assignment=assignment,
     )

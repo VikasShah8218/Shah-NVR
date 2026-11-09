@@ -19,6 +19,7 @@ class CameraAssignment(Model):
 
     class Meta:
         table = "camera_assignments"
+        indexes = (("node_id",),)  # cameras of one node
 
 
 class AssignmentHistory(Model):

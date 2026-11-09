@@ -67,9 +67,18 @@ def main():
                 "onvif_host": "192.168.1.241", "clock_offset_seconds": -12}).to_qml())
             manual = _decorate(Camera.model_validate({**CAMERA, "id": 2, "name": "Manual disabled",
                 "enabled": False, "model": None}).to_qml())
-            cameras._apply([camera, manual])
+            cameras._apply([camera, manual], 2)
             cameras._set_loading(False)
-            stores["Cluster"]._apply({"cameras_total": 2, "cameras_enabled": 1, "streams_by_status": {"RECORDING": 1},
+            # Pickers and the live sidebar use the small searchable list (CameraOptionsStore).
+            options = [{"id": 1, "name": "Gate", "enabled": True, "has_ptz": False, "profiles": ["main"],
+                        "status": "RECORDING", "node_id": 2},
+                       {"id": 2, "name": "Manual disabled", "enabled": False, "has_ptz": False, "profiles": ["main"],
+                        "status": "DISABLED", "node_id": None}]
+            for name in ("LiveCameras", "PlaybackCameras", "EncoderCameras"):
+                stores[name]._set(options, 2)
+                stores[name]._set_loading(False)
+            stores["Cluster"]._apply({"cameras_total": 2, "cameras_enabled": 1, "record_streams": 1,
+                "streams_by_status": {"RECORDING": 1},
                 "nodes_by_state": {"ACTIVE": 1}, "segments_last_hour": 10, "segments_total": 100})
 
             def settle():
@@ -113,6 +122,17 @@ Item {
                 if page == "cameras":
                     assert "Manual disabled" in texts()
                     assert window.grabWindow().save(str(output / "cameras.png"))
+                    # Pagination (2026-11-10): with 120 cameras the pager shows "Page 1 / 3".
+                    cameras._apply([camera, manual], 120)
+                    settle()
+                    pager = window.findChild(QObject, "camerasPager")
+                    assert pager is not None and pager.property("visible") and "Page 1 / 3" in texts(), texts()
+                    assert window.grabWindow().save(str(output / "cameras-paged.png"))
+                    cameras._apply([camera, manual], 2)
+                if page == "live":
+                    stores["Live"]._set_grid_total(40)  # 4 per page -> 10 grid pages
+                    settle()
+                    assert "10 pages" in texts() and window.findChild(QObject, "gridNext") is not None, texts()
 
             # Playback parity (2026-11-09): bookmark markers (point + range), the bookmarks panel, the
             # add dialog and the new transport buttons render without QML warnings.
@@ -148,7 +168,8 @@ Item {
             router.go("live")
             stores["Live"].place(1, 0)
             settle()
-            cameras._apply([{**camera, "name": "Gate renamed"}, manual])
+            cameras._apply([{**camera, "name": "Gate renamed"}, manual], 2)  # tile: from the camera cache
+            stores["LiveCameras"]._set([{**options[0], "name": "Gate renamed"}, options[1]], 2)  # sidebar list
             settle()
             assert first.property("cameraName") == "Gate renamed"
             assert texts().count("Gate renamed") >= 2  # list AND existing tile

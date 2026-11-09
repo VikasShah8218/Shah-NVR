@@ -18,6 +18,8 @@ def local_to_utc(value: str) -> str:
     return parsed.astimezone(timezone.utc).isoformat()
 
 
+JOBS_PER_PAGE = 10
+
 class BackfillStore(BaseStore):
     changed = Signal()
 
@@ -27,6 +29,8 @@ class BackfillStore(BaseStore):
         self._config: dict = {}
         self._recordings: list[dict] = []
         self._jobs: list[dict] = []
+        self._job_page = 1
+        self._job_total = 0
         self._generation = 0
         self._poller = Poller(self.refreshJobs, 3, self)
         ctx.centralChanged.connect(self._reset)
@@ -41,6 +45,7 @@ class BackfillStore(BaseStore):
         if camera_id == self._camera_id:
             return
         self._camera_id, self._config, self._recordings, self._jobs = camera_id, {}, [], []
+        self._job_page, self._job_total = 1, 0
         self._generation += 1
         self.changed.emit()
         if camera_id:
@@ -88,13 +93,25 @@ class BackfillStore(BaseStore):
         if not cid:
             return
 
-        def apply(rows):
-            if generation == self._generation:
-                self._jobs = rows
+        page = self._job_page
+
+        def load():
+            rows, total = self.api.backfill_jobs(cid, limit=JOBS_PER_PAGE, offset=(page - 1) * JOBS_PER_PAGE)
+            return [j.to_qml() for j in rows], total
+
+        def apply(result):
+            if generation == self._generation and page == self._job_page:
+                self._jobs, self._job_total = result
                 self.changed.emit()
 
-        self.fetch("backfill-jobs", lambda: [j.to_qml() for j in self.api.backfill_jobs(cid)],
-                   apply, track_error=False)
+        self.fetch("backfill-jobs", load, apply, track_error=False)
+
+    @Slot(int)
+    def setJobPage(self, page: int) -> None:
+        if page >= 1 and page != self._job_page:
+            self._job_page = page
+            self.changed.emit()
+            self.refreshJobs()
 
     @Slot(str, str, str, result=bool)
     def queue(self, start: str, end: str, profile: str) -> bool:
@@ -112,3 +129,6 @@ class BackfillStore(BaseStore):
     config = Property("QVariant", lambda self: self._config, notify=changed)
     recordings = Property("QVariantList", lambda self: self._recordings, notify=changed)
     jobs = Property("QVariantList", lambda self: self._jobs, notify=changed)
+    jobPage = Property(int, lambda self: self._job_page, notify=changed)
+    jobTotal = Property(int, lambda self: self._job_total, notify=changed)
+    jobPageSize = Property(int, lambda self: JOBS_PER_PAGE, constant=True)

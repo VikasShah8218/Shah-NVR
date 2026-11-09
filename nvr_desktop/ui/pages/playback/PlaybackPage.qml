@@ -50,8 +50,11 @@ PageScroll {
 
     PageHeader { title: "Playback"; description: "Browse and play recordings. Click the timeline to play from that moment." }
 
+    // there are cameras at all (first page of the picker list)
+    readonly property bool hasCameras: PlaybackCameras.total > 0 || PlaybackCameras.query !== ""
+
     EmptyState {
-        visible: !Cameras.loading && Cameras.error === "" && Cameras.listModel.count === 0
+        visible: !PlaybackCameras.loading && PlaybackCameras.error === "" && !root.hasCameras
         iconName: "film"
         title: "No cameras yet"
         text: "Add a camera first; its recordings will appear here."
@@ -59,16 +62,16 @@ PageScroll {
 
     // ================================================================= toolbar
     RowLayout {
-        visible: Cameras.listModel.count > 0
+        visible: root.hasCameras
         Layout.fillWidth: true
         spacing: 8
 
-        AppSelect {
-            implicitWidth: 224
-            options: Cameras.all.map(c => ({ value: c.id, label: c.name }))
-            value: Playback.cameraId || null
-            placeholder: "Select camera"
-            onPicked: v => Playback.setCamera(v)
+        CameraPicker {
+            objectName: "playbackCameraPicker"
+            store: PlaybackCameras
+            value: Playback.cameraId
+            label: Playback.cameraName
+            onPicked: id => Playback.setCamera(id)
         }
         AppSelect {
             implicitWidth: 112
@@ -137,7 +140,7 @@ PageScroll {
     // Placeholder in the page; the player itself moves to the window overlay in fullscreen.
     Item {
         id: playerSlot
-        visible: Cameras.listModel.count > 0
+        visible: root.hasCameras
         Layout.fillWidth: true
         // Height-capped so the timeline below stays on screen (web: max-w-[calc(55vh*16/9)]).
         readonly property real videoHeight: Math.min(width * 9 / 16, (root.appWindow ? root.appWindow.height : 900) * 0.55)
@@ -340,7 +343,7 @@ PageScroll {
 
     // ================================================================= timeline
     Card {
-        visible: Cameras.listModel.count > 0
+        visible: root.hasCameras
         Layout.fillWidth: true
         spacing: 12
 
@@ -394,27 +397,46 @@ PageScroll {
 
     // ================================================================= bookmarks
     BookmarksPanel {
-        visible: Cameras.listModel.count > 0
+        visible: root.hasCameras
         Layout.fillWidth: true
         dialog: bookmarkDialog
     }
 
     // ================================================================= chunks in view
     Card {
-        visible: Cameras.listModel.count > 0
+        visible: root.hasCameras
         Layout.fillWidth: true
         padding: 0
         spacing: 0
 
-        RowLayout {
+        // hidden until opened (a day can hold 1,440 chunks), then 50 per page
+        Rectangle {
             Layout.fillWidth: true
-            Layout.margins: 16
-            spacing: 6
-            AppText { text: "Chunks in view"; font.weight: Font.Medium }
-            AppText { text: "(" + Playback.chunks.length + ")"; variant: "muted" }
+            implicitHeight: 52
+            color: chunksHeader.containsMouse ? Theme.alpha(Theme.accent, 0.3) : "transparent"
+            radius: Theme.radiusLg
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                anchors.rightMargin: 16
+                spacing: 6
+                Icon { name: Playback.chunksOpen ? "chevron-down" : "chevron-right"; size: 16; color: Theme.mutedForeground }
+                AppText { text: "Chunks in view"; font.weight: Font.Medium }
+                AppText { text: "(" + Playback.chunkTotal + ")"; variant: "muted" }
+                Item { Layout.fillWidth: true }
+                AppText { text: Playback.chunksOpen ? "Hide" : "Show"; variant: "small" }
+            }
+            MouseArea {
+                id: chunksHeader
+                objectName: "chunksToggle"
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: Playback.toggleChunks()
+            }
         }
         AppText {
-            visible: Playback.chunks.length === 0
+            visible: Playback.chunksOpen && Playback.chunkTotal === 0
             text: "No recordings in this window."
             variant: "muted"
             Layout.leftMargin: 16
@@ -457,14 +479,27 @@ PageScroll {
                 }
             }
         }
+        Pager {
+            visible: Playback.chunksOpen && pageCount > 1
+            Layout.fillWidth: true
+            Layout.margins: 12
+            page: Playback.chunkPage
+            pageSize: Playback.chunkPageSize
+            total: Playback.chunkTotal
+            onPaged: p => Playback.setChunkPage(p)
+        }
     }
 
     // ================================================================= export jobs
     Card {
-        visible: Playback.exports.length > 0
+        visible: Playback.exportTotal > 0
         Layout.fillWidth: true
         spacing: 10
-        AppText { text: "Exports"; font.weight: Font.Medium }
+        RowLayout {
+            spacing: 6
+            AppText { text: "Exports"; font.weight: Font.Medium }
+            AppText { text: "(" + Playback.exportTotal + ")"; variant: "muted" }
+        }
         Repeater {
             model: Playback.exports
             delegate: Rectangle {
@@ -494,6 +529,13 @@ PageScroll {
                     AppButton { visible: exportJob.active; text: "Cancel"; variant: "outline"; onClicked: Playback.cancelExport(modelData.id) }
                 }
             }
+        }
+        Pager {
+            Layout.fillWidth: true
+            page: Playback.exportPage
+            pageSize: Playback.exportPageSize
+            total: Playback.exportTotal
+            onPaged: p => Playback.setExportPage(p)
         }
     }
 

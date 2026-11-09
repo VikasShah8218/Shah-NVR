@@ -1,36 +1,34 @@
-"""AssignmentsStore: which media node records each camera; move, history, run scheduler."""
+"""AssignmentsStore: which media node records each camera (one page at a time, searchable by camera name);
+move, history (latest 50 moves), run scheduler."""
 
 from __future__ import annotations
 
-from PySide6.QtCore import Property, QObject, Signal, Slot
+from PySide6.QtCore import Property, Signal, Slot
 
 from app.core.context import AppContext
-from app.core.list_model import DictListModel
-from app.core.poller import Poller
-from app.core.store import BaseStore
+from app.core.paged_store import PagedStore
 
 ASSIGNMENT_ROLES = ["camera_id", "camera_name", "node_id", "node_name", "generation", "lease_expires_at",
                     "reason", "updated_at"]
 
 
-class AssignmentsStore(BaseStore):
+HISTORY_LIMIT = 50
+
+
+class AssignmentsStore(PagedStore):
     historyChanged = Signal()
 
     def __init__(self, ctx: AppContext, parent=None):
-        super().__init__(ctx, parent)
-        self.model = DictListModel(ASSIGNMENT_ROLES, key="camera_id", parent=self)
+        super().__init__(ctx, ASSIGNMENT_ROLES, key="camera_id", poll_seconds=ctx.prefs.pollSeconds, parent=parent)
         self._history: list[dict] = []
         self._history_camera = 0
-        self._poller = Poller(self.refresh, ctx.prefs.pollSeconds, self)
         ctx.prefs.pollSecondsChanged.connect(lambda: self._poller.set_interval(ctx.prefs.pollSeconds))
         ctx.centralChanged.connect(self.refresh)
-        self._poller.start()
+        self.start_polling()
 
-    @Slot()
-    def refresh(self) -> None:
-        self.fetch("assignments", lambda: [a.to_qml() for a in self.api.assignments()], self.model.set_items)
-
-    listModel = Property(QObject, lambda self: self.model, constant=True)
+    def _load(self, limit: int, offset: int):
+        rows, total = self.api.assignments(q=self._query, limit=limit, offset=offset)
+        return [a.to_qml() for a in rows], total
 
     # ------------------------------------------------------------------ history
     @Slot(int)
@@ -43,8 +41,8 @@ class AssignmentsStore(BaseStore):
                 self._history = rows
                 self.historyChanged.emit()
 
-        self.fetch("history", lambda: [h.to_qml() for h in self.api.assignment_history(camera_id)], apply,
-                   track_error=False)
+        self.fetch("history", lambda: [h.to_qml() for h in self.api.assignment_history(camera_id, HISTORY_LIMIT)[0]],
+                   apply, track_error=False)
 
     history = Property("QVariantList", lambda self: self._history, notify=historyChanged)
 

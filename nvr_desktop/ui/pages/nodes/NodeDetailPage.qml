@@ -311,6 +311,13 @@ PageScroll {
                         AppSwitch { checked: modelData.expose_via_onvif ?? false; onToggled: NodeDetail.setCameraExposure(modelData.id, checked) }
                     }
                 }
+                Pager {
+                    Layout.fillWidth: true
+                    page: NodeDetail.assignedCameraPage
+                    pageSize: NodeDetail.assignedCameraPageSize
+                    total: NodeDetail.assignedCameraTotal
+                    onPaged: p => NodeDetail.setOnvifCameraPage(p)
+                }
             }
         }
     }
@@ -419,6 +426,13 @@ PageScroll {
                         }
                     }
                 }
+            }
+            Pager {
+                Layout.fillWidth: true
+                page: NodeDetail.chunkPage
+                pageSize: NodeDetail.chunkPageSize
+                total: NodeDetail.chunkTotal
+                onPaged: p => NodeDetail.setChunkPage(p)
             }
         }
     }

@@ -125,10 +125,11 @@ BOOKMARK = {"id": 3, "camera_id": 1, "camera_name": "Gate", "profile": "main", "
 
 @respx.mock
 def test_bookmark_search_sends_filters():
-    route = respx.get(f"{BASE}/api/v1/bookmarks").mock(return_value=httpx.Response(200, json=[BOOKMARK]))
-    rows = CentralApi(BASE).bookmarks(camera_id=1, profile="main", q="  truck ", start=T0,
-                                      end=T0 + timedelta(days=1), order="desc", limit=100)
-    assert rows[0].note == "Truck" and rows[0].to_qml()["camera_name"] == "Gate"
+    route = respx.get(f"{BASE}/api/v1/bookmarks").mock(return_value=httpx.Response(
+        200, json={"items": [BOOKMARK], "total": 7, "limit": 100, "offset": 0}))
+    rows, total = CentralApi(BASE).bookmarks(camera_id=1, profile="main", q="  truck ", start=T0,
+                                             end=T0 + timedelta(days=1), order="desc", limit=100)
+    assert total == 7 and rows[0].note == "Truck" and rows[0].to_qml()["camera_name"] == "Gate"
     params = route.calls.last.request.url.params
     assert params["camera_id"] == "1" and params["profile"] == "main" and params["q"] == "truck"
     assert params["order"] == "desc" and params["limit"] == "100" and params["start"].startswith("2026-11-09T12:00")

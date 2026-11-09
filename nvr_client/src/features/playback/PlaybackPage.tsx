@@ -1,11 +1,13 @@
-import { BookmarkPlus, CalendarDays, ChevronLeft, ChevronRight, Copy, Crosshair, Download, FileVideo, Film, X } from "lucide-react"
+import { BookmarkPlus, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Copy, Crosshair, Download, FileVideo, Film, X } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router"
 import { toast } from "sonner"
 import { exportDownloadUrl, mediaFileUrl, playbackAudioUrl, playbackUrl } from "@/api/client"
-import { useBookmarks, useCameras, useCancelExport, useExports, useNodes, useTimeline } from "@/api/queries"
+import { useBookmarks, useCamera, useCameraOptions, useCancelExport, useExports, useNodes, useTimeline } from "@/api/queries"
 import type { Bookmark, Segment } from "@/api/types"
+import { CameraPicker } from "@/components/CameraPicker"
 import { EmptyState, ErrorState, PageHeader } from "@/components/common"
+import { Pager } from "@/components/Pager"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,7 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { formatBytes, formatDuration } from "@/lib/format"
-import { useSettings } from "@/lib/settings"
+import { slicePage } from "@/lib/pager"
+import { readStored, useSettings, writeStored } from "@/lib/settings"
 import { nodeApiUrl, playbackAccess, selectedNodeAccess, useNodeAccessMap } from "@/lib/nodeAccess"
 import { DAY, HOUR, fmtDay, fmtTime, startOfLocalDay } from "@/lib/time"
 import { BookmarkDialog, BookmarksPanel } from "./BookmarksPanel"
@@ -25,6 +28,10 @@ import { thumbnailUrl, thumbTarget } from "./thumbs"
 import { Timeline } from "./Timeline"
 import { VodPlayer } from "./VodPlayer"
 import { ExportDialog } from "./ExportDialog"
+
+const CHUNKS_PER_PAGE = 50
+const EXPORTS_PER_PAGE = 5
+const CHUNKS_OPEN_KEY = "shah-nvr.playback.chunksOpen"
 
 const ZOOMS = [
   { label: "24h", ms: DAY },
@@ -36,7 +43,8 @@ const ZOOMS = [
 export function PlaybackPage() {
   const [params, setParams] = useSearchParams()
   const { settings } = useSettings()
-  const cameras = useCameras()
+  // First page of the camera picker list: only used to pick a default camera and to detect "no cameras".
+  const firstCameras = useCameraOptions("")
   const nodes = useNodes(30_000)
   const detected = useNodeAccessMap(nodes.data ?? [])
 
@@ -53,13 +61,24 @@ export function PlaybackPage() {
   const [goto, setGoto] = useState("")
   const [exportOpen, setExportOpen] = useState(false)
   const [bookmarkOpen, setBookmarkOpen] = useState(false)
+  // The chunk list is hidden until asked for (it can hold 1,440 rows a day), then shown 50 at a time.
+  const [chunksOpen, setChunksOpen] = useState<boolean>(() => readStored(CHUNKS_OPEN_KEY, false))
+  const [chunkPage, setChunkPage] = useState(1)
+  const [exportPage, setExportPage] = useState(1)
+  const toggleChunks = () => {
+    setChunksOpen(!chunksOpen)
+    writeStored(CHUNKS_OPEN_KEY, !chunksOpen)
+  }
 
-  // Default to the first camera once the list loads.
+  // Default to the first camera (by name) once the list loads.
+  const firstCameraId = firstCameras.data?.pages[0]?.items[0]?.id
   useEffect(() => {
-    if (cameraId == null && cameras.data?.length) setCameraId(cameras.data[0].id)
-  }, [cameras.data, cameraId])
+    if (cameraId == null && firstCameraId != null) setCameraId(firstCameraId)
+  }, [firstCameraId, cameraId])
+  useEffect(() => { setChunkPage(1); setExportPage(1) }, [cameraId, profile])
 
-  const camera = cameras.data?.find((c) => c.id === cameraId)
+  const cameraQuery = useCamera(cameraId ?? 0, cameraId != null)
+  const camera = cameraQuery.data?.id === cameraId ? cameraQuery.data : undefined
   const profiles = useMemo(() => camera?.streams.map((s) => s.profile) ?? [], [camera])
   useEffect(() => {
     if (camera && !profiles.includes(profile)) setProfile(camera.streams.find((s) => s.record)?.profile ?? profiles[0])
@@ -69,7 +88,7 @@ export function PlaybackPage() {
   const dayEnd = dayStart + DAY
   const isToday = startOfLocalDay(new Date()).getTime() === dayStart
   const timeline = useTimeline(cameraId, profile, new Date(dayStart), new Date(dayEnd), isToday ? 20_000 : 0)
-  const exports = useExports(cameraId)
+  const exports = useExports(cameraId, { limit: EXPORTS_PER_PAGE, offset: (exportPage - 1) * EXPORTS_PER_PAGE })
   const cancelExport = useCancelExport()
   const segments: Segment[] = useMemo(() => timeline.data?.segments ?? [], [timeline.data])
   // This camera's bookmarks for the day (incl. camera-wide ones) -> timeline markers.
@@ -77,7 +96,7 @@ export function PlaybackPage() {
     { cameraId, profile, start: new Date(dayStart), end: new Date(dayEnd), limit: 1000 },
     cameraId != null,
   )
-  const markers = useMemo(() => (dayBookmarks.data ?? []).map(bookmarkMarker), [dayBookmarks.data])
+  const markers = useMemo(() => (dayBookmarks.data?.items ?? []).map(bookmarkMarker), [dayBookmarks.data])
   const access = playbackAccess(
     nodes.data ?? [], [...new Set(segments.map((segment) => segment.node_id))], settings.nodeAccess, detected.data,
   )
@@ -141,8 +160,8 @@ export function PlaybackPage() {
   const openBookmark = (b: Bookmark) => {
     const t = new Date(b.start_time)
     if (b.camera_id !== cameraId) setCameraId(b.camera_id)
-    const cam = cameras.data?.find((c) => c.id === b.camera_id)
-    if (b.profile && cam?.streams.some((s) => s.profile === b.profile)) setProfile(b.profile)
+    // An unknown profile is corrected by the effect above once the camera has loaded.
+    if (b.profile) setProfile(b.profile)
     const d = startOfLocalDay(t)
     if (d.getTime() !== dayStart) changeDay(d)
     // Not seek(): that caps the playlist at the *current* day's end, which may be another day.
@@ -171,11 +190,12 @@ export function PlaybackPage() {
   }
 
   const windowSegments = segments.filter((s) => new Date(s.end_time).getTime() > viewStart && new Date(s.start_time).getTime() < viewEnd)
+  const chunkRows = chunksOpen ? slicePage([...windowSegments].reverse(), chunkPage, CHUNKS_PER_PAGE) : []
   const latestExportEnd = Math.min(Date.now(), dayEnd)
   const exportEnd = new Date(playFrom ? Math.min(latestExportEnd, playFrom.getTime() + 15 * 60_000) : latestExportEnd)
   const exportStart = playFrom ?? new Date(Math.max(dayStart, exportEnd.getTime() - 15 * 60_000))
 
-  if (cameras.data && cameras.data.length === 0) {
+  if (firstCameras.data && firstCameras.data.pages[0]?.total === 0) {
     return (
       <div>
         <PageHeader title="Playback" />
@@ -189,18 +209,8 @@ export function PlaybackPage() {
       <PageHeader title="Playback" description="Browse and play recordings. Click the timeline to play from that moment." />
 
       <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
-        <Select value={cameraId != null ? String(cameraId) : undefined} onValueChange={(v) => { setCameraId(Number(v)); setPlayFrom(null); setPlayhead(null) }}>
-          <SelectTrigger className="col-span-2 w-full sm:w-56">
-            <SelectValue placeholder="Select camera" />
-          </SelectTrigger>
-          <SelectContent>
-            {(cameras.data ?? []).map((c) => (
-              <SelectItem key={c.id} value={String(c.id)}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <CameraPicker className="col-span-2 w-full sm:w-56" value={cameraId} label={camera?.name}
+          onChange={(c) => { setCameraId(c.id); setPlayFrom(null); setPlayhead(null) }} />
         <Select value={profile} onValueChange={(v) => { setProfile(v); setPlayFrom(null) }}>
           <SelectTrigger className="w-full sm:w-28">
             <SelectValue />
@@ -305,17 +315,20 @@ export function PlaybackPage() {
 
       <Card className="gap-2">
         <CardHeader>
-          <CardTitle className="text-sm font-medium">
+          <button type="button" onClick={toggleChunks} aria-expanded={chunksOpen}
+            className="flex w-full items-center gap-2 text-left text-sm font-medium hover:text-primary">
+            <ChevronDown className={chunksOpen ? "size-4 transition-transform" : "size-4 -rotate-90 transition-transform"} />
             Chunks in view <span className="font-normal text-muted-foreground">({windowSegments.length})</span>
-          </CardTitle>
+            <span className="ml-auto text-xs font-normal text-muted-foreground">{chunksOpen ? "Hide" : "Show"}</span>
+          </button>
         </CardHeader>
-        <CardContent className="max-h-80 overflow-auto px-0">
+        {chunksOpen && <CardContent className="px-0">
           {windowSegments.length === 0 ? (
             <div className="px-6 pb-2 text-sm text-muted-foreground">No recordings in this window.</div>
           ) : (
             <>
             <div className="space-y-2 px-3 pb-3 md:hidden">
-              {[...windowSegments].reverse().map((s) => {
+              {chunkRows.map((s) => {
                 const start = new Date(s.start_time)
                 const apiUrl = nodeUrl.get(s.node_id)
                 return <button key={s.id} type="button" onClick={() => seek(start.getTime())} className="flex w-full items-center gap-3 rounded-lg border bg-background/30 p-3 text-left">
@@ -342,7 +355,7 @@ export function PlaybackPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {[...windowSegments].reverse().map((s) => {
+                {chunkRows.map((s) => {
                   const start = new Date(s.start_time)
                   const apiUrl = nodeUrl.get(s.node_id)
                   return (
@@ -367,15 +380,16 @@ export function PlaybackPage() {
                 })}
               </TableBody>
             </Table></div>
+            <Pager className="px-6 pt-2" page={chunkPage} pageSize={CHUNKS_PER_PAGE} total={windowSegments.length} onPage={setChunkPage} />
             </>
           )}
-        </CardContent>
+        </CardContent>}
       </Card>
 
-      {(exports.data?.length ?? 0) > 0 && <Card className="gap-2">
-        <CardHeader><CardTitle className="text-sm font-medium">Exports</CardTitle></CardHeader>
+      {(exports.data?.total ?? 0) > 0 && <Card className="gap-2">
+        <CardHeader><CardTitle className="text-sm font-medium">Exports <span className="font-normal text-muted-foreground">({exports.data!.total})</span></CardTitle></CardHeader>
         <CardContent className="space-y-2">
-          {exports.data!.map(job => {
+          {exports.data!.items.map(job => {
             const active = ["QUEUED", "CLAIMED", "PROCESSING", "FINALIZING"].includes(job.state)
             return <div key={job.id} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1">
@@ -390,6 +404,7 @@ export function PlaybackPage() {
               </div>
             </div>
           })}
+          <Pager page={exportPage} pageSize={EXPORTS_PER_PAGE} total={exports.data!.total} onPage={setExportPage} />
         </CardContent>
       </Card>}
 

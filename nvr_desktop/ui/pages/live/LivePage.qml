@@ -8,12 +8,12 @@ import "../../video"
 
 // Port of nvr_client/src/features/live/LivePage.tsx: camera list (click or drag onto a tile),
 // layouts 1 / 2×2 / 3×3 / 4×4, grid protocol, clear, fullscreen, double-click → main stream.
-// Layout and tiles are remembered (LiveStore → Preferences).
+// Layout and tiles are remembered (LiveStore → Preferences). The camera list is searched on the server and
+// loaded 50 at a time (LiveCameras); ‹ › fill the grid with the next page of cameras.
 Item {
     id: root
     objectName: "livePage"
 
-    property string search: ""
     property string protocol: Prefs.liveProtocol
     property var expandedCamera: null
     readonly property int columns: Math.round(Math.sqrt(Live.layout))
@@ -66,7 +66,7 @@ Item {
 
     function expand(cameraId) {
         expandedZoom.reset()
-        expandedCamera = Cameras.byId(cameraId)  // PtzOverlay resets itself on cameraId change
+        expandedCamera = Cameras.byId(cameraId)  // on view, so cached; PtzOverlay resets itself on cameraId change
         expandDialog.open()
     }
 
@@ -99,11 +99,11 @@ Item {
                     Layout.margins: 12
                     iconName: "search"
                     placeholderText: "Search cameras"
-                    onTextChanged: root.search = text.toLowerCase()
+                    onTextChanged: LiveCameras.setSearch(text)
                 }
 
-                LoadingState { visible: Cameras.loading && Cameras.listModel.count === 0 && Cameras.error === "" }
-                ErrorState { text: Cameras.error; Layout.margins: 8 }
+                LoadingState { visible: LiveCameras.loading && LiveCameras.listModel.count === 0 && LiveCameras.error === "" }
+                ErrorState { text: LiveCameras.error; Layout.margins: 8 }
 
                 ListView {
                     id: cameraList
@@ -113,17 +113,15 @@ Item {
                     rightMargin: 8
                     bottomMargin: 12
                     clip: true
-                    model: Cameras.listModel
+                    model: LiveCameras.listModel
                     ScrollBar.vertical: AppScrollBar {}
 
                     delegate: Rectangle {
                         id: entry
                         required property var model
-                        readonly property bool matches: root.search === "" || model.name.toLowerCase().includes(root.search)
 
                         width: cameraList.width - 16
-                        height: matches ? 36 : 0
-                        visible: matches
+                        height: 36
                         radius: Theme.radiusSm
                         color: entryArea.containsMouse && model.enabled ? Theme.accent : "transparent"
                         opacity: model.enabled ? 1 : 0.5
@@ -133,7 +131,7 @@ Item {
                             anchors.leftMargin: 10
                             anchors.rightMargin: 10
                             spacing: 10
-                            StatusDot { status: entry.model.recordStatus }
+                            StatusDot { status: entry.model.status }
                             AppText { text: entry.model.name; Layout.fillWidth: true }
                             AppText {
                                 visible: Live.onView.includes(entry.model.id)
@@ -171,9 +169,20 @@ Item {
                         }
                     }
 
+                    footer: AppButton {
+                        visible: LiveCameras.hasMore
+                        width: visible ? cameraList.width - 16 : 0
+                        height: visible ? 32 : 0
+                        variant: "ghost"
+                        size: "sm"
+                        text: LiveCameras.loadingMore ? "Loading…" : LiveCameras.moreLabel
+                        enabled: !LiveCameras.loadingMore
+                        onClicked: LiveCameras.loadMore()
+                    }
+
                     AppText {
-                        visible: Cameras.listModel.count > 0 && !Cameras.all.some(c => c.name.toLowerCase().includes(root.search))
-                        text: "No cameras."
+                        visible: !LiveCameras.loading && LiveCameras.error === "" && LiveCameras.listModel.count === 0
+                        text: LiveCameras.query !== "" ? "No cameras match." : "No cameras."
                         variant: "muted"
                         x: 12
                         y: 8
@@ -216,6 +225,33 @@ Item {
                         value: root.protocol
                         onPicked: v => root.protocol = v
                     }
+                    // grid pages: the next 4 / 9 / 16 enabled cameras by name
+                    RowLayout {
+                        visible: Live.gridTotal > 0
+                        spacing: 2
+                        AppButton {
+                            objectName: "gridPrev"
+                            variant: "ghost"; size: "icon"; iconName: "chevron-left"; implicitHeight: 30
+                            tip: "Previous cameras"
+                            enabled: !Live.gridPaging
+                            onClicked: Live.prevGridPage()
+                        }
+                        AppText {
+                            objectName: "gridPageLabel"
+                            text: Live.gridPaging ? "Loading…" : Live.gridPage > 0 ? "Page " + Live.gridPage + " / " + Live.gridPages
+                                                                               : Live.gridPages + " pages"
+                            variant: "small"
+                            horizontalAlignment: Text.AlignHCenter
+                            Layout.minimumWidth: 78
+                        }
+                        AppButton {
+                            objectName: "gridNext"
+                            variant: "ghost"; size: "icon"; iconName: "chevron-right"; implicitHeight: 30
+                            tip: "Next cameras"
+                            enabled: !Live.gridPaging
+                            onClicked: Live.nextGridPage()
+                        }
+                    }
                     Item { Layout.fillWidth: true }
                     AppButton { text: "Clear"; iconName: "trash-2"; variant: "outline"; size: "sm"; onClicked: Live.clearAll() }
                     AppButton {
@@ -231,7 +267,7 @@ Item {
             }
 
             EmptyState {
-                visible: !Cameras.loading && Cameras.error === "" && Cameras.listModel.count === 0
+                visible: Live.gridTotal === 0 && LiveCameras.query === "" && LiveCameras.total === 0
                 Layout.margins: 24
                 iconName: "camera"
                 title: "No cameras yet"
@@ -242,7 +278,7 @@ Item {
             // own size back into the layout.
             Item {
                 id: gridArea
-                visible: Cameras.listModel.count > 0
+                visible: Live.gridTotal !== 0 || LiveCameras.total > 0
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 

@@ -1,7 +1,8 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { onvifErrorText } from "@/lib/onvif"
 import { type NodeAccess, selectedNodeAccess, useNodeAccessMap } from "@/lib/nodeAccess"
+import type { Paged } from "@/lib/pager"
 import { useSettings } from "@/lib/settings"
 import { ApiError, cancelExport, centralClient, createExport, listExports, nodeClient, nodeGet, unwrap } from "./client"
 import type {
@@ -15,8 +16,10 @@ import type {
   Bookmark,
   BookmarkCreate,
   BookmarkUpdate,
+  AlertPage,
   Camera,
   CameraCreate,
+  CameraOption,
   CameraUpdate,
   ClusterHealth,
   LiveInfo,
@@ -91,19 +94,78 @@ export function useOnvifServer(nodeId: number, refetchMs = 5000) {
   })
 }
 
-export function useCameras() {
+export interface CameraQuery {
+  q?: string
+  enabled?: boolean
+  nodeId?: number
+  status?: Camera["streams"][number]["status"]
+  limit: number
+  offset: number
+}
+
+/** One page of full camera rows (Cameras page, node ONVIF tab). Keys start with [url, "cameras"], so every
+ *  camera mutation still refreshes them. */
+export function usePagedCameras(params: CameraQuery, enabled = true) {
   const { url, api, poll } = useCentral()
+  const query = {
+    q: params.q || undefined, enabled: params.enabled, node_id: params.nodeId, status: params.status,
+    limit: params.limit, offset: params.offset,
+  }
   return useQuery({
-    queryKey: [url, "cameras"],
-    queryFn: () => unwrap<Camera[]>(api.GET("/api/v1/cameras")),
+    queryKey: [url, "cameras", "page", query],
+    enabled,
+    placeholderData: keepPreviousData,
+    queryFn: () => unwrap<Paged<Camera>>(api.GET("/api/v1/cameras", { params: { query } })),
     refetchInterval: poll,
   })
 }
 
-export function useCamera(cameraId: number) {
+/** Full rows for just these cameras (live tiles, the bulk-encoder list). Max 200 ids. */
+export function useCamerasByIds(ids: number[]) {
+  const { url, api, poll } = useCentral()
+  const key = [...new Set(ids)].sort((a, b) => a - b).join(",")
+  return useQuery({
+    queryKey: [url, "cameras", "ids", key],
+    enabled: key !== "",
+    placeholderData: keepPreviousData,
+    queryFn: async () =>
+      (await unwrap<Paged<Camera>>(api.GET("/api/v1/cameras", { params: { query: { ids: key, limit: 200 } } }))).items,
+    refetchInterval: poll,
+  })
+}
+
+export const CAMERA_OPTIONS_PAGE = 50
+
+/** Small searchable camera rows for pickers and the live sidebar, loaded 50 at a time ("Load more"). */
+export function useCameraOptions(q: string, opts: { enabled?: boolean; nodeId?: number } = {}) {
+  const { url, api } = useCentral()
+  const query = { q: q.trim() || undefined, enabled: opts.enabled, node_id: opts.nodeId, limit: CAMERA_OPTIONS_PAGE }
+  return useInfiniteQuery({
+    queryKey: [url, "cameras", "options", query],
+    initialPageParam: 0,
+    placeholderData: keepPreviousData,
+    queryFn: ({ pageParam }) =>
+      unwrap<Paged<CameraOption>>(api.GET("/api/v1/cameras/options", { params: { query: { ...query, offset: pageParam } } })),
+    getNextPageParam: (last) => (last.offset + last.items.length < last.total ? last.offset + last.items.length : undefined),
+  })
+}
+
+/** Camera alerts built by central (danger first). Node alerts are still built in the dashboard. */
+export function useAlerts(params: { level?: "danger" | "warning"; limit: number; offset: number }) {
+  const { url, api, poll } = useCentral()
+  return useQuery({
+    queryKey: [url, "cluster-alerts", params],
+    placeholderData: keepPreviousData,
+    queryFn: () => unwrap<AlertPage>(api.GET("/api/v1/cluster/alerts", { params: { query: params } })),
+    refetchInterval: poll,
+  })
+}
+
+export function useCamera(cameraId: number, enabled = true) {
   const { url, api, poll } = useCentral()
   return useQuery({
     queryKey: [url, "cameras", cameraId],
+    enabled,
     queryFn: () =>
       unwrap<Camera>(api.GET("/api/v1/cameras/{camera_id}", { params: { path: { camera_id: cameraId } } })),
     refetchInterval: poll,
@@ -182,23 +244,25 @@ export function useBackfill(cameraId: number, enabled = true) {
   })
 }
 
-export function useBackfillJobs(cameraId: number, enabled = true) {
+export function useBackfillJobs(cameraId: number, enabled = true, page = { limit: 10, offset: 0 }) {
   const { url, api } = useCentral()
   return useQuery({
-    queryKey: [url, "backfill-jobs", cameraId],
+    queryKey: [url, "backfill-jobs", cameraId, page],
     enabled,
-    queryFn: () => unwrap<BackfillJob[]>(api.GET("/api/v1/cameras/{camera_id}/backfill/jobs", {
-      params: { path: { camera_id: cameraId }, query: { limit: 50 } },
+    placeholderData: keepPreviousData,
+    queryFn: () => unwrap<Paged<BackfillJob>>(api.GET("/api/v1/cameras/{camera_id}/backfill/jobs", {
+      params: { path: { camera_id: cameraId }, query: page },
     })),
     refetchInterval: 3000,
   })
 }
 
-export function useExports(cameraId: number | null) {
+export function useExports(cameraId: number | null, page = { limit: 10, offset: 0 }) {
   const { url } = useCentral()
   return useQuery({
-    queryKey: [url, "exports", cameraId], enabled: cameraId != null,
-    queryFn: () => listExports(url, cameraId!), refetchInterval: 3000,
+    queryKey: [url, "exports", cameraId, page], enabled: cameraId != null,
+    placeholderData: keepPreviousData,
+    queryFn: () => listExports(url, cameraId!, page.limit, page.offset), refetchInterval: 3000,
   })
 }
 
@@ -232,6 +296,7 @@ export interface BookmarkQuery {
   /** by start time; "desc" = newest first (search lists) */
   order?: "asc" | "desc"
   limit?: number
+  offset?: number
 }
 
 export function useBookmarks(params: BookmarkQuery, enabled = true) {
@@ -244,12 +309,13 @@ export function useBookmarks(params: BookmarkQuery, enabled = true) {
     end: params.end?.toISOString(),
     order: params.order,
     limit: params.limit,
+    offset: params.offset,
   }
   return useQuery({
     queryKey: [url, "bookmarks", query],
     enabled,
     placeholderData: keepPreviousData,
-    queryFn: () => unwrap<Bookmark[]>(api.GET("/api/v1/bookmarks", { params: { query } })),
+    queryFn: () => unwrap<Paged<Bookmark>>(api.GET("/api/v1/bookmarks", { params: { query } })),
   })
 }
 
@@ -272,23 +338,26 @@ export const useDeleteBookmark = () =>
     { success: "Bookmark deleted", invalidate: ["bookmarks"] },
   )
 
-export function useAssignments() {
+export function useAssignments(params: { q?: string; nodeId?: number; limit: number; offset: number }) {
   const { url, api, poll } = useCentral()
+  const query = { q: params.q || undefined, node_id: params.nodeId, limit: params.limit, offset: params.offset }
   return useQuery({
-    queryKey: [url, "assignments"],
-    queryFn: () => unwrap<Assignment[]>(api.GET("/api/v1/assignments")),
+    queryKey: [url, "assignments", query],
+    placeholderData: keepPreviousData,
+    queryFn: () => unwrap<Paged<Assignment>>(api.GET("/api/v1/assignments", { params: { query } })),
     refetchInterval: poll,
   })
 }
 
-export function useAssignmentHistory(cameraId: number | null) {
+export function useAssignmentHistory(cameraId: number | null, page = { limit: 10, offset: 0 }) {
   const { url, api } = useCentral()
   return useQuery({
-    queryKey: [url, "assignment-history", cameraId],
+    queryKey: [url, "assignment-history", cameraId, page],
     enabled: cameraId != null,
+    placeholderData: keepPreviousData,
     queryFn: () =>
-      unwrap<AssignmentHistory[]>(
-        api.GET("/api/v1/assignments/{camera_id}/history", { params: { path: { camera_id: cameraId! } } }),
+      unwrap<Paged<AssignmentHistory>>(
+        api.GET("/api/v1/assignments/{camera_id}/history", { params: { path: { camera_id: cameraId! }, query: page } }),
       ),
   })
 }
@@ -325,11 +394,12 @@ export function useNodePaths(apiUrl: string | undefined) {
   })
 }
 
-export function useNodeSegments(apiUrl: string | undefined, limit = 100) {
+export function useNodeSegments(apiUrl: string | undefined, limit = 50, offset = 0) {
   return useQuery({
-    queryKey: ["node", apiUrl, "segments", limit],
+    queryKey: ["node", apiUrl, "segments", limit, offset],
     enabled: !!apiUrl,
-    queryFn: () => nodeGet<LocalSegment[]>(apiUrl!, "/api/v1/segments", { limit }),
+    placeholderData: keepPreviousData,
+    queryFn: () => nodeGet<Paged<LocalSegment>>(apiUrl!, "/api/v1/segments", { limit, offset }),
     refetchInterval: 10_000,
     retry: false,
   })
