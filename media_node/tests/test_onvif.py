@@ -139,6 +139,24 @@ def test_rehost():
     assert services.rehost("rtsp://192.168.1.241/x", "192.168.1.241") == "rtsp://192.168.1.241/x"
 
 
+def test_device_url_scheme_follows_port():
+    # Plaintext http:// to a camera's TLS port 443 fails instantly (RemoteProtocolError);
+    # port 443 must bootstrap over https. An explicit xaddr always wins.
+    async def build():
+        http = services.OnvifDevice("192.168.1.9", 80, "u", "p")
+        tls = services.OnvifDevice("192.168.1.9", 443, "u", "p")
+        given = services.OnvifDevice("192.168.1.9", 443, "u", "p", xaddr="http://10.0.0.1/onvif/device_service")
+        try:
+            return http.device_url, tls.device_url, given.device_url
+        finally:
+            for d in (http, tls, given):
+                await d.__aexit__(None, None, None)
+    http_url, tls_url, given_url = asyncio.run(build())
+    assert http_url == "http://192.168.1.9:80/onvif/device_service"
+    assert tls_url == "https://192.168.1.9:443/onvif/device_service"
+    assert given_url == "http://10.0.0.1/onvif/device_service"
+
+
 # ---------------------------------------------------------------- SOAP client
 def test_security_header_digest_and_clock_offset():
     nonce = b"0123456789abcdef"
