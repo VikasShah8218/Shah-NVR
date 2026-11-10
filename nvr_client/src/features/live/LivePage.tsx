@@ -10,6 +10,7 @@ import {
   MoreVertical,
   Play,
   Plus,
+  RotateCw,
   Search,
   Settings2,
   Loader2,
@@ -527,6 +528,7 @@ function LiveTile({
   }, [])
   const protocol = override ?? gridProtocol
   const recording = camera.streams.some((s) => s.record && s.status === "RECORDING")
+  const [reconnects, setReconnects] = useState(0) // ↻: bump = fresh connection
 
   const copyRtsp = () => {
     const url = pickStream(live.data, profile)?.rtsp
@@ -536,7 +538,8 @@ function LiveTile({
 
   return (
     <div className="group relative size-full" onDoubleClick={onExpand}>
-      <LivePlayer cameraId={camera.id} profile={profile} protocol={protocol} suspended={suspended} className="size-full" onVideo={setVideo} />
+      <LivePlayer cameraId={camera.id} profile={profile} protocol={protocol} suspended={suspended} className="size-full" onVideo={setVideo}
+        reconnectSignal={reconnects} />
       <div className="pointer-events-none absolute inset-x-0 top-0 flex min-w-0 items-center gap-2 overflow-hidden bg-gradient-to-b from-black/60 to-transparent px-2 py-1.5 text-xs text-white">
         <span className="min-w-0 flex-1 truncate font-medium">{camera.name}</span>
         {recording && (
@@ -546,6 +549,13 @@ function LiveTile({
         )}
         <span className="shrink-0 text-white/60">{profile}</span>
         <div className="pointer-events-auto flex shrink-0 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+          {!suspended && (
+            <Button variant="ghost" size="icon" className="size-9 text-white hover:bg-white/15 hover:text-white md:size-6"
+              title="Reconnect (fresh connection)" aria-label="Reconnect"
+              onDoubleClick={(e) => e.stopPropagation()} onClick={() => setReconnects((n) => n + 1)}>
+              <RotateCw className="size-3.5" />
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="size-9 text-white hover:bg-white/15 hover:text-white md:size-6">
@@ -562,6 +572,9 @@ function LiveTile({
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onExpand}>
                 <Maximize className="size-4" /> Open main stream
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={suspended} onClick={() => setReconnects((n) => n + 1)}>
+                <RotateCw className="size-4" /> Reconnect
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => saveSnapshot(videoEl.current, camera.name) || toast.error("No video frame yet")}>
                 <ImageDown className="size-4" /> Snapshot
@@ -587,7 +600,7 @@ function LiveTile({
 function DigitalZoomPlayer({ cameraId, protocol }: { cameraId: number; protocol: LiveProtocol }) {
   return (
     <DigitalZoom className="min-h-0 w-full flex-1 rounded-md bg-video">
-      {(videoStyle) => <LivePlayer cameraId={cameraId} profile="main" protocol={protocol} className="size-full" videoStyle={videoStyle} />}
+      {(videoStyle) => <LivePlayer cameraId={cameraId} profile="main" protocol={protocol} className="size-full" videoStyle={videoStyle} showRefresh />}
     </DigitalZoom>
   )
 }
