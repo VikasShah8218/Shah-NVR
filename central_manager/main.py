@@ -21,6 +21,7 @@ from app.backfill.services import backfill_scheduler_tick
 from app.bookmarks.router import router as bookmarks_router
 from app.cameras.router import router as cameras_router
 from app.cluster.router import router as cluster_router
+from app.groups.router import router as groups_router
 from app.nodes.router import internal_router as nodes_internal_router
 from app.nodes.router import router as nodes_router
 from app.nodes.services import node_health_tick
@@ -73,6 +74,7 @@ app.add_middleware(
 
 for r in (
     cameras_router,
+    groups_router,
     recordings_router,
     playback_router,
     bookmarks_router,

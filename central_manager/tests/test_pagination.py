@@ -51,7 +51,8 @@ def test_camera_options_are_small_rows():
         page = client.get("/api/v1/cameras/options", params={"q": "ga"}).json()
         assert page["total"] == 1
         assert page["items"] == [{"id": gate, "name": "Gate", "enabled": True, "has_ptz": False,
-                                  "profiles": ["main", "sub"], "status": "UNASSIGNED", "node_id": None}]
+                                  "profiles": ["main", "sub"], "status": "UNASSIGNED", "node_id": None,
+                                  "group_id": None, "group_path": None}]
 
 
 def test_alerts_are_paged_danger_first_with_counts():

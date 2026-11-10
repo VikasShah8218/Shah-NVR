@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { SettingsProvider } from "@/lib/settings"
 
 // Each page is its own chunk, loaded on first visit.
+const GroupsPage = lazy(() => import("@/features/groups/GroupsPage").then((m) => ({ default: m.GroupsPage })))
 const AssignmentsPage = lazy(() => import("@/features/assignments/AssignmentsPage").then((m) => ({ default: m.AssignmentsPage })))
 const CameraDetailPage = lazy(() => import("@/features/cameras/CameraDetailPage").then((m) => ({ default: m.CameraDetailPage })))
 const CamerasPage = lazy(() => import("@/features/cameras/CamerasPage").then((m) => ({ default: m.CamerasPage })))
@@ -38,6 +39,7 @@ export default function App() {
                 <Route path="discover" element={<DiscoverPage />} />
                 <Route path="nodes" element={<NodesPage />} />
                 <Route path="nodes/:id" element={<NodeDetailPage />} />
+                <Route path="groups" element={<GroupsPage />} />
                 <Route path="assignments" element={<AssignmentsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>

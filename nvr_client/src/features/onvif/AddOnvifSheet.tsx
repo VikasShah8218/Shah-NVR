@@ -5,6 +5,7 @@ import { useOnvifAddCall, useOnvifProbeCall, useOnvifSnapshotCall } from "@/api/
 import type { OnvifDiscovered, OnvifProbe } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { GroupPicker } from "@/components/GroupPicker"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -45,6 +46,7 @@ export function AddOnvifSheet({
   const snapshotCall = useOnvifSnapshotCall()
   const [username, setUsername] = useState("admin")
   const [password, setPassword] = useState("")
+  const [groupId, setGroupId] = useState<number | null>(null)
   const [rows, setRows] = useState<Row[]>(() =>
     devices.map((d) => ({ device: d, status: "idle", name: "", main: "", sub: "", recordSub: false })),
   )
@@ -102,7 +104,7 @@ export function AddOnvifSheet({
       try {
         const streams = [{ profile: "main", token: r.main, record: true }]
         if (r.sub) streams.push({ profile: "sub", token: r.sub, record: r.recordSub })
-        const cam = await addCall({ ...creds(r.device), name: r.name.trim() || null, streams, enabled: true, allow_duplicate: false })
+        const cam = await addCall({ ...creds(r.device), name: r.name.trim() || null, streams, enabled: true, allow_duplicate: false, group_id: groupId })
         patch(r.device.endpoint, { status: "added", cameraId: cam.id })
       } catch (err) {
         patch(r.device.endpoint, { status: "error", error: onvifErrorText(err) })
@@ -127,6 +129,10 @@ export function AddOnvifSheet({
         </SheetHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-4">
+          <div className="grid gap-1.5">
+            <Label>Add to group</Label>
+            <GroupPicker className="w-full" value={groupId} onChange={(id) => setGroupId(id)} noneLabel="No group" />
+          </div>
           <div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
             <div className="grid gap-1.5">
               <Label htmlFor="onvif-user">Username</Label>

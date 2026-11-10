@@ -116,6 +116,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Direct sub-groups of a group, or the top level (paged) */
+        get: operations["list_groups_api_v1_groups_get"];
+        put?: never;
+        /** Create Group */
+        post: operations["create_group_api_v1_groups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Groups whose name contains `q`, anywhere in the tree */
+        get: operations["search_groups_api_v1_groups_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move cameras into a group (group_id null = no group) */
+        post: operations["assign_api_v1_groups_assign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups/{group_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Group */
+        get: operations["get_group_api_v1_groups__group_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete a group (409 when not empty, unless move_children=parent) */
+        delete: operations["delete_group_api_v1_groups__group_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename / describe / move (parent_id) */
+        patch: operations["update_group_api_v1_groups__group_id__patch"];
+        trace?: never;
+    };
     "/api/v1/cameras/{camera_id}/recordings": {
         parameters: {
             query?: never;
@@ -1231,6 +1302,18 @@ export interface components {
             offset: number;
             counts: components["schemas"]["AlertCounts"];
         };
+        /** AssignIn */
+        AssignIn: {
+            /** Camera Ids */
+            camera_ids: number[];
+            /** Group Id */
+            group_id: number | null;
+        };
+        /** AssignOut */
+        AssignOut: {
+            /** Updated */
+            updated: number;
+        };
         /** AssignmentHistoryOut */
         AssignmentHistoryOut: {
             /** Camera Id */
@@ -1563,6 +1646,8 @@ export interface components {
              * @default false
              */
             has_ptz: boolean;
+            /** Group Id */
+            group_id?: number | null;
             /** Streams */
             streams: components["schemas"]["StreamIn"][];
         };
@@ -1584,6 +1669,10 @@ export interface components {
             status: components["schemas"]["StreamStatus"];
             /** Node Id */
             node_id: number | null;
+            /** Group Id */
+            group_id?: number | null;
+            /** Group Path */
+            group_path?: string | null;
         };
         /** CameraOut */
         CameraOut: {
@@ -1627,6 +1716,10 @@ export interface components {
             clock_offset_seconds?: number | null;
             /** Onvif Checked At */
             onvif_checked_at?: string | null;
+            /** Group Id */
+            group_id?: number | null;
+            /** Group Path */
+            group_path?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1657,6 +1750,8 @@ export interface components {
             expose_via_onvif?: boolean | null;
             /** Has Ptz */
             has_ptz?: boolean | null;
+            /** Group Id */
+            group_id?: number | null;
             /** Retention Days */
             retention_days?: number | null;
         };
@@ -2258,6 +2353,110 @@ export interface components {
             /** Memory Total Bytes */
             memory_total_bytes?: number | null;
         };
+        /** GroupCreate */
+        GroupCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Parent Id */
+            parent_id?: number | null;
+        };
+        /** GroupDetail */
+        GroupDetail: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Parent Id */
+            parent_id: number | null;
+            /** Depth */
+            depth: number;
+            /** Path */
+            path: string;
+            /** Path Label */
+            path_label: string;
+            /** Sort Order */
+            sort_order: number;
+            /** Child Groups */
+            child_groups: number;
+            /** Cameras Direct */
+            cameras_direct: number;
+            /** Cameras Total */
+            cameras_total: number;
+            /** Online Total */
+            online_total: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Breadcrumb */
+            breadcrumb: components["schemas"]["GroupRef"][];
+        };
+        /** GroupOut */
+        GroupOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Parent Id */
+            parent_id: number | null;
+            /** Depth */
+            depth: number;
+            /** Path */
+            path: string;
+            /** Path Label */
+            path_label: string;
+            /** Sort Order */
+            sort_order: number;
+            /** Child Groups */
+            child_groups: number;
+            /** Cameras Direct */
+            cameras_direct: number;
+            /** Cameras Total */
+            cameras_total: number;
+            /** Online Total */
+            online_total: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** GroupRef */
+        GroupRef: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /**
+         * GroupUpdate
+         * @description Rename, describe or move. Send `parent_id: null` to move a group to the top level.
+         */
+        GroupUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Parent Id */
+            parent_id?: number | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2656,6 +2855,8 @@ export interface components {
             enabled: boolean;
             /** Retention Days */
             retention_days?: number | null;
+            /** Group Id */
+            group_id?: number | null;
             /** Streams */
             streams?: components["schemas"]["StreamPick"][] | null;
             /**
@@ -2788,6 +2989,17 @@ export interface components {
         Page_ExportOut_: {
             /** Items */
             items: components["schemas"]["ExportOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[GroupOut] */
+        Page_GroupOut_: {
+            /** Items */
+            items: components["schemas"]["GroupOut"][];
             /** Total */
             total: number;
             /** Limit */
@@ -3494,6 +3706,12 @@ export interface operations {
                 /** @description Only these ids, comma-separated (max 200) */
                 ids?: string | null;
                 sort?: "name" | "id";
+                /** @description Cameras directly in this group */
+                group_id?: number | null;
+                /** @description Only cameras in no group */
+                ungrouped?: boolean;
+                /** @description With group_id: also every sub-group's cameras */
+                recursive?: boolean;
                 /** @description Rows per page */
                 limit?: number;
                 /** @description Rows to skip */
@@ -3565,6 +3783,12 @@ export interface operations {
                 enabled?: boolean | null;
                 node_id?: number | null;
                 ids?: string | null;
+                /** @description Cameras directly in this group */
+                group_id?: number | null;
+                /** @description Only cameras in no group */
+                ungrouped?: boolean;
+                /** @description With group_id: also every sub-group's cameras */
+                recursive?: boolean;
                 /** @description Rows per page */
                 limit?: number;
                 /** @description Rows to skip */
@@ -3813,6 +4037,240 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LiveOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_groups_api_v1_groups_get: {
+        parameters: {
+            query?: {
+                /** @description Omit for the top-level groups */
+                parent_id?: number | null;
+                /** @description Rows per page */
+                limit?: number;
+                /** @description Rows to skip */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_GroupOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_group_api_v1_groups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_groups_api_v1_groups_search_get: {
+        parameters: {
+            query: {
+                q: string;
+                /** @description Rows per page */
+                limit?: number;
+                /** @description Rows to skip */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_GroupOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_api_v1_groups_assign_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_group_api_v1_groups__group_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_group_api_v1_groups__group_id__delete: {
+        parameters: {
+            query?: {
+                move_children?: string | null;
+            };
+            header?: never;
+            path: {
+                group_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_group_api_v1_groups__group_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupDetail"];
                 };
             };
             /** @description Validation Error */

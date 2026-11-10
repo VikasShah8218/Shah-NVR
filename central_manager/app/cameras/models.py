@@ -54,6 +54,9 @@ class Camera(Model):
     backfill_latest = fields.DatetimeField(null=True)
     backfill_checked_at = fields.DatetimeField(null=True)
     backfill_error = fields.CharField(max_length=512, null=True)
+    # Camera tree (docs/GROUPING_PLAN.md): one group or none. Deleting a group never deletes cameras.
+    group = fields.ForeignKeyField("models.CameraGroup", related_name="cameras", null=True,
+                                   on_delete=fields.SET_NULL)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
@@ -61,7 +64,8 @@ class Camera(Model):
 
     class Meta:
         table = "cameras"
-        indexes = (("name", "id"),)  # paged camera list is ordered by name, id
+        # paged camera list is ordered by name, id; a group's cameras likewise
+        indexes = (("name", "id"), ("group_id", "name", "id"))
         ordering = ["id"]
 
 

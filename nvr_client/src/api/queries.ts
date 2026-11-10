@@ -21,7 +21,11 @@ import type {
   CameraCreate,
   CameraOption,
   CameraUpdate,
+  CameraGroup,
   ClusterHealth,
+  GroupCreate,
+  GroupDetail,
+  GroupUpdate,
   LiveInfo,
   LocalSegment,
   MediaNode,
@@ -94,7 +98,18 @@ export function useOnvifServer(nodeId: number, refetchMs = 5000) {
   })
 }
 
-export interface CameraQuery {
+/** Camera group filter of the camera lists: directly in a group, in its whole subtree, or in no group. */
+export interface CameraScope {
+  groupId?: number
+  ungrouped?: boolean
+  recursive?: boolean
+}
+
+const scopeQuery = (s: CameraScope) => ({
+  group_id: s.groupId, ungrouped: s.ungrouped || undefined, recursive: s.recursive || undefined,
+})
+
+export interface CameraQuery extends CameraScope {
   q?: string
   enabled?: boolean
   nodeId?: number
@@ -109,7 +124,7 @@ export function usePagedCameras(params: CameraQuery, enabled = true) {
   const { url, api, poll } = useCentral()
   const query = {
     q: params.q || undefined, enabled: params.enabled, node_id: params.nodeId, status: params.status,
-    limit: params.limit, offset: params.offset,
+    limit: params.limit, offset: params.offset, ...scopeQuery(params),
   }
   return useQuery({
     queryKey: [url, "cameras", "page", query],
@@ -136,17 +151,96 @@ export function useCamerasByIds(ids: number[]) {
 
 export const CAMERA_OPTIONS_PAGE = 50
 
-/** Small searchable camera rows for pickers and the live sidebar, loaded 50 at a time ("Load more"). */
-export function useCameraOptions(q: string, opts: { enabled?: boolean; nodeId?: number } = {}) {
-  const { url, api } = useCentral()
-  const query = { q: q.trim() || undefined, enabled: opts.enabled, node_id: opts.nodeId, limit: CAMERA_OPTIONS_PAGE }
+const nextOffset = (last: Paged<unknown>) =>
+  last.offset + last.items.length < last.total ? last.offset + last.items.length : undefined
+
+/** Small searchable camera rows for pickers and the live sidebar, loaded 50 at a time ("Load more").
+ *  `scope` limits it to a camera group (the group tree); `poll` keeps status dots fresh; `active: false` waits. */
+export function useCameraOptions(
+  q: string,
+  opts: { enabled?: boolean; nodeId?: number; scope?: CameraScope; poll?: boolean; active?: boolean } = {},
+) {
+  const { url, api, poll } = useCentral()
+  const query = {
+    q: q.trim() || undefined, enabled: opts.enabled, node_id: opts.nodeId, limit: CAMERA_OPTIONS_PAGE,
+    ...scopeQuery(opts.scope ?? {}),
+  }
   return useInfiniteQuery({
     queryKey: [url, "cameras", "options", query],
+    enabled: opts.active ?? true,
     initialPageParam: 0,
-    placeholderData: keepPreviousData,
+    placeholderData: opts.scope ? undefined : keepPreviousData,
     queryFn: ({ pageParam }) =>
       unwrap<Paged<CameraOption>>(api.GET("/api/v1/cameras/options", { params: { query: { ...query, offset: pageParam } } })),
-    getNextPageParam: (last) => (last.offset + last.items.length < last.total ? last.offset + last.items.length : undefined),
+    getNextPageParam: nextOffset,
+    refetchInterval: opts.poll ? poll : undefined,
+  })
+}
+
+/** One page of camera picker rows for a table (Groups page: cameras of a group, "Add cameras" dialog). */
+export function useCameraOptionsPage(params: { q?: string; scope: CameraScope; limit: number; offset: number }) {
+  const { url, api, poll } = useCentral()
+  const query = { q: params.q?.trim() || undefined, limit: params.limit, offset: params.offset, ...scopeQuery(params.scope) }
+  return useQuery({
+    queryKey: [url, "cameras", "options", "page", query],
+    placeholderData: keepPreviousData,
+    queryFn: () => unwrap<Paged<CameraOption>>(api.GET("/api/v1/cameras/options", { params: { query } })),
+    refetchInterval: poll,
+  })
+}
+
+// ---------------------------------------------------------------- camera groups (lazy tree)
+
+export const GROUP_PAGE = 50
+
+/** Direct sub-groups of one group (or the top level), 50 at a time. Only mounted (= expanded) tree nodes poll. */
+export function useGroupChildren(parentId: number | null, active = true) {
+  const { url, api, poll } = useCentral()
+  return useInfiniteQuery({
+    queryKey: [url, "groups", "children", parentId],
+    enabled: active,
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => unwrap<Paged<CameraGroup>>(api.GET("/api/v1/groups", {
+      params: { query: { parent_id: parentId ?? undefined, limit: GROUP_PAGE, offset: pageParam } },
+    })),
+    getNextPageParam: nextOffset,
+    refetchInterval: poll,
+  })
+}
+
+/** One page of sub-groups for a table (Groups page). */
+export function useGroupPage(parentId: number | null, limit: number, offset: number) {
+  const { url, api, poll } = useCentral()
+  return useQuery({
+    queryKey: [url, "groups", "page", parentId, limit, offset],
+    placeholderData: keepPreviousData,
+    queryFn: () => unwrap<Paged<CameraGroup>>(api.GET("/api/v1/groups", {
+      params: { query: { parent_id: parentId ?? undefined, limit, offset } },
+    })),
+    refetchInterval: poll,
+  })
+}
+
+export function useGroup(groupId: number | null) {
+  const { url, api, poll } = useCentral()
+  return useQuery({
+    queryKey: [url, "groups", "one", groupId],
+    enabled: groupId != null,
+    queryFn: () => unwrap<GroupDetail>(api.GET("/api/v1/groups/{group_id}", { params: { path: { group_id: groupId! } } })),
+    refetchInterval: poll,
+    retry: (count, err) => !(err instanceof ApiError && err.status === 404) && count < 2,
+  })
+}
+
+/** Groups whose name matches, anywhere in the tree (with their full path label). */
+export function useGroupSearch(q: string, limit = 20) {
+  const { url, api } = useCentral()
+  const term = q.trim()
+  return useQuery({
+    queryKey: [url, "groups", "search", term, limit],
+    enabled: term !== "",
+    placeholderData: keepPreviousData,
+    queryFn: () => unwrap<Paged<CameraGroup>>(api.GET("/api/v1/groups/search", { params: { query: { q: term, limit } } })),
   })
 }
 
@@ -450,6 +544,40 @@ export const useDeleteCamera = () =>
   useCentralMutation(
     (api, id: number) => unwrap(api.DELETE("/api/v1/cameras/{camera_id}", { params: { path: { camera_id: id } } })),
     { success: "Camera deleted" },
+  )
+
+const GROUP_KEYS = ["groups", "cameras"]
+
+export const useCreateGroup = () =>
+  useCentralMutation((api, body: GroupCreate) => unwrap<GroupDetail>(api.POST("/api/v1/groups", { body })), {
+    invalidate: GROUP_KEYS, success: (g) => `Group "${g.name}" created`,
+  })
+
+export const useUpdateGroup = () =>
+  useCentralMutation(
+    (api, { id, body }: { id: number; body: GroupUpdate }) =>
+      unwrap<GroupDetail>(api.PATCH("/api/v1/groups/{group_id}", { params: { path: { group_id: id } }, body })),
+    { invalidate: GROUP_KEYS, success: "Group updated" },
+  )
+
+export const useDeleteGroup = () =>
+  useCentralMutation(
+    (api, { id, moveChildren }: { id: number; moveChildren: boolean }) =>
+      unwrap(api.DELETE("/api/v1/groups/{group_id}", {
+        params: { path: { group_id: id }, query: { move_children: moveChildren ? "parent" : undefined } },
+      })),
+    { invalidate: GROUP_KEYS, success: "Group deleted" },
+  )
+
+/** Move cameras into a group (`groupId: null` = out of every group). */
+export const useAssignCameras = () =>
+  useCentralMutation(
+    (api, { cameraIds, groupId }: { cameraIds: number[]; groupId: number | null }) =>
+      unwrap<{ updated: number }>(api.POST("/api/v1/groups/assign", { body: { camera_ids: cameraIds, group_id: groupId } })),
+    {
+      invalidate: GROUP_KEYS,
+      success: (r, v) => `${r.updated} camera${r.updated === 1 ? "" : "s"} ${v.groupId == null ? "removed from group" : "moved"}`,
+    },
   )
 
 const BACKFILL_KEYS = ["backfill", "backfill-jobs", "timeline"]

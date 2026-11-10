@@ -102,6 +102,7 @@ class OnvifCameraCreate(DeviceIn):
     description: str | None = None
     enabled: bool = True
     retention_days: int | None = Field(default=None, ge=1, le=3650)  # omitted = default, null = until full
+    group_id: int | None = None  # camera group to add it to (docs/GROUPING_PLAN.md)
     # None = the suggestion: main (recorded) + sub (live only) when the camera has a smaller profile
     streams: list[StreamPick] | None = None
     allow_duplicate: bool = False

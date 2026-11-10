@@ -4,6 +4,7 @@ import { useCreateCamera, useSyncStreams, useUpdateCamera } from "@/api/queries"
 import type { Camera, StreamIn } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { GroupPicker } from "@/components/GroupPicker"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
@@ -65,6 +66,7 @@ export function CameraFormSheet({
   const [untilFull, setUntilFull] = useState(camera ? camera.retention_days == null : false)
   const [enabled, setEnabled] = useState(camera?.enabled ?? true)
   const [hasPtz, setHasPtz] = useState(camera?.has_ptz ?? false)
+  const [groupId, setGroupId] = useState<number | null>(camera?.group_id ?? null)
   const [streams, setStreams] = useState<StreamDraft[]>(() => draftFromCamera(camera))
   const [errors, setErrors] = useState<string[]>([])
 
@@ -117,6 +119,7 @@ export function CameraFormSheet({
         retention_days: untilFull ? null : Number(retention),
         enabled,
         has_ptz: hasPtz,
+        group_id: groupId,
         streams: used.map(toIn),
       })
     } else {
@@ -129,6 +132,7 @@ export function CameraFormSheet({
           retention_days: untilFull ? null : Number(retention),
           enabled,
           has_ptz: hasPtz,
+          group_id: groupId,
           ...(password ? { password } : {}),
         },
       })
@@ -169,6 +173,10 @@ export function CameraFormSheet({
           <div className="grid gap-1.5">
             <Label htmlFor="desc">Description</Label>
             <Textarea id="desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Group</Label>
+            <GroupPicker className="w-full" value={groupId} onChange={(id) => setGroupId(id)} noneLabel="No group" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">

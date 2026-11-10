@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { GroupPicker } from "@/components/GroupPicker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -30,16 +31,20 @@ const FILTERS: Record<string, { label: string; query: Partial<CameraQuery> }> = 
   disabled: { label: "Disabled", query: { enabled: false } },
   not_recording: { label: "Not recording", query: { enabled: true, status: "NOT_RECORDING" } },
   connecting: { label: "Connecting", query: { enabled: true, status: "CONNECTING" } },
+  ungrouped: { label: "Ungrouped", query: { ungrouped: true } },
 }
 
 export function CamerasPage() {
   const paged = usePaged({ sizeKey: "cameras" })
   const [filter, setFilter] = useState("all")
+  // camera group filter: the group and all its sub-groups
+  const [groupId, setGroupId] = useState<number | null>(null)
   const [editing, setEditing] = useState<Camera | "new" | null>(null)
-  const cameras = usePagedCameras({ q: paged.query, ...FILTERS[filter].query, limit: paged.limit, offset: paged.offset })
+  const groupScope = groupId != null && filter !== "ungrouped" ? { groupId, recursive: true } : {}
+  const cameras = usePagedCameras({ q: paged.query, ...FILTERS[filter].query, ...groupScope, limit: paged.limit, offset: paged.offset })
   useClampPage(paged, cameras.data?.total)
   const list = cameras.data?.items ?? []
-  const filtered = paged.query !== "" || filter !== "all"
+  const filtered = paged.query !== "" || filter !== "all" || groupId != null
 
   return (
     <div>
@@ -58,6 +63,8 @@ export function CamerasPage() {
                 {Object.entries(FILTERS).map(([k, f]) => <SelectItem key={k} value={k}>{f.label}</SelectItem>)}
               </SelectContent>
             </Select>
+            <GroupPicker className="w-full sm:w-48" value={filter === "ungrouped" ? null : groupId} noneLabel="Any group"
+              onChange={(id) => { setGroupId(id); if (id != null && filter === "ungrouped") setFilter("all"); paged.setPage(1) }} />
             <Button variant="outline" asChild>
               <Link to="/discover">
                 <Radar className="size-4" /> Discover
@@ -90,6 +97,7 @@ export function CamerasPage() {
               <TableRow className="hover:bg-transparent">
                 <TableHead className="w-12 pl-4">#</TableHead>
                 <TableHead>Name</TableHead>
+                <TableHead>Group</TableHead>
                 <TableHead>Streams</TableHead>
                 <TableHead>Media node</TableHead>
                 <TableHead>Retention</TableHead>
@@ -142,6 +150,7 @@ function MobileCameraCard({ camera: c, onEdit }: { camera: Camera; onEdit: () =>
     <div className="grid grid-cols-2 gap-2 border-t pt-3 text-xs">
       <div><div className="text-muted-foreground">Media node</div><div className="truncate">{c.assignment?.node_name ?? "Unassigned"}</div></div>
       <div><div className="text-muted-foreground">Retention</div><div>{retentionLabel(c.retention_days)}</div></div>
+      {c.group_path && <div className="col-span-2 truncate"><span className="text-muted-foreground">Group: </span>{c.group_path}</div>}
       <div className="col-span-2"><span className="text-muted-foreground">Last recording: </span>{lastSegment ? timeAgo(lastSegment) : "—"}</div>
     </div>
     <ConfirmDialog open={confirmDelete} onOpenChange={setConfirmDelete} title={`Delete ${c.name}?`} description="Only cameras without recordings can be deleted. Disable cameras with recordings to preserve their history." confirmLabel="Delete camera" destructive onConfirm={() => del.mutate(c.id)} />
@@ -165,6 +174,15 @@ function CameraRow({ camera: c, onEdit }: { camera: Camera; onEdit: () => void }
       <TableCell>
         <div className="font-medium">{c.name}</div>
         {c.description && <div className="max-w-xs truncate text-xs text-muted-foreground">{c.description}</div>}
+      </TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        {c.group_id != null ? (
+          <Link to={`/groups?group=${c.group_id}`} className="block max-w-48 truncate text-xs hover:text-primary" title={c.group_path ?? undefined}>
+            {c.group_path}
+          </Link>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
       </TableCell>
       <TableCell>
         <div className="flex flex-wrap gap-1.5">

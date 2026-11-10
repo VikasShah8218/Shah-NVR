@@ -3,6 +3,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 
 from app.cameras.models import Camera, CameraStream, StreamStatus
 from app.cameras.schemas import AssignmentInfo, CameraOption, CameraOut, StreamOut
+from app.groups.services import group_labels
 
 
 DEVICE_FIELDS = ("onvif_host", "onvif_port", "manufacturer", "model", "firmware", "serial", "mac", "onvif_services",
@@ -38,7 +39,8 @@ async def cameras_to_out(cameras: Sequence[Camera]) -> list[CameraOut]:
     for s in await CameraStream.filter(camera_id__in=ids).order_by("id"):
         streams[s.camera_id].append(s)
     assignments = {a.camera_id: a for a in await CameraAssignment.filter(camera_id__in=ids).prefetch_related("node")}
-    return [_camera_out(c, streams[c.id], assignments.get(c.id)) for c in cameras]
+    labels = await group_labels(c.group_id for c in cameras)
+    return [_camera_out(c, streams[c.id], assignments.get(c.id), labels) for c in cameras]
 
 
 async def camera_options_out(cameras: Sequence[Camera]) -> list[CameraOption]:
@@ -59,12 +61,14 @@ async def camera_options_out(cameras: Sequence[Camera]) -> list[CameraOption]:
         if record:
             recording.add(camera_id)
     nodes = dict(await CameraAssignment.filter(camera_id__in=ids).values_list("camera_id", "node_id"))
+    labels = await group_labels(c.group_id for c in cameras)
     return [CameraOption(id=c.id, name=c.name, enabled=c.enabled, has_ptz=c.has_ptz, profiles=profiles[c.id],
                          status=status.get(c.id, StreamStatus.UNKNOWN) if c.enabled else StreamStatus.DISABLED,
-                         node_id=nodes.get(c.id)) for c in cameras]
+                         node_id=nodes.get(c.id), group_id=c.group_id, group_path=labels.get(c.group_id))
+            for c in cameras]
 
 
-def _camera_out(camera: Camera, streams: list[CameraStream], a) -> CameraOut:
+def _camera_out(camera: Camera, streams: list[CameraStream], a, labels: dict[int, str]) -> CameraOut:
     assignment = None
     if a is not None:
         node = a.node
@@ -85,6 +89,8 @@ def _camera_out(camera: Camera, streams: list[CameraStream], a) -> CameraOut:
         has_ptz=camera.has_ptz,
         retention_days=camera.retention_days,
         **{f: getattr(camera, f) for f in DEVICE_FIELDS},
+        group_id=camera.group_id,
+        group_path=labels.get(camera.group_id),
         created_at=camera.created_at,
         updated_at=camera.updated_at,
         streams=[
