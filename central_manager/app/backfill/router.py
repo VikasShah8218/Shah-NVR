@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.assignments.models import CameraAssignment
 from app.backfill.schemas import (
@@ -15,6 +15,7 @@ from app.onvif.services import device_target
 from app.recordings.models import BackfillJob, BackfillState
 from app.recordings.utils import compute_gaps, find_segments
 from utilities.common import utcnow
+from utilities.pagination import Page, PageParams, paginate
 
 router = APIRouter(prefix="/api/v1/cameras", tags=["L3 Backfill"])
 internal_router = APIRouter(prefix="/internal/v1/backfill", tags=["Internal: L3 Backfill"])
@@ -146,10 +147,11 @@ async def create_backfill_job(camera_id: int, body: BackfillJobCreate):
     return _job(job)
 
 
-@router.get("/{camera_id}/backfill/jobs", response_model=list[BackfillJobOut])
-async def list_backfill_jobs(camera_id: int, limit: int = Query(50, ge=1, le=500)):
+@router.get("/{camera_id}/backfill/jobs", response_model=Page[BackfillJobOut], summary="Backfill jobs (paged)")
+async def list_backfill_jobs(camera_id: int, page: PageParams = Depends()):
     await _camera(camera_id)
-    return [_job(j) for j in await BackfillJob.filter(camera_id=camera_id).limit(limit)]
+    qs = BackfillJob.filter(camera_id=camera_id).order_by("-created_at", "-id")
+    return await paginate(qs, page, lambda rows: [_job(j) for j in rows])
 
 
 @internal_router.post("/claim", response_model=ClaimedJobOut | None)

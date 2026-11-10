@@ -22,6 +22,7 @@ import { CameraFormSheet } from "./CameraFormSheet"
 import { DeviceTab } from "./DeviceTab"
 import { VideoTab } from "./VideoTab"
 import { BackfillTab } from "./BackfillTab"
+import { Pager } from "@/components/Pager"
 
 export function CameraDetailPage() {
   const id = Number(useParams().id)
@@ -289,8 +290,11 @@ function RecentRecordings({ camera: c }: { camera: Camera }) {
   )
 }
 
+const HISTORY_PER_PAGE = 10
+
 function AssignmentTab({ camera: c }: { camera: Camera }) {
-  const history = useAssignmentHistory(c.id)
+  const [historyPage, setHistoryPage] = useState(1)
+  const history = useAssignmentHistory(c.id, { limit: HISTORY_PER_PAGE, offset: (historyPage - 1) * HISTORY_PER_PAGE })
   const [moving, setMoving] = useState(false)
   const [, tick] = useState(0)
   useEffect(() => {
@@ -318,7 +322,7 @@ function AssignmentTab({ camera: c }: { camera: Camera }) {
         </CardContent>
       </Card>
       <Card className="py-0 lg:col-span-2">
-        <div className="space-y-2 p-3 md:hidden">{(history.data ?? []).map((h) => (
+        <div className="space-y-2 p-3 md:hidden">{(history.data?.items ?? []).map((h) => (
           <div key={h.generation} className="rounded-lg border p-3 text-sm"><div className="flex justify-between gap-2"><b>Generation {h.generation}</b><span>{h.node_id ? `node ${h.node_id}` : "—"}</span></div><div className="mt-1 text-muted-foreground">{h.reason}</div><div className="mt-2 text-xs tabular-nums">{fmtDateTime(new Date(h.started_at))}<br />to {h.ended_at ? fmtDateTime(new Date(h.ended_at)) : <span className="text-success">current</span>}</div></div>
         ))}</div>
         <div className="hidden md:block"><Table>
@@ -332,7 +336,7 @@ function AssignmentTab({ camera: c }: { camera: Camera }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(history.data ?? []).map((h) => (
+            {(history.data?.items ?? []).map((h) => (
               <TableRow key={h.generation}>
                 <TableCell className="pl-4 tabular-nums">{h.generation}</TableCell>
                 <TableCell>{h.node_id ? `node ${h.node_id}` : "—"}</TableCell>
@@ -343,6 +347,7 @@ function AssignmentTab({ camera: c }: { camera: Camera }) {
             ))}
           </TableBody>
         </Table></div>
+        {history.data && <Pager className="px-4 py-2" page={historyPage} pageSize={HISTORY_PER_PAGE} total={history.data.total} onPage={setHistoryPage} />}
       </Card>
       {moving && (
         <MoveCameraDialog cameraId={c.id} cameraName={c.name} currentNodeId={a?.node_id ?? null} open onOpenChange={setMoving} />

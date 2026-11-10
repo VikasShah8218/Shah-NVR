@@ -339,9 +339,13 @@ PageScroll {
             }
         }
 
-        TableCard {
-            Layout.preferredWidth: 2
-            Layout.alignment: Qt.AlignTop
+        ColumnLayout {
+          Layout.preferredWidth: 2
+          Layout.fillWidth: true
+          Layout.alignment: Qt.AlignTop
+          spacing: 8
+          TableCard {
+            Layout.fillWidth: true
             columns: [
                 { title: "Generation", width: 100 }, { title: "Node", width: 110 }, { title: "Reason", width: 0 },
                 { title: "From", width: 170 }, { title: "Until", width: 170 }
@@ -360,6 +364,14 @@ PageScroll {
                     Layout.preferredWidth: 170
                 }
             }
+          }
+          Pager {
+            Layout.fillWidth: true
+            page: CameraDetail.historyPage
+            pageSize: CameraDetail.historyPageSize
+            total: CameraDetail.historyTotal
+            onPaged: p => CameraDetail.setHistoryPage(p)
+          }
         }
     }
 

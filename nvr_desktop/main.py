@@ -86,6 +86,7 @@ def build_app():
     from app.features.assignments.store import AssignmentsStore
     from app.features.cameras.detail_store import CameraDetailStore
     from app.features.cameras.backfill_store import BackfillStore
+    from app.features.cameras.options_store import EncoderCamerasStore, LiveCamerasStore, PlaybackCamerasStore
     from app.features.cameras.store import CamerasStore
     from app.features.dashboard.cluster_store import ClusterStore
     from app.features.dashboard.store import DashboardStore
@@ -96,6 +97,7 @@ def build_app():
     from app.features.nodes.store import NodesStore
     from app.features.onvif.store import DiscoverStore
     from app.features.encoder.store import EncoderStore
+    from app.features.playback.bookmarks_store import BookmarksStore
     from app.features.playback.store import PlaybackStore
     from app.features.settings.store import SettingsStore
     from app.video import register_video_types
@@ -109,6 +111,8 @@ def build_app():
     cluster = ClusterStore(ctx)
     cameras = CamerasStore(ctx)
     nodes = NodesStore(ctx)
+    playback_cameras = PlaybackCamerasStore(ctx)
+    playback = PlaybackStore(ctx, cameras, nodes, playback_cameras)
     singletons = {
         "Prefs": prefs,
         "Toasts": toasts,
@@ -118,9 +122,12 @@ def build_app():
         "Utils": Utils(toasts),
         "Cluster": cluster,
         "Cameras": cameras,
+        "LiveCameras": LiveCamerasStore(ctx),
+        "PlaybackCameras": playback_cameras,
+        "EncoderCameras": EncoderCamerasStore(ctx),
         "Nodes": nodes,
         "Discover": DiscoverStore(ctx, cameras, nodes),
-        "Dashboard": DashboardStore(ctx, cluster, cameras, nodes),
+        "Dashboard": DashboardStore(ctx, cluster, nodes),
         "CameraDetail": CameraDetailStore(ctx, nodes),
         "Backfill": BackfillStore(ctx),
         "Encoder": EncoderStore(ctx, cameras),
@@ -129,7 +136,8 @@ def build_app():
         "Live": LiveStore(ctx, cameras, nodes),
         "Ptz": PtzStore(ctx),
         "PtzWs": PtzWsStore(ctx, cameras, nodes),
-        "Playback": PlaybackStore(ctx, cameras, nodes),
+        "Playback": playback,
+        "Bookmarks": BookmarksStore(ctx, playback),
         "SettingsPage": SettingsStore(ctx),
     }
     for name, instance in singletons.items():

@@ -4,6 +4,10 @@ State: camera, profile, day, timeline zoom/pan, the playlist being played and th
 Clicking the timeline (or a chunk, or "Go") calls `seek(ms)`: it builds an HLS VOD playlist URL from
 that moment to the end of the day (or now, for today) and QML's player loads it. The player reports
 the real recorded time back through `setPlayhead(ms)`.
+
+Paging (docs/PAGINATION_PLAN.md): the camera picker is a searchable server list (PlaybackCameras), only the
+picked camera is loaded in full (CamerasStore.track), the chunk list is hidden until opened and then shown
+50 at a time, and exports are paged by central.
 """
 
 from __future__ import annotations
@@ -11,18 +15,26 @@ from __future__ import annotations
 import time
 from datetime import datetime, timezone
 
-from PySide6.QtCore import Property, Signal, Slot
+from PySide6.QtCore import Property, QSettings, Signal, Slot
 
 from app.core.context import AppContext
 from app.core.downloads import download_chunk, downloads_folder
 from app.core.api import node as node_api
 from app.core.tasks import run_task
 from app.core.format import format_bytes
+from app.core.paging import clamp_page, slice_page
 from app.core.poller import Poller
 from app.core.store import BaseStore
+from app.features.cameras.options_store import CameraOptionsStore
 from app.features.cameras.store import CamerasStore
 from app.features.nodes.store import NodesStore
+from app.features.playback.thumbs import thumb_target, thumbnail_url
 from app.features.playback.timeline import DAY, local_midnight, merge_ranges, parse_clock, ticks, to_ms
+
+
+CHUNKS_PER_PAGE = 50
+EXPORTS_PER_PAGE = 5
+CHUNKS_OPEN_KEY = "playback/chunksOpen"
 
 
 def _utc(ms: float) -> datetime:
@@ -35,10 +47,13 @@ class PlaybackStore(BaseStore):
     timelineChanged = Signal()
     playChanged = Signal()
     exportsChanged = Signal()
+    cameraInfoChanged = Signal()  # the picked camera's full row arrived / changed (name, profiles)
+    chunksChanged = Signal()
 
-    def __init__(self, ctx: AppContext, cameras: CamerasStore, nodes: NodesStore, parent=None):
+    def __init__(self, ctx: AppContext, cameras: CamerasStore, nodes: NodesStore,
+                 options: CameraOptionsStore | None = None, parent=None):
         super().__init__(ctx, parent)
-        self._cameras, self._nodes = cameras, nodes
+        self._cameras, self._nodes, self._options = cameras, nodes, options
         self._camera_id = 0
         self._profile = "main"
         self._day = local_midnight(time.time() * 1000)
@@ -52,18 +67,37 @@ class PlaybackStore(BaseStore):
         self._backfill_ranges: list[dict] = []
         self._access = "lan"
         self._exports: list[dict] = []
+        self._export_total = 0
+        self._export_page = 1
+        self._chunk_page = 1
+        self._chunks_open = bool(QSettings().value(CHUNKS_OPEN_KEY, False, type=bool))
         self._poller = Poller(self.refresh, 20, self)
         self._export_poller = Poller(self._refresh_exports, 3, self)
-        cameras.camerasChanged.connect(self._ensure_camera)
+        cameras.camerasChanged.connect(self._camera_arrived)
+        if options is not None:
+            options.changed.connect(self._ensure_camera)
         self._poller.start(immediately=False)
         self._export_poller.start(immediately=False)
 
     # ------------------------------------------------------------------ selection
     def _ensure_camera(self) -> None:
-        """Default to the first camera, and a recorded profile of the selected camera."""
-        cameras = self._cameras.cameras()
-        if not self._camera_id and cameras:
-            self.setCamera(cameras[0]["id"])
+        """Default to the first camera of the picker list (by name)."""
+        rows = self._options.rows if self._options is not None else []
+        if not self._camera_id and rows:
+            self.setCamera(rows[0]["id"])
+
+    def _camera_arrived(self) -> None:
+        """The picked camera's full row came in (or changed): fix the profile if it has no such stream."""
+        camera = self._cameras.byId(self._camera_id) if self._camera_id else None
+        if not camera:
+            return
+        self.cameraInfoChanged.emit()
+        names = [s["profile"] for s in camera["streams"]]
+        if names and self._profile not in names:
+            self._profile = next((s["profile"] for s in camera["streams"] if s["record"]), names[0])
+            self._stop_playback()
+            self.selectionChanged.emit()
+            self.refresh()
 
     def _camera(self) -> dict:
         return self._cameras.byId(self._camera_id) or {"streams": []}
@@ -71,6 +105,9 @@ class PlaybackStore(BaseStore):
     @Slot(int)
     def setCamera(self, camera_id: int) -> None:
         self._camera_id = camera_id
+        self._cameras.track("playback", [camera_id])  # full row (streams) for this camera only
+        self._chunk_page = self._export_page = 1
+        self.cameraInfoChanged.emit()
         streams = self._camera()["streams"]
         if streams and self._profile not in [s["profile"] for s in streams]:
             self._profile = next((s["profile"] for s in streams if s["record"]), streams[0]["profile"])
@@ -91,6 +128,11 @@ class PlaybackStore(BaseStore):
         self.setCamera(camera_id)
         if epoch_ms > 0:
             self.seek(epoch_ms)
+
+    @Slot(int, str, float)
+    def openBookmark(self, camera_id: int, profile: str, start_ms: float) -> None:
+        """Bookmarks panel: switch camera / profile / day as needed and play from the bookmark."""
+        self.openAt(camera_id, profile, start_ms)
 
     @Slot(str)
     def setProfile(self, profile: str) -> None:
@@ -124,7 +166,8 @@ class PlaybackStore(BaseStore):
     cameraId = Property(int, lambda self: self._camera_id, notify=selectionChanged)
     profile = Property(str, lambda self: self._profile, notify=selectionChanged)
     profiles = Property("QVariantList", lambda self: [s["profile"] for s in self._camera()["streams"]],
-                        notify=selectionChanged)
+                        notify=cameraInfoChanged)
+    cameraName = Property(str, lambda self: self._camera().get("name", ""), notify=cameraInfoChanged)
     day = Property(float, lambda self: self._day, notify=selectionChanged)
     isToday = Property(bool, _is_today, notify=selectionChanged)
 
@@ -163,19 +206,63 @@ class PlaybackStore(BaseStore):
         cid = camera_id or self._camera_id
         if not cid:
             return
-        self.fetch("exports", lambda: [job.to_qml() for job in self.api.exports(cid)],
-                   lambda rows: self._apply_exports(cid, rows), track_error=False)
+        page = self._export_page
 
-    def _apply_exports(self, camera_id: int, rows: list[dict]) -> None:
-        if camera_id != self._camera_id:
+        def load():
+            rows, total = self.api.exports(cid, limit=EXPORTS_PER_PAGE, offset=(page - 1) * EXPORTS_PER_PAGE)
+            return [job.to_qml() for job in rows], total
+
+        self.fetch("exports", load, lambda result: self._apply_exports(cid, page, *result), track_error=False)
+
+    def _apply_exports(self, camera_id: int, page: int, rows: list[dict], total: int) -> None:
+        if camera_id != self._camera_id or page != self._export_page:
             return
-        self._exports = rows
+        self._exports, self._export_total = rows, total
+        clamped = clamp_page(page, total, EXPORTS_PER_PAGE)
+        if clamped != page:
+            self._export_page = clamped
+            self._refresh_exports()
         self.exportsChanged.emit()
 
-    def _chunks_in_view(self) -> list[dict]:
+    @Slot(int)
+    def setExportPage(self, page: int) -> None:
+        if page != self._export_page:
+            self._export_page = max(1, page)
+            self.exportsChanged.emit()
+            self._refresh_exports()
+
+    exportPage = Property(int, lambda self: self._export_page, notify=exportsChanged)
+    exportTotal = Property(int, lambda self: self._export_total, notify=exportsChanged)
+    exportPageSize = Property(int, lambda self: EXPORTS_PER_PAGE, constant=True)
+
+    # ------------------------------------------------------------------ chunks in view (hidden by default, paged)
+    def _all_chunks_in_view(self) -> list[dict]:
         start, end = self._view_start, self._view_start + self._zoom
-        rows = [s for s in self._timeline.get("segments", []) if to_ms(s["end_time"]) > start and to_ms(s["start_time"]) < end]
-        return [{**s, "startMs": to_ms(s["start_time"]), "endMs": to_ms(s["end_time"])} for s in reversed(rows)]
+        return [s for s in self._timeline.get("segments", []) if to_ms(s["end_time"]) > start and to_ms(s["start_time"]) < end]
+
+    def _chunks_in_view(self) -> list[dict]:
+        """The current page of the chunks in view, newest first (empty while the list is hidden)."""
+        if not self._chunks_open:
+            return []
+        rows = slice_page(list(reversed(self._all_chunks_in_view())), self._chunk_page, CHUNKS_PER_PAGE)
+        return [{**s, "startMs": to_ms(s["start_time"]), "endMs": to_ms(s["end_time"])} for s in rows]
+
+    @Slot()
+    def toggleChunks(self) -> None:
+        self._chunks_open = not self._chunks_open
+        QSettings().setValue(CHUNKS_OPEN_KEY, self._chunks_open)
+        self.viewChanged.emit()
+
+    @Slot(int)
+    def setChunkPage(self, page: int) -> None:
+        self._chunk_page = clamp_page(page, len(self._all_chunks_in_view()), CHUNKS_PER_PAGE)
+        self.viewChanged.emit()
+
+    chunksOpen = Property(bool, lambda self: self._chunks_open, notify=viewChanged)
+    chunkTotal = Property(int, lambda self: len(self._all_chunks_in_view()), notify=viewChanged)
+    chunkPage = Property(int, lambda self: clamp_page(self._chunk_page, len(self._all_chunks_in_view()), CHUNKS_PER_PAGE),
+                         notify=viewChanged)
+    chunkPageSize = Property(int, lambda self: CHUNKS_PER_PAGE, constant=True)
 
     ranges = Property("QVariantList", lambda self: self._ranges, notify=timelineChanged)
     backfillRanges = Property("QVariantList", lambda self: self._backfill_ranges, notify=timelineChanged)
@@ -225,6 +312,17 @@ class PlaybackStore(BaseStore):
         self.seek(self._day + offset)
         return True
 
+    @Slot(float, result="QVariant")
+    def thumbAt(self, epoch_ms: float) -> dict:
+        """Timeline hover preview: {url, at} for the chunk recorded at `epoch_ms`, or {} (gap / unknown node).
+
+        The picture comes straight from the node that holds the chunk (app/features/playback/thumbs.py)."""
+        target = thumb_target(self._timeline.get("segments", []), epoch_ms)
+        api_url = target and self._nodes.api_url(target["node_id"])
+        if not target or not api_url:
+            return {}
+        return {"url": thumbnail_url(api_url, target["segment_id"], target["at_ms"]), "at": target["slot_start"]}
+
     @Slot(float)
     def setPlayhead(self, epoch_ms: float) -> None:
         self._playhead = epoch_ms
@@ -236,7 +334,7 @@ class PlaybackStore(BaseStore):
     def _stop_playback(self) -> None:
         self._play_from = self._playhead = 0.0
         self._timeline, self._ranges, self._backfill_ranges = {}, [], []
-        self._exports = []
+        self._exports, self._export_total = [], 0
         self.playChanged.emit()
         self.timelineChanged.emit()
         self.exportsChanged.emit()

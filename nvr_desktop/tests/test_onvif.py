@@ -6,7 +6,7 @@ import respx
 
 from app.core.api.central import CentralApi
 from app.core.api.errors import ApiError
-from app.features.dashboard.alerts import build_alerts
+from app.features.dashboard.alerts import camera_alert
 from app.features.onvif.helpers import (format_offset, onvif_error_text, parse_address, profile_labels,
                                         profile_options, service_names)
 
@@ -85,15 +85,12 @@ def test_structured_onvif_error_keeps_code_and_detail():
 
 
 def test_onvif_dashboard_alerts_link_to_device_tab():
-    camera = {
-        "id": 4, "name": "Gate", "enabled": True, "assignment": {"node_id": 1}, "streams": [],
-        "onvif_reachable": False, "clock_offset_seconds": -563,
-    }
-    alerts = build_alerts([camera], [])
-    assert {alert["title"] for alert in alerts} == {
-        "Gate: ONVIF is not answering", "Gate: camera clock is off",
-    }
-    assert all(alert["tab"] == "device" for alert in alerts)
+    base = {"level": "warning", "detail": "last check", "camera_id": 4, "camera_name": "Gate"}
+    onvif = camera_alert({**base, "kind": "onvif", "title": "Gate: ONVIF not answering",
+                          "since": "2020-01-01T00:00:00Z"}, 0)
+    clock = camera_alert({**base, "kind": "clock", "title": "Gate: camera clock −9 min 23 s off", "since": None}, 1)
+    assert onvif["tab"] == clock["tab"] == "device" and onvif["page"] == "camera" and onvif["id"] == 4
+    assert onvif["detail"].startswith("last check ") and clock["detail"] == "last check"
 
 
 @respx.mock

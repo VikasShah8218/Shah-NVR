@@ -1,7 +1,10 @@
 import { format } from "date-fns"
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import type { Segment } from "@/api/types"
 import { cn } from "@/lib/utils"
+import { placeMarkers, type TimelineMarker } from "./markers"
+import { THUMB_DEBOUNCE_MS } from "./thumbs"
 
 const MIN = 60_000
 
@@ -37,6 +40,8 @@ export function Timeline({
   playhead,
   onSeek,
   onPan,
+  markers = [],
+  thumbAt,
   height = 56,
 }: {
   segments: Segment[]
@@ -46,14 +51,30 @@ export function Timeline({
   playhead: number | null
   onSeek: (t: number) => void
   onPan?: (newViewStart: number) => void
+  /** Bookmarks today; motion / ONVIF events later. Clicking one seeks to its start. */
+  markers?: TimelineMarker[]
+  /** Hover preview: picture URL + the time it shows for a hovered time, or null (gap / unknown node). */
+  thumbAt?: (t: number) => { url: string; at: number } | null
   height?: number
 }) {
   const ref = useRef<SVGSVGElement>(null)
   const drag = useRef<{ x: number; start: number; moved: boolean } | null>(null)
   const [hover, setHover] = useState<number | null>(null)
+  // Screen position of the hover (for the preview, which is drawn in a portal so the card can't clip it).
+  const [anchor, setAnchor] = useState<{ x: number; top: number } | null>(null)
+  // Debounced hover time for the preview picture (see thumbs.ts).
+  const [settled, setSettled] = useState<number | null>(null)
+  const [dragging, setDragging] = useState(false)
+  useEffect(() => {
+    if (hover == null || !thumbAt) return
+    const id = window.setTimeout(() => setSettled(hover), THUMB_DEBOUNCE_MS)
+    return () => window.clearTimeout(id)
+  }, [hover, thumbAt])
+  const thumb = hover != null && settled != null && !dragging ? thumbAt?.(settled) ?? null : null
   const span = viewEnd - viewStart
   const ranges = useMemo(() => mergeRanges(segments.filter((segment) => segment.origin !== "CAMERA_SD")), [segments])
   const backfillRanges = useMemo(() => mergeRanges(segments.filter((segment) => segment.origin === "CAMERA_SD")), [segments])
+  const placed = useMemo(() => placeMarkers(markers, viewStart, viewEnd), [markers, viewStart, viewEnd])
   const now = Date.now()
 
   const pct = (t: number) => ((t - viewStart) / span) * 100
@@ -74,10 +95,11 @@ export function Timeline({
   }
   const onPointerMove = (e: React.PointerEvent) => {
     setHover(timeAt(e.clientX))
+    setAnchor({ x: e.clientX, top: ref.current!.getBoundingClientRect().top })
     const d = drag.current
     if (!d || !onPan) return
     const dx = e.clientX - d.x
-    if (Math.abs(dx) > 3) d.moved = true
+    if (Math.abs(dx) > 3 && !d.moved) { d.moved = true; setDragging(true) }
     if (d.moved) {
       const width = ref.current!.getBoundingClientRect().width
       const next = d.start - (dx / width) * span
@@ -87,11 +109,17 @@ export function Timeline({
   const onPointerUp = (e: React.PointerEvent) => {
     const d = drag.current
     drag.current = null
-    if (d && !d.moved) onSeek(Math.max(bounds[0], Math.min(bounds[1], timeAt(e.clientX))))
+    setDragging(false)
+    if (!d || d.moved) return
+    // A click on a marker seeks exactly to its start, not to the pixel under the pointer.
+    const markerT = (e.target as Element).closest?.("[data-marker-t]")?.getAttribute("data-marker-t")
+    const t = markerT != null ? Number(markerT) : timeAt(e.clientX)
+    onSeek(Math.max(bounds[0], Math.min(bounds[1], t)))
   }
 
   return (
-    <div className="select-none py-1">
+    <div className="relative select-none py-1">
+      {thumb && anchor && createPortal(<ThumbPopover key={thumb.url} url={thumb.url} at={thumb.at} {...anchor} />, document.body)}
       <svg
         ref={ref}
         className={cn("w-full touch-none", onPan ? "cursor-grab active:cursor-grabbing" : "cursor-pointer")}
@@ -99,8 +127,8 @@ export function Timeline({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={() => { drag.current = null }}
-        onPointerLeave={() => setHover(null)}
+        onPointerCancel={() => { drag.current = null; setDragging(false) }}
+        onPointerLeave={() => { setHover(null); setSettled(null); setAnchor(null) }}
       >
         <defs>
           <pattern id="camera-sd-backfill" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -153,6 +181,25 @@ export function Timeline({
             </text>
           </g>
         ))}
+        {/* markers (bookmarks, later events): ranges as a band under the bar, points as a pin */}
+        {placed.map((m) => {
+          const color = m.color ?? "var(--primary)"
+          return (
+            <g key={m.id} data-marker-t={m.t} className="cursor-pointer">
+              <title>{m.label ?? m.kind}</title>
+              {m.width != null ? (
+                <rect x={`${m.x}%`} y={height - 12} width={`${m.width}%`} height="5" rx="2" fill={color} opacity="0.85" />
+              ) : (
+                <>
+                  <line x1={`${m.x}%`} x2={`${m.x}%`} y1="16" y2={height - 6} stroke={color} strokeWidth="2" />
+                  <circle cx={`${m.x}%`} cy={height - 7} r="3.5" fill={color} />
+                  {/* wider invisible hit area so a 2px pin is easy to click */}
+                  <line x1={`${m.x}%`} x2={`${m.x}%`} y1="14" y2={height} stroke="transparent" strokeWidth="10" />
+                </>
+              )}
+            </g>
+          )
+        })}
         {/* now */}
         {now > viewStart && now < viewEnd && (
           <line x1={`${pct(now)}%`} x2={`${pct(now)}%`} y1="14" y2={height - 4} stroke="var(--info)" strokeDasharray="3 3" />
@@ -176,6 +223,32 @@ export function Timeline({
         <span>{hover != null ? format(hover, "HH:mm:ss") : ""}</span>
         <span>{format(viewEnd, "dd MMM HH:mm")}</span>
       </div>
+    </div>
+  )
+}
+
+const THUMB_BOX_PX = 160
+
+/**
+ * Small preview frame just above the timeline, fixed to the viewport (rendered in a portal) so the
+ * timeline card's overflow-hidden can't cut it off. Keyed by URL: a new slot starts in the loading state.
+ */
+function ThumbPopover({ url, at, x, top }: { url: string; at: number; x: number; top: number }) {
+  const [state, setState] = useState<"loading" | "ok" | "error">("loading")
+  // Centre on the pointer but keep the whole box inside the window.
+  const left = Math.min(Math.max(8, x - THUMB_BOX_PX / 2), window.innerWidth - THUMB_BOX_PX - 8)
+  return (
+    <div className="pointer-events-none fixed z-50 overflow-hidden rounded-md border bg-card shadow-lg"
+      style={{ left, top: top - 6, width: THUMB_BOX_PX, transform: "translateY(-100%)" }}>
+      <div className="grid aspect-video place-items-center bg-video text-[11px] text-muted-foreground">
+        {state !== "error" && (
+          <img src={url} alt="" className={cn("size-full object-cover", state === "loading" && "opacity-0")}
+            onLoad={() => setState("ok")} onError={() => setState("error")} />
+        )}
+        {state === "loading" && <span className="absolute">Loading…</span>}
+        {state === "error" && <span>No preview</span>}
+      </div>
+      <div className="px-1.5 py-0.5 text-center text-[11px] tabular-nums text-muted-foreground">{format(at, "HH:mm:ss")}</div>
     </div>
   )
 }

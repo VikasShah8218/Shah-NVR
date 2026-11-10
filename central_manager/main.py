@@ -18,6 +18,7 @@ from app.assignments.services import scheduler_tick
 from app.backfill.router import internal_router as backfill_internal_router
 from app.backfill.router import router as backfill_router
 from app.backfill.services import backfill_scheduler_tick
+from app.bookmarks.router import router as bookmarks_router
 from app.cameras.router import router as cameras_router
 from app.cluster.router import router as cluster_router
 from app.nodes.router import internal_router as nodes_internal_router
@@ -74,6 +75,7 @@ for r in (
     cameras_router,
     recordings_router,
     playback_router,
+    bookmarks_router,
     nodes_router,
     assignments_router,
     cluster_router,

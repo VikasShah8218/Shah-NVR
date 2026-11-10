@@ -341,12 +341,80 @@
         }
       }
     },
+    "/api/v1/media/{segment_id}/thumb.jpg": {
+      "get": {
+        "tags": [
+          "Recorded media"
+        ],
+        "summary": "Small preview frame for the playback timeline",
+        "description": "`at_ms` (offset in the chunk) snaps to THUMBNAIL_GRID_SECONDS; every time in a slot gets the same\ncached JPEG. A miss decodes one keyframe with ffmpeg; the video itself is never re-encoded.",
+        "operationId": "media_thumb_api_v1_media__segment_id__thumb_jpg_get",
+        "parameters": [
+          {
+            "name": "segment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Segment Id"
+            }
+          },
+          {
+            "name": "at_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "At Ms"
+            }
+          },
+          {
+            "name": "w",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "W"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/segments": {
       "get": {
         "tags": [
           "Recorded media"
         ],
-        "summary": "Chunks stored on this node (debug)",
+        "summary": "Chunks stored on this node, newest first (paged)",
         "operationId": "list_local_segments_api_v1_segments_get",
         "parameters": [
           {
@@ -371,8 +439,21 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
             }
           }
         ],
@@ -382,11 +463,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/LocalSegmentOut"
-                  },
-                  "title": "Response List Local Segments Api V1 Segments Get"
+                  "$ref": "#/components/schemas/LocalSegmentPage"
                 }
               }
             }
@@ -2045,6 +2122,38 @@
           "uploaded"
         ],
         "title": "LocalSegmentOut"
+      },
+      "LocalSegmentPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LocalSegmentOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "LocalSegmentPage",
+        "description": "One page of GET /api/v1/segments (same shape as central's paged lists)."
       },
       "NetworkOut": {
         "properties": {

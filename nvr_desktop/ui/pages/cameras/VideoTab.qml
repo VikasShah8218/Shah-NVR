@@ -193,13 +193,21 @@ ColumnLayout {
             text: "Select up to 20 targets. Only edited fields are copied to the same NVR stream name (" + root.profile + "). Each target is checked separately; unsupported or shared encoders are skipped. Changes run sequentially and stop after an unverified result."
             variant: "muted"; wrapMode: Text.WordWrap; elide: Text.ElideNone; Layout.fillWidth: true
         }
+        AppInput {
+            objectName: "bulkSearch"
+            Layout.fillWidth: true
+            iconName: "search"
+            placeholderText: "Search cameras"
+            onTextChanged: EncoderCameras.setSearch(text)
+        }
         GridLayout {
             Layout.fillWidth: true
             columns: root.width >= 720 ? 2 : 1
             columnSpacing: 28
             rowSpacing: 10
             Repeater {
-                model: Cameras.all.filter(c => c.id !== root.cameraId && c.onvif_host)
+                // searched on the server, 50 at a time; only cameras with the same stream name
+                model: EncoderCameras.rows.filter(c => c.id !== root.cameraId && c.profiles.includes(root.profile))
                 AppCheckBox {
                     required property var modelData
                     id: bulkCheck
@@ -211,6 +219,17 @@ ColumnLayout {
                     onToggled: Encoder.selectCamera(modelData.id, checked)
                 }
             }
+        }
+        AppButton {
+            visible: EncoderCameras.hasMore
+            variant: "ghost"; size: "sm"
+            text: EncoderCameras.loadingMore ? "Loading…" : EncoderCameras.moreLabel
+            onClicked: EncoderCameras.loadMore()
+        }
+        AppText {
+            visible: root.v.selected.length > 0
+            text: "Selected: " + root.v.selected.length + " / 20"
+            variant: "small"
         }
         AppButton { text: "Check selected cameras…"; enabled: !root.v.busy && !root.v.locked && root.v.selected.length > 0 && root.v.proposal !== "" && root.v.errors.length === 0; onClicked: Encoder.prepareBulk() }
     }

@@ -15,6 +15,7 @@ import shutil
 import time
 from datetime import timedelta
 from pathlib import Path
+from uuid import UUID
 
 from tortoise.expressions import Q
 from tortoise.functions import Sum
@@ -22,6 +23,7 @@ from tortoise.functions import Sum
 from app.node.models import KeyValue
 from app.node.utils import CentralError, central, runtime
 from app.recordings.models import LocalSegment, SegmentOrigin, SkippedFile
+from app.recordings.thumbnails import thumbnails
 from app.recordings.utils import Mp4IndexError, decoder_signature, index_fmp4, parse_rel_path, segment_uuid
 from app.storage.services import storage
 from app.storage.utils import FREE_BELOW
@@ -253,6 +255,7 @@ async def _delete_local(items: list[tuple[str, int | None, str]]) -> list[str]:
             continue
         await LocalSegment.filter(id=seg_id).delete()
         _known.discard(rel)
+        thumbnails.forget_segment(UUID(str(seg_id)))
         deleted.append(seg_id)
     return deleted
 

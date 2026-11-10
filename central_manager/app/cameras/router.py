@@ -1,11 +1,13 @@
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from tortoise.expressions import Q, Subquery
 
 from app.assignments.models import CameraAssignment
 from app.cameras.models import Camera, CameraStream, StreamStatus
 from app.cameras.schemas import (
     CameraCreate,
+    CameraOption,
     CameraOut,
     CameraUpdate,
     LiveOut,
@@ -15,9 +17,10 @@ from app.cameras.schemas import (
     StreamUpdate,
 )
 from app.cameras.services import create_camera_with_streams
-from app.cameras.utils import camera_to_out
+from app.cameras.utils import camera_options_out, camera_to_out, cameras_to_out
 from app.recordings.models import RecordingSegment
 from settings.settings import settings
+from utilities.pagination import MAX_LIMIT, Page, PageParams, paginate
 
 router = APIRouter(prefix="/api/v1/cameras", tags=["Cameras"])
 
@@ -48,12 +51,61 @@ async def create_camera(body: CameraCreate):
     return await camera_to_out(camera)
 
 
-@router.get("", response_model=list[CameraOut])
-async def list_cameras(enabled: bool | None = None):
+def _parse_ids(ids: str | None) -> list[int] | None:
+    if ids is None:
+        return None
+    try:
+        out = [int(x) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "ids must be a comma-separated list of numbers")
+    if len(out) > MAX_LIMIT:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"At most {MAX_LIMIT} ids")
+    return out
+
+
+def _camera_query(q: str | None, enabled: bool | None, node_id: int | None, stream_status: StreamStatus | None,
+                  ids: list[int] | None, sort: str):
+    """Shared filters of the camera list and the picker list. Ordered on a unique key so pages are stable."""
     qs = Camera.all()
+    if ids is not None:
+        qs = qs.filter(id__in=ids)
     if enabled is not None:
         qs = qs.filter(enabled=enabled)
-    return [await camera_to_out(c) for c in await qs]
+    if q and q.strip():
+        term = q.strip()
+        qs = qs.filter(Q(name__icontains=term) | Q(id=int(term))) if term.isdigit() else qs.filter(name__icontains=term)
+    if node_id is not None:
+        qs = qs.filter(id__in=Subquery(CameraAssignment.filter(node_id=node_id).values("camera_id")))
+    if stream_status is not None:
+        qs = qs.filter(id__in=Subquery(CameraStream.filter(status=stream_status).values("camera_id")))
+    return qs.order_by(*(("id",) if sort == "id" else ("name", "id")))
+
+
+@router.get("", response_model=Page[CameraOut], summary="List / search cameras (paged)")
+async def list_cameras(
+    page: PageParams = Depends(),
+    q: str | None = Query(default=None, max_length=128, description="Name contains, or the exact camera id"),
+    enabled: bool | None = None,
+    node_id: int | None = Query(default=None, description="Cameras assigned to this media node"),
+    stream_status: StreamStatus | None = Query(default=None, alias="status", description="Any stream in this state"),
+    ids: str | None = Query(default=None, description="Only these ids, comma-separated (max 200)"),
+    sort: Literal["name", "id"] = "name",
+):
+    qs = _camera_query(q, enabled, node_id, stream_status, _parse_ids(ids), sort)
+    return await paginate(qs, page, cameras_to_out)
+
+
+@router.get("/options", response_model=Page[CameraOption], summary="Small camera list for pickers (paged)")
+async def camera_options(
+    page: PageParams = Depends(),
+    q: str | None = Query(default=None, max_length=128),
+    enabled: bool | None = None,
+    node_id: int | None = None,
+    ids: str | None = None,
+):
+    """`id`, `name` and what a picker or a live tile needs, without the full camera (streams, ONVIF details)."""
+    qs = _camera_query(q, enabled, node_id, None, _parse_ids(ids), "name")
+    return await paginate(qs, page, camera_options_out)
 
 
 @router.get("/{camera_id}", response_model=CameraOut)

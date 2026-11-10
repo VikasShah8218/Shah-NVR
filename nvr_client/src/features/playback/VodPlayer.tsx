@@ -1,12 +1,12 @@
 import Hls from "hls.js"
-import { FastForward, Loader2, Maximize, Pause, Play, Rewind, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { ChevronLeft, ChevronRight, FastForward, Loader2, Maximize, Pause, Play, Rewind, SkipBack, SkipForward, Undo2, Volume2, VolumeX } from "lucide-react"
+import { type KeyboardEvent, useEffect, useRef, useState } from "react"
 import { DigitalZoom } from "@/components/DigitalZoom"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { fmtDateTime } from "@/lib/time"
-
-const RATES = [0.5, 1, 2, 4, 8]
+import { cn } from "@/lib/utils"
+import { frameStepTarget, RATES, REVERSE_TICK_MS, type ReverseAnchor, reverseDone, reverseTarget } from "./transport"
 
 /**
  * Plays a recorded HLS VOD playlist. Reports the real recorded wall-clock time of the playhead
@@ -33,6 +33,14 @@ export function VodPlayer({ src, audioSrc, onTime, onEnded, viewKey }: {
   const [muted, setMuted] = useState(true)
   const [audioError, setAudioError] = useState<string | null>(null)
   const [volume, setVolume] = useState(() => Number(localStorage.getItem("shah-nvr.playback-volume") ?? 0.8))
+  const [reversing, setReversing] = useState(false)
+  const reverseAnchor = useRef<ReverseAnchor | null>(null)
+  // A new playlist stops reverse play (adjusting state during render, as React recommends over an effect).
+  const [reverseSrc, setReverseSrc] = useState(src)
+  if (reverseSrc !== src) {
+    setReverseSrc(src)
+    setReversing(false)
+  }
 
   useEffect(() => {
     const video = videoRef.current
@@ -100,6 +108,23 @@ export function VodPlayer({ src, audioSrc, onTime, onEnded, viewKey }: {
     }
   }, [audioSrc, muted])
 
+  // Reverse play: MSE can't decode backwards, so pause and keep seeking back. Speed is anchored to wall
+  // time (see transport.ts); a tick is skipped while the previous seek is still decoding.
+  useEffect(() => {
+    const v = videoRef.current
+    if (!reversing || !v) return
+    v.pause()
+    reverseAnchor.current = { media: v.currentTime, clock: performance.now(), rate }
+    const id = window.setInterval(() => {
+      const a = reverseAnchor.current
+      if (!a || v.seeking) return
+      const target = reverseTarget(a, performance.now())
+      v.currentTime = target
+      if (reverseDone(target)) setReversing(false)
+    }, REVERSE_TICK_MS)
+    return () => window.clearInterval(id)
+  }, [reversing, rate])
+
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = rate
     if (audioRef.current) audioRef.current.playbackRate = rate
@@ -135,12 +160,36 @@ export function VodPlayer({ src, audioSrc, onTime, onEnded, viewKey }: {
   const toggle = () => {
     const v = videoRef.current
     if (!v) return
+    if (reversing) { setReversing(false); return }
     if (v.paused) v.play().catch(() => {})
     else v.pause()
   }
+  /** Pause and move one frame (negative = back). */
+  const stepFrame = (frames: number) => {
+    const v = videoRef.current
+    if (!v) return
+    setReversing(false)
+    v.pause()
+    v.currentTime = frameStepTarget(v.currentTime, frames, v.duration)
+  }
+  const toggleReverse = () => {
+    const v = videoRef.current
+    if (!v) return
+    if (reversing) { setReversing(false); return }
+    if (v.currentTime > 0) setReversing(true)
+  }
+  // , / . step a frame (like most players); k / space play-pause. Arrow keys stay with the digital zoom.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!src || (e.target as HTMLElement).closest("input, textarea, select, [role=combobox]")) return
+    if (e.key === ",") stepFrame(-1)
+    else if (e.key === ".") stepFrame(1)
+    else if (e.key === "k" || e.key === " ") toggle()
+    else return
+    e.preventDefault()
+  }
 
   return (
-    <div ref={wrapRef} className="overflow-hidden rounded-lg border bg-video">
+    <div ref={wrapRef} className="overflow-hidden rounded-lg border bg-video" onKeyDown={onKeyDown}>
       {/* Height-capped so the timeline below stays on screen. */}
       {/* Digital zoom: wheel / drag / keys zoom and pan the video; a click still plays/pauses. */}
       <DigitalZoom className="aspect-video max-h-[55vh] w-full" onTap={src ? toggle : undefined} resetKey={viewKey}>
@@ -184,8 +233,18 @@ export function VodPlayer({ src, audioSrc, onTime, onEnded, viewKey }: {
         <Button variant="ghost" size="icon" className="size-10 sm:size-8" onClick={() => seekBy(-10)} title="Back 10 s" disabled={!src}>
           <Rewind className="size-4" />
         </Button>
+        <Button variant="ghost" size="icon" className={cn("size-10 sm:size-8", reversing && "bg-primary/15 text-primary")}
+          onClick={toggleReverse} title={reversing ? "Stop reverse play" : `Play backwards (${rate}×)`} disabled={!src}>
+          <Undo2 className="size-4" />
+        </Button>
+        <Button variant="ghost" size="icon" className="size-10 sm:size-8" onClick={() => stepFrame(-1)} title="Previous frame ( , )" disabled={!src}>
+          <ChevronLeft className="size-4" />
+        </Button>
         <Button size="icon" className="size-11 rounded-full sm:size-9" onClick={toggle} disabled={!src}>
-          {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
+          {playing || reversing ? <Pause className="size-4" /> : <Play className="size-4" />}
+        </Button>
+        <Button variant="ghost" size="icon" className="size-10 sm:size-8" onClick={() => stepFrame(1)} title="Next frame ( . )" disabled={!src}>
+          <ChevronRight className="size-4" />
         </Button>
         <Button variant="ghost" size="icon" className="size-10 sm:size-8" onClick={() => seekBy(10)} title="Forward 10 s" disabled={!src}>
           <FastForward className="size-4" />
@@ -228,7 +287,7 @@ export function VodPlayer({ src, audioSrc, onTime, onEnded, viewKey }: {
             <SelectContent>
               {RATES.map((r) => (
                 <SelectItem key={r} value={String(r)}>
-                  {r}×
+                  {reversing ? "−" : ""}{r}×
                 </SelectItem>
               ))}
             </SelectContent>

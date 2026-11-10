@@ -21,9 +21,11 @@ CAMERA = {
 
 @respx.mock
 def test_cameras_are_parsed_into_models():
-    respx.get(f"{BASE}/api/v1/cameras").mock(return_value=httpx.Response(200, json=[CAMERA]))
-    cameras = CentralApi(BASE).cameras()
-    assert cameras[0].name == "Gate"
+    route = respx.get(f"{BASE}/api/v1/cameras").mock(return_value=httpx.Response(
+        200, json={"items": [CAMERA], "total": 41, "limit": 25, "offset": 25}))
+    cameras, total = CentralApi(BASE).cameras(q=" gate ", enabled=True, limit=25, offset=25)
+    assert total == 41 and cameras[0].name == "Gate"
+    assert dict(route.calls.last.request.url.params) == {"q": "gate", "enabled": "true", "limit": "25", "offset": "25"}
     assert cameras[0].assignment.node_name == "node-2"
     qml = cameras[0].to_qml()  # JSON-safe dict for QML
     assert qml["created_at"].startswith("2026-10-14T00:00:00") and qml["streams"][0]["status"] == "RECORDING"

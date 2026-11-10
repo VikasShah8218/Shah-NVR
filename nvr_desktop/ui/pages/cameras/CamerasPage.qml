@@ -5,22 +5,17 @@ import App
 import "../../theme"
 import "../../components"
 
-// Port of nvr_client/src/features/cameras/CamerasPage.tsx: searchable camera table, enable switch,
-// row menu (edit, live preview, recordings, delete) and the add / edit form sheet.
+// Port of nvr_client/src/features/cameras/CamerasPage.tsx: camera table one page at a time (search and filter
+// run on the server), enable switch, row menu (edit, live preview, recordings, delete) and the add / edit form.
 PageScroll {
     id: root
 
-    property string search: ""
+    readonly property bool filtered: Cameras.query !== "" || Cameras.filter !== "all"
     readonly property var columns: [
         { title: "#", width: 40 }, { title: "Name", width: 0 }, { title: "Streams", width: 280 },
         { title: "Media node", width: 150 }, { title: "Retention", width: 90 }, { title: "Last recording", width: 120 },
         { title: "Enabled", width: 70 }, { title: "", width: 36 }
     ]
-
-    function matches(name, id) {
-        const q = search.trim().toLowerCase()
-        return q === "" || name.toLowerCase().includes(q) || String(id) === q
-    }
 
     PageHeader {
         title: "Cameras"
@@ -28,8 +23,16 @@ PageScroll {
         AppInput {
             width: 240
             iconName: "search"
-            placeholderText: "Search cameras"
-            onTextChanged: root.search = text
+            placeholderText: "Search name or #id"
+            text: Cameras.search
+            onTextChanged: Cameras.setSearch(text)
+        }
+        AppSelect {
+            objectName: "cameraFilter"
+            implicitWidth: 150
+            options: Cameras.filterOptions
+            value: Cameras.filter
+            onPicked: v => Cameras.setFilter(v)
         }
         AppButton { text: "Discover"; iconName: "search"; variant: "outline"; onClicked: Router.go("discover") }
         AppButton { text: "Add camera"; iconName: "plus"; onClicked: form.openFor(null) }
@@ -38,7 +41,7 @@ PageScroll {
     LoadingState { visible: Cameras.loading && Cameras.error === "" && Cameras.listModel.count === 0 }
     ErrorState { text: Cameras.error }
     EmptyState {
-        visible: !Cameras.loading && Cameras.error === "" && Cameras.listModel.count === 0
+        visible: !Cameras.loading && Cameras.error === "" && Cameras.total === 0 && !root.filtered
         iconName: "camera"
         title: "No cameras yet"
         text: "Use Discover for ONVIF cameras, or Add camera to enter an RTSP URL manually."
@@ -63,7 +66,6 @@ PageScroll {
                 delegate: TableRow {
                     id: row
                     required property var model
-                    visible: root.matches(model.name, model.id)
                     clickable: true
                     onClicked: Router.go("camera", model.id)
 
@@ -138,9 +140,17 @@ PageScroll {
     }
 
     EmptyState {
-        visible: Cameras.listModel.count > 0 && !Cameras.all.some(c => root.matches(c.name, c.id))
+        visible: !Cameras.loading && Cameras.error === "" && Cameras.total === 0 && root.filtered
         iconName: "search"
-        title: "No camera matches \"" + root.search + "\""
+        title: "No cameras match"
+        text: "Change the search or the filter."
+    }
+
+    Pager {
+        objectName: "camerasPager"
+        Layout.fillWidth: true
+        store: Cameras
+        sizes: [25, 50, 100]
     }
 
     // One menu + confirm shared by all rows (cheaper than one per row).

@@ -45,8 +45,10 @@ def mediamtx_paths(api_url: str) -> list[dict]:
     return _get(api_url, "/api/v1/mediamtx/paths")
 
 
-def segments(api_url: str, limit: int = 100) -> list[LocalSegment]:
-    return [LocalSegment.model_validate(s) for s in _get(api_url, "/api/v1/segments", limit=limit)]
+def segments(api_url: str, limit: int = 50, offset: int = 0) -> tuple[list[LocalSegment], int]:
+    """One page of the node's chunks, newest first. Returns (chunks, total)."""
+    body = _get(api_url, "/api/v1/segments", limit=limit, offset=offset)
+    return [LocalSegment.model_validate(s) for s in body["items"]], body["total"]
 
 
 def logs(api_url: str, source: str, lines: int = 500) -> list[str]:

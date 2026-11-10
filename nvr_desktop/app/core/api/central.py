@@ -19,8 +19,11 @@ from app.core.api.models import (
     BackfillConfig,
     BackfillJob,
     BackfillProbe,
+    Bookmark,
     ExportJob,
     Camera,
+    CameraAlert,
+    CameraOption,
     ClusterHealth,
     LiveInfo,
     MediaNode,
@@ -35,6 +38,16 @@ from app.core.api.models import (
     Timeline,
 )
 from settings.settings import settings
+
+
+def _page(body: dict, model) -> tuple[list, int]:
+    """(rows of one page, total rows) from a paged list response `{items, total, limit, offset}`."""
+    return [model.model_validate(row) for row in body["items"]], body["total"]
+
+
+def _clean(params: dict) -> dict:
+    """Drop empty filters so the server applies its defaults."""
+    return {k: v for k, v in params.items() if v is not None and v != ""}
 
 
 class CentralApi:
@@ -94,8 +107,34 @@ class CentralApi:
         return ClusterHealth.model_validate(self._request("GET", "/api/v1/cluster/health"))
 
     # ------------------------------------------------------------------ cameras
-    def cameras(self) -> list[Camera]:
-        return [Camera.model_validate(c) for c in self._request("GET", "/api/v1/cameras")]
+    def cameras(self, *, q: str | None = None, enabled: bool | None = None, node_id: int | None = None,
+                status: str | None = None, limit: int = 50, offset: int = 0) -> tuple[list[Camera], int]:
+        """One page of full camera rows, ordered by name. Returns (cameras, total)."""
+        params = _clean({"q": (q or "").strip(), "enabled": enabled, "node_id": node_id, "status": status,
+                         "limit": limit, "offset": offset})
+        return _page(self._request("GET", "/api/v1/cameras", params=params), Camera)
+
+    def cameras_by_ids(self, ids: list[int]) -> list[Camera]:
+        """Full rows for just these cameras (live tiles, the picked playback camera). At most 200."""
+        ids = sorted(set(ids))[:200]
+        if not ids:
+            return []
+        return _page(self._request("GET", "/api/v1/cameras", params={"ids": ",".join(map(str, ids)),
+                                                                     "limit": 200}), Camera)[0]
+
+    def camera_options(self, *, q: str | None = None, enabled: bool | None = None, node_id: int | None = None,
+                       limit: int = 50, offset: int = 0) -> tuple[list[CameraOption], int]:
+        """Small searchable camera rows for pickers and the live sidebar. Returns (rows, total)."""
+        params = _clean({"q": (q or "").strip(), "enabled": enabled, "node_id": node_id, "limit": limit,
+                         "offset": offset})
+        return _page(self._request("GET", "/api/v1/cameras/options", params=params), CameraOption)
+
+    def alerts(self, *, level: str | None = None, limit: int = 10, offset: int = 0) -> tuple[list[CameraAlert], int, dict]:
+        """Camera alerts built by central, danger first. Returns (rows, total, {"danger": n, "warning": n})."""
+        body = self._request("GET", "/api/v1/cluster/alerts", params=_clean({"level": level, "limit": limit,
+                                                                              "offset": offset}))
+        rows, total = _page(body, CameraAlert)
+        return rows, total, body["counts"]
 
     def camera(self, camera_id: int) -> Camera:
         return Camera.model_validate(self._request("GET", f"/api/v1/cameras/{camera_id}"))
@@ -162,9 +201,10 @@ class CentralApi:
             "PATCH", f"/api/v1/cameras/{camera_id}/backfill", json=body,
         ))
 
-    def backfill_jobs(self, camera_id: int) -> list[BackfillJob]:
-        rows = self._request("GET", f"/api/v1/cameras/{camera_id}/backfill/jobs", params={"limit": 50})
-        return [BackfillJob.model_validate(row) for row in rows]
+    def backfill_jobs(self, camera_id: int, limit: int = 10, offset: int = 0) -> tuple[list[BackfillJob], int]:
+        body = self._request("GET", f"/api/v1/cameras/{camera_id}/backfill/jobs",
+                             params={"limit": limit, "offset": offset})
+        return _page(body, BackfillJob)
 
     def create_backfill_job(self, camera_id: int, body: dict) -> BackfillJob:
         return BackfillJob.model_validate(self._request(
@@ -172,9 +212,9 @@ class CentralApi:
         ))
 
     # ------------------------------------------------------------------ recording exports
-    def exports(self, camera_id: int) -> list[ExportJob]:
-        rows = self._request("GET", "/api/v1/exports", params={"camera_id": camera_id, "limit": 50})
-        return [ExportJob.model_validate(row) for row in rows]
+    def exports(self, camera_id: int, limit: int = 5, offset: int = 0) -> tuple[list[ExportJob], int]:
+        body = self._request("GET", "/api/v1/exports", params={"camera_id": camera_id, "limit": limit, "offset": offset})
+        return _page(body, ExportJob)
 
     def create_export(self, body: dict) -> ExportJob:
         return ExportJob.model_validate(self._request("POST", "/api/v1/exports", json=body))
@@ -184,6 +224,36 @@ class CentralApi:
 
     def export_download_url(self, export_id: str, access: str = "lan") -> str:
         return f"{self.base_url}/api/v1/exports/{export_id}/download?{urlencode({'access': access})}"
+
+    # ------------------------------------------------------------------ bookmarks
+    def bookmarks(self, *, camera_id: int | None = None, profile: str | None = None, q: str | None = None,
+                  start: datetime | None = None, end: datetime | None = None, order: str = "asc",
+                  limit: int = 200, offset: int = 0) -> tuple[list[Bookmark], int]:
+        """Search bookmarks. `start`/`end` = overlap with the window; `profile` also matches camera-wide ones.
+        Returns (bookmarks, total)."""
+        params: dict = {"order": order, "limit": limit}
+        if offset:
+            params["offset"] = offset
+        if camera_id:
+            params["camera_id"] = camera_id
+        if profile:
+            params["profile"] = profile
+        if q and q.strip():
+            params["q"] = q.strip()
+        if start is not None:
+            params["start"] = start.isoformat()
+        if end is not None:
+            params["end"] = end.isoformat()
+        return _page(self._request("GET", "/api/v1/bookmarks", params=params), Bookmark)
+
+    def create_bookmark(self, body: dict) -> Bookmark:
+        return Bookmark.model_validate(self._request("POST", "/api/v1/bookmarks", json=body))
+
+    def update_bookmark(self, bookmark_id: int, body: dict) -> Bookmark:
+        return Bookmark.model_validate(self._request("PATCH", f"/api/v1/bookmarks/{bookmark_id}", json=body))
+
+    def delete_bookmark(self, bookmark_id: int) -> None:
+        self._request("DELETE", f"/api/v1/bookmarks/{bookmark_id}")
 
     # ------------------------------------------------------------------ ONVIF H1
     def onvif_discover(self, node_id: int | None = None, seconds: float = 3.0) -> list[OnvifDiscovered]:
@@ -269,17 +339,19 @@ class CentralApi:
         self._request("DELETE", f"/api/v1/nodes/{node_id}/volumes/{volume_id}", params={"force": str(force).lower()})
 
     # ------------------------------------------------------------------ assignments
-    def assignments(self) -> list[Assignment]:
-        return [Assignment.model_validate(a) for a in self._request("GET", "/api/v1/assignments")]
+    def assignments(self, *, q: str | None = None, node_id: int | None = None, limit: int = 50,
+                    offset: int = 0) -> tuple[list[Assignment], int]:
+        params = _clean({"q": (q or "").strip(), "node_id": node_id, "limit": limit, "offset": offset})
+        return _page(self._request("GET", "/api/v1/assignments", params=params), Assignment)
 
     def move_camera(self, camera_id: int, node_id: int) -> Assignment:
         return Assignment.model_validate(
             self._request("PUT", f"/api/v1/assignments/{camera_id}", json={"node_id": node_id})
         )
 
-    def assignment_history(self, camera_id: int) -> list[AssignmentHistory]:
-        rows = self._request("GET", f"/api/v1/assignments/{camera_id}/history")
-        return [AssignmentHistory.model_validate(r) for r in rows]
+    def assignment_history(self, camera_id: int, limit: int = 10, offset: int = 0) -> tuple[list[AssignmentHistory], int]:
+        body = self._request("GET", f"/api/v1/assignments/{camera_id}/history", params={"limit": limit, "offset": offset})
+        return _page(body, AssignmentHistory)
 
     def run_scheduler(self) -> None:
         self._request("POST", "/api/v1/assignments/run-scheduler")

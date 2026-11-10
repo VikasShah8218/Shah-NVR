@@ -19,15 +19,23 @@ PageScroll {
     PageHeader {
         title: "Assignments"
         description: "Which media node records each camera. The scheduler places cameras automatically and moves them on failure."
+        AppInput {
+            width: 240
+            iconName: "search"
+            placeholderText: "Search cameras"
+            text: Assignments.search
+            onTextChanged: Assignments.setSearch(text)
+        }
         AppButton { text: "Run scheduler now"; variant: "outline"; iconName: "play"; onClicked: Assignments.runScheduler() }
     }
 
-    LoadingState { visible: Assignments.loading && Assignments.error === "" }
+    LoadingState { visible: Assignments.loading && Assignments.error === "" && Assignments.listModel.count === 0 }
     ErrorState { text: Assignments.error }
     EmptyState {
-        visible: !Assignments.loading && Assignments.error === "" && Assignments.listModel.count === 0
-        title: "No assignments yet"
-        text: "Add a camera and start a media node."
+        visible: !Assignments.loading && Assignments.error === "" && Assignments.total === 0
+        iconName: Assignments.query !== "" ? "search" : "inbox"
+        title: Assignments.query !== "" ? "No cameras match" : "No assignments yet"
+        text: Assignments.query !== "" ? "Change the search." : "Add a camera and start a media node."
     }
 
     Rectangle {
@@ -102,6 +110,13 @@ PageScroll {
                 }
             }
         }
+    }
+
+    Pager {
+        objectName: "assignmentsPager"
+        Layout.fillWidth: true
+        store: Assignments
+        sizes: [25, 50, 100]
     }
 
     MoveCameraDialog {

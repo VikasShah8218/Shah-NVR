@@ -3,8 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { useEncoder, useEncoderApi } from "@/api/encoder"
 import type { EncoderState, EncoderValues, EncoderWrite } from "@/api/encoder"
-import type { Camera } from "@/api/types"
-import { useCameras } from "@/api/queries"
+import type { Camera, CameraOption } from "@/api/types"
+import { CameraOptionsList } from "@/components/CameraPicker"
 import { ConfirmDialog, ErrorState, Loading } from "@/components/common"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -225,9 +225,17 @@ function EncoderEditor({ camera, profile, active }: { camera: Camera; profile: s
 
 type BulkRow = { id: number; name: string; body?: EncoderWrite; status: string }
 function BulkEncoder({ sourceId, profile, values }: { sourceId: number; profile: string; values: EncoderValues }) {
-  const cameras = useCameras()
   const api = useEncoderApi()
   const [selected, setSelected] = useState<number[]>([])
+  const [names, setNames] = useState<Record<number, string>>({})
+  const [search, setSearch] = useState("")
+  const toggle = (c: CameraOption) => {
+    const on = selected.includes(c.id)
+    if (!on && selected.length >= 20) return
+    setSelected(on ? selected.filter(id => id !== c.id) : [...selected, c.id])
+    setNames({ ...names, [c.id]: c.name })
+    setRows([])
+  }
   const [rows, setRows] = useState<BulkRow[]>([])
   const [busy, setBusy] = useState(false)
   const [confirm, setConfirm] = useState(false)
@@ -237,7 +245,7 @@ function BulkEncoder({ sourceId, profile, values }: { sourceId: number; profile:
     setBusy(true); setRows([]); setReviewed("")
     const out: BulkRow[] = []
     for (const id of selected) {
-      const row: BulkRow = { id, name: cameras.data?.find(c => c.id === id)?.name ?? String(id), status: "Checking" }
+      const row: BulkRow = { id, name: names[id] ?? String(id), status: "Checking" }
       try {
         const state = await api.read(id, profile)
         if (!state.revision) throw new Error("ONVIF profile mapping required")
@@ -263,10 +271,11 @@ function BulkEncoder({ sourceId, profile, values }: { sourceId: number; profile:
   return <details className="rounded-lg border p-4"><summary className="cursor-pointer font-medium">Apply this draft to other cameras</summary>
     <p className="my-3 text-sm text-muted-foreground">Copies only changed fields to the same stream name ({profile}). Each target gets its own read, capability check and revision. Unsupported/shared targets are skipped; nothing is substituted. Maximum 20 cameras.</p>
     <fieldset disabled={busy} className="space-y-3">
-      <div className="grid gap-2 sm:grid-cols-2">{cameras.data?.filter(c => c.id !== sourceId && c.streams.some(s => s.profile === profile)).map(c => <label className="flex gap-2 text-sm" key={c.id}>
-        <input type="checkbox" checked={selected.includes(c.id)} disabled={!selected.includes(c.id) && selected.length >= 20}
-          onChange={e => { setSelected(e.target.checked ? [...selected, c.id] : selected.filter(id => id !== c.id)); setRows([]) }} />{c.name}
-      </label>)}</div>
+      <Input placeholder="Search cameras" value={search} onChange={e => setSearch(e.target.value)} />
+      <CameraOptionsList className="max-h-60 overflow-y-auto rounded-md border p-1" search={search}
+        filter={c => c.id !== sourceId && c.profiles.includes(profile)}
+        isSelected={c => selected.includes(c.id)} onPick={toggle} />
+      {selected.length > 0 && <p className="text-xs text-muted-foreground">Selected ({selected.length}/20): {selected.map(id => names[id] ?? id).join(", ")}</p>}
       <Button variant="outline" disabled={!selected.length || !Object.keys(values).length} onClick={() => void preflight()}>Preflight selected cameras</Button>
       {rows.map(row => <p key={row.id} className="text-sm">{row.name}: {row.status}</p>)}
       <Button disabled={reviewed !== signature || !rows.some(r => r.body)} onClick={() => setConfirm(true)}>Review bulk apply</Button>

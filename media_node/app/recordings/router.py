@@ -4,6 +4,7 @@
   /api/v1/media/{segment_id}/part/{n}.m4s  -> n-th part (byte slice of the file,
                                               timestamps rebased to the absolute timeline)
   /api/v1/media/{segment_id}/file.mp4      -> whole chunk (download / export)
+  /api/v1/media/{segment_id}/thumb.jpg     -> timeline hover preview (see recordings/thumbnails.py)
 
 `?video_only=true` on init/part drops every non-video track: browsers refuse a whole stream when one
 track is unplayable (see recordings/utils.py), and they get audio from the AAC playlist instead.
@@ -14,12 +15,13 @@ import logging
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from fastapi.responses import FileResponse
 
 from app.recordings.models import LocalSegment
-from app.recordings.schemas import LocalSegmentOut
+from app.recordings.schemas import LocalSegmentOut, LocalSegmentPage
 from app.recordings.services import file_exists, read_slice
+from app.recordings.thumbnails import ThumbnailError, clamp_width, thumb_slot, thumbnails
 from app.recordings.utils import (
     Mp4IndexError,
     rebase_timestamps,
@@ -128,13 +130,42 @@ async def media_audio(segment_id: UUID, start_ms: int = 0, duration_ms: int | No
     )
 
 
-@router.get("/segments", response_model=list[LocalSegmentOut], summary="Chunks stored on this node (debug)")
-async def list_local_segments(camera_id: int | None = None, limit: int = 50):
-    qs = LocalSegment.all().order_by("-start_time").limit(min(limit, 1000))
+@router.get("/media/{segment_id}/thumb.jpg", summary="Small preview frame for the playback timeline")
+async def media_thumb(segment_id: UUID, at_ms: int = 0, w: int | None = None):
+    """`at_ms` (offset in the chunk) snaps to THUMBNAIL_GRID_SECONDS; every time in a slot gets the same
+    cached JPEG. A miss decodes one keyframe with ffmpeg; the video itself is never re-encoded."""
+    seg, root = await _segment(segment_id)
+    try:
+        slot, slot_ms = thumb_slot(at_ms, seg.duration_ms, settings.THUMBNAIL_GRID_SECONDS * 1000)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    try:
+        data = await thumbnails.get(seg.id, root / seg.rel_path, slot, slot_ms, clamp_width(w))
+    except FileNotFoundError as exc:
+        logger.error("FFmpeg is unavailable at %s", settings.FFMPEG_BIN)
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Thumbnail generator is not installed") from exc
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(status.HTTP_504_GATEWAY_TIMEOUT, "Thumbnail timed out") from exc
+    except ThumbnailError as exc:
+        logger.warning("No thumbnail for segment %s @%dms: %s", segment_id, slot_ms, exc)
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No picture at this time") from exc
+    return Response(data, media_type="image/jpeg", headers=CACHE_HEADERS)
+
+
+@router.get("/segments", response_model=LocalSegmentPage, summary="Chunks stored on this node, newest first (paged)")
+async def list_local_segments(
+    camera_id: int | None = None,
+    limit: int = Query(50, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+):
+    qs = LocalSegment.all()
     if camera_id is not None:
         qs = qs.filter(camera_id=camera_id)
-    return [
+    total = await qs.count()
+    rows = await qs.order_by("-start_time", "-id").offset(offset).limit(limit)
+    items = [
         LocalSegmentOut(**{k: getattr(s, k) for k in LocalSegmentOut.model_fields if k != "part_count"},
                         part_count=len(s.parts))
-        for s in await qs
+        for s in rows
     ]
+    return LocalSegmentPage(items=items, total=total, limit=limit, offset=offset)

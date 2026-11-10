@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.assignments.models import AssignmentHistory, CameraAssignment
 from app.assignments.schemas import AssignmentHistoryOut, AssignmentOut, ManualAssignIn
 from app.assignments.services import assign_camera, scheduler_tick
 from app.cameras.models import Camera
 from app.nodes.models import MediaNode, NodeState
+from utilities.pagination import Page, PageParams, paginate
 
 router = APIRouter(prefix="/api/v1/assignments", tags=["Assignments"])
 
@@ -22,12 +23,18 @@ def _out(a: CameraAssignment) -> AssignmentOut:
     )
 
 
-@router.get("", response_model=list[AssignmentOut])
-async def list_assignments(node_id: int | None = None):
+@router.get("", response_model=Page[AssignmentOut], summary="Camera → node assignments (paged)")
+async def list_assignments(
+    page: PageParams = Depends(),
+    node_id: int | None = None,
+    q: str | None = Query(default=None, max_length=128, description="Camera name contains"),
+):
     qs = CameraAssignment.all().prefetch_related("camera", "node").order_by("camera_id")
     if node_id is not None:
         qs = qs.filter(node_id=node_id)
-    return [_out(a) for a in await qs]
+    if q and q.strip():
+        qs = qs.filter(camera__name__icontains=q.strip())
+    return await paginate(qs, page, lambda rows: [_out(a) for a in rows])
 
 
 @router.put("/{camera_id}", response_model=AssignmentOut, summary="Manually move a camera to a node")
@@ -47,16 +54,16 @@ async def manual_assign(camera_id: int, body: ManualAssignIn):
     return _out(a)
 
 
-@router.get("/{camera_id}/history", response_model=list[AssignmentHistoryOut])
-async def assignment_history(camera_id: int, limit: int = 50):
-    rows = await AssignmentHistory.filter(camera_id=camera_id).limit(limit)
-    return [
+@router.get("/{camera_id}/history", response_model=Page[AssignmentHistoryOut], summary="Assignment history (paged)")
+async def assignment_history(camera_id: int, page: PageParams = Depends()):
+    qs = AssignmentHistory.filter(camera_id=camera_id).order_by("-started_at", "-id")
+    return await paginate(qs, page, lambda rows: [
         AssignmentHistoryOut(
             camera_id=r.camera_id, node_id=r.node_id, generation=r.generation,
             reason=r.reason, started_at=r.started_at, ended_at=r.ended_at,
         )
         for r in rows
-    ]
+    ])
 
 
 @router.post("/run-scheduler", status_code=status.HTTP_204_NO_CONTENT, summary="Run one scheduler cycle now")

@@ -45,6 +45,29 @@ class Stream(ApiModel):
     audio_last_observed_at: datetime | None = None
 
 
+class CameraOption(ApiModel):
+    """Small picker / live-sidebar row (GET /api/v1/cameras/options)."""
+    id: int
+    name: str
+    enabled: bool = True
+    has_ptz: bool = False
+    profiles: list[str] = []
+    status: str = "UNKNOWN"  # the recording stream's state; DISABLED when the camera is disabled
+    node_id: int | None = None
+
+
+class CameraAlert(ApiModel):
+    """One camera alert built by central (GET /api/v1/cluster/alerts)."""
+    level: str
+    kind: str
+    title: str
+    detail: str
+    since: datetime | None = None
+    camera_id: int
+    camera_name: str
+    profile: str | None = None
+
+
 class AssignmentInfo(ApiModel):
     node_id: int | None = None
     node_name: str | None = None
@@ -276,6 +299,7 @@ class MediaNode(ApiModel):
 class ClusterHealth(ApiModel):
     cameras_total: int
     cameras_enabled: int
+    record_streams: int = 0  # streams set to record on enabled cameras
     streams_by_status: dict[str, int]
     nodes_by_state: dict[str, int]
     segments_last_hour: int
@@ -466,4 +490,20 @@ class ExportJob(ApiModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     expires_at: datetime | None = None
+    updated_at: datetime
+
+
+# ---------------------------------------------------------------- bookmarks (central /api/v1/bookmarks)
+class Bookmark(ApiModel):
+    id: int
+    camera_id: int
+    camera_name: str = ""
+    profile: str | None = None
+    start_time: datetime
+    end_time: datetime | None = None
+    note: str
+    label: str | None = None
+    color: str | None = None
+    author: str | None = None
+    created_at: datetime
     updated_at: datetime

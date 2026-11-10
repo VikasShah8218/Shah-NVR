@@ -10,7 +10,7 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 os.environ["QSG_RHI_BACKEND"] = "software"
 os.environ["RENDER_MODE"] = "cpu"
 
-from PySide6.QtCore import QCoreApplication, QEvent, QMetaObject, QObject, QSettings, QUrl, qInstallMessageHandler
+from PySide6.QtCore import QCoreApplication, QEvent, QMetaObject, QObject, QSettings, Qt, QUrl, qInstallMessageHandler
 from PySide6.QtQml import QQmlComponent
 from PySide6.QtQuick import QQuickItem, QQuickWindow
 from PySide6.QtTest import QTest
@@ -67,9 +67,18 @@ def main():
                 "onvif_host": "192.168.1.241", "clock_offset_seconds": -12}).to_qml())
             manual = _decorate(Camera.model_validate({**CAMERA, "id": 2, "name": "Manual disabled",
                 "enabled": False, "model": None}).to_qml())
-            cameras._apply([camera, manual])
+            cameras._apply([camera, manual], 2)
             cameras._set_loading(False)
-            stores["Cluster"]._apply({"cameras_total": 2, "cameras_enabled": 1, "streams_by_status": {"RECORDING": 1},
+            # Pickers and the live sidebar use the small searchable list (CameraOptionsStore).
+            options = [{"id": 1, "name": "Gate", "enabled": True, "has_ptz": False, "profiles": ["main"],
+                        "status": "RECORDING", "node_id": 2},
+                       {"id": 2, "name": "Manual disabled", "enabled": False, "has_ptz": False, "profiles": ["main"],
+                        "status": "DISABLED", "node_id": None}]
+            for name in ("LiveCameras", "PlaybackCameras", "EncoderCameras"):
+                stores[name]._set(options, 2)
+                stores[name]._set_loading(False)
+            stores["Cluster"]._apply({"cameras_total": 2, "cameras_enabled": 1, "record_streams": 1,
+                "streams_by_status": {"RECORDING": 1},
                 "nodes_by_state": {"ACTIVE": 1}, "segments_last_hour": 10, "segments_total": 100})
 
             def settle():
@@ -113,11 +122,54 @@ Item {
                 if page == "cameras":
                     assert "Manual disabled" in texts()
                     assert window.grabWindow().save(str(output / "cameras.png"))
+                    # Pagination (2026-11-10): with 120 cameras the pager shows "Page 1 / 3".
+                    cameras._apply([camera, manual], 120)
+                    settle()
+                    pager = window.findChild(QObject, "camerasPager")
+                    assert pager is not None and pager.property("visible") and "Page 1 / 3" in texts(), texts()
+                    assert window.grabWindow().save(str(output / "cameras-paged.png"))
+                    cameras._apply([camera, manual], 2)
+                if page == "live":
+                    stores["Live"]._set_grid_total(40)  # 4 per page -> 10 grid pages
+                    settle()
+                    assert "10 pages" in texts() and window.findChild(QObject, "gridNext") is not None, texts()
+
+            # Playback parity (2026-11-09): bookmark markers (point + range), the bookmarks panel, the
+            # add dialog and the new transport buttons render without QML warnings.
+            router.go("playback")
+            settle()
+            bookmarks, playback = stores["Bookmarks"], stores["Playback"]
+            day = playback.day
+            bookmarks._day_markers = [
+                {"id": "bookmark-1", "t": day + 3_600_000, "end_t": None, "kind": "bookmark",
+                 "label": "Truck at gate", "color": "#ef4444"},
+                {"id": "bookmark-2", "t": day + 7_200_000, "end_t": day + 7_500_000, "kind": "bookmark",
+                 "label": "vehicle: Car", "color": ""},
+            ]
+            bookmarks.markersChanged.emit()
+            bookmarks._rows = [{"id": 1, "camera_id": 1, "camera_name": "Gate", "profile": "main",
+                                "start_time": "2026-11-09T01:00:00+00:00", "end_time": None, "note": "Truck at gate",
+                                "label": "vehicle", "color": "#ef4444", "startMs": day + 3_600_000, "endMs": 0}]
+            bookmarks.rowsChanged.emit()
+            settle()
+            assert len(bookmarks.markers) == 2 and bookmarks.markers[1]["width"] is not None
+            assert "Truck at gate" in texts() and "Bookmarks" in texts(), texts()
+            assert window.findChild(QObject, "reverseButton") is not None
+            add = window.findChild(QObject, "addBookmarkButton")
+            assert add is not None
+            QMetaObject.invokeMethod(add, "click")
+            settle()
+            note = window.findChild(QObject, "bookmarkNote")
+            assert note is not None and note.property("visible"), "bookmark dialog did not open"
+            assert window.grabWindow().save(str(output / "playback-bookmarks.png"))
+            QTest.keyClick(window, Qt.Key.Key_Escape)
+            settle()
 
             router.go("live")
             stores["Live"].place(1, 0)
             settle()
-            cameras._apply([{**camera, "name": "Gate renamed"}, manual])
+            cameras._apply([{**camera, "name": "Gate renamed"}, manual], 2)  # tile: from the camera cache
+            stores["LiveCameras"]._set([{**options[0], "name": "Gate renamed"}, options[1]], 2)  # sidebar list
             settle()
             assert first.property("cameraName") == "Gate renamed"
             assert texts().count("Gate renamed") >= 2  # list AND existing tile

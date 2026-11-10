@@ -1,0 +1,5 @@
+ffmpeg  =  https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+Expand-Archive $env:TEMP\ff.zip $env:TEMP\ff -Force
+Copy-Item "$env:TEMP\ff\*\bin\ffmpeg.exe","$env:TEMP\ff\*\bin\ffprobe.exe" $bin
+FFMPEG_BIN=C:\Shah-NVR\Shah-NVR\media_node\bin\ffmpeg.exe
+FFPROBE_BIN=C:\Shah-NVR\Shah-NVR\media_node\bin\ffprobe.exe

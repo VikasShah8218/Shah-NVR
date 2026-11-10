@@ -1,17 +1,21 @@
 import { useEffect, useState } from "react"
-import { useCameras, useOnvifServer, useUpdateCamera, useUpdateOnvifServer } from "@/api/queries"
+import { usePagedCameras, useOnvifServer, useUpdateCamera, useUpdateOnvifServer } from "@/api/queries"
 import type { MediaNode } from "@/api/types"
 import { EmptyState, ErrorState, Field, Loading } from "@/components/common"
+import { Pager } from "@/components/Pager"
 import { StatusBadge } from "@/components/StatusBadge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { usePaged } from "@/lib/usePaged"
 
 export function OnvifServerTab({ node }: { node: MediaNode }) {
   const server = useOnvifServer(node.id)
-  const cameras = useCameras()
+  // Only this node's cameras, one page at a time.
+  const paged = usePaged({ size: 25 })
+  const cameras = usePagedCameras({ nodeId: node.id, limit: paged.limit, offset: paged.offset })
   const update = useUpdateOnvifServer()
   const updateCamera = useUpdateCamera()
   const [name, setName] = useState("")
@@ -27,7 +31,7 @@ export function OnvifServerTab({ node }: { node: MediaNode }) {
   if (server.isLoading) return <Loading />
   if (server.error || !server.data) return <ErrorState error={server.error ?? "ONVIF server state unavailable"} />
   const state = server.data
-  const assigned = (cameras.data ?? []).filter((camera) => camera.assignment?.node_id === node.id)
+  const assigned = cameras.data?.items ?? []
 
   return <div className="space-y-4">
     <Card>
@@ -76,6 +80,7 @@ export function OnvifServerTab({ node }: { node: MediaNode }) {
           <Switch checked={camera.expose_via_onvif} disabled={updateCamera.isPending || !camera.enabled}
             onCheckedChange={(value) => updateCamera.mutate({ id: camera.id, body: { expose_via_onvif: value } })} />
         </div>)}
+        {cameras.data && <Pager page={paged.page} pageSize={paged.pageSize} total={cameras.data.total} onPage={paged.setPage} />}
       </CardContent>
     </Card>
   </div>

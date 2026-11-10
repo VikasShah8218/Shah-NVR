@@ -1,5 +1,6 @@
 """H2 regression tests: no server, camera, real settings or database access."""
 from copy import deepcopy
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import httpx
@@ -58,8 +59,11 @@ def setup(monkeypatch):
     ctx = Context()
     ctx.central = mock_api()
     cameras = Mock()
-    cameras.cameras.return_value = [{"id": cid, "name": f"Camera {cid}", "enabled": True,
-                                     "onvif_host": f"192.0.2.{cid}", "streams": [{"profile": "main"}]} for cid in range(1, 25)]
+    rows = [{"id": cid, "name": f"Camera {cid}", "enabled": True,
+             "onvif_host": f"192.0.2.{cid}", "streams": [{"profile": "main"}]} for cid in range(1, 25)]
+    # Bulk targets are fetched by id (never the whole camera list).
+    ctx.central.cameras_by_ids.side_effect = lambda ids: [SimpleNamespace(to_qml=lambda c=c: dict(c))
+                                                          for c in rows if c["id"] in ids]
     monkeypatch.setattr("app.features.encoder.store.run_task", immediate)
     store = EncoderStore(ctx, cameras)
     store.setTarget(1, "main")

@@ -11,11 +11,31 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Cameras */
+        /** List / search cameras (paged) */
         get: operations["list_cameras_api_v1_cameras_get"];
         put?: never;
         /** Create Camera */
         post: operations["create_camera_api_v1_cameras_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cameras/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Small camera list for pickers (paged)
+         * @description `id`, `name` and what a picker or a live tile needs, without the full camera (streams, ONVIF details).
+         */
+        get: operations["camera_options_api_v1_cameras_options_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -145,6 +165,43 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookmarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List / search bookmarks (paged) */
+        get: operations["list_bookmarks_api_v1_bookmarks_get"];
+        put?: never;
+        /** Create Bookmark */
+        post: operations["create_bookmark_api_v1_bookmarks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bookmarks/{bookmark_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Bookmark */
+        get: operations["get_bookmark_api_v1_bookmarks__bookmark_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Bookmark */
+        delete: operations["delete_bookmark_api_v1_bookmarks__bookmark_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Bookmark */
+        patch: operations["update_bookmark_api_v1_bookmarks__bookmark_id__patch"];
         trace?: never;
     };
     "/api/v1/nodes": {
@@ -326,7 +383,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Assignments */
+        /** Camera → node assignments (paged) */
         get: operations["list_assignments_api_v1_assignments_get"];
         put?: never;
         post?: never;
@@ -360,7 +417,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Assignment History */
+        /** Assignment history (paged) */
         get: operations["assignment_history_api_v1_assignments__camera_id__history_get"];
         put?: never;
         post?: never;
@@ -396,6 +453,27 @@ export interface paths {
         };
         /** Cluster Health */
         get: operations["cluster_health_api_v1_cluster_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cluster/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Camera alerts for the dashboard (paged, danger first)
+         * @description Enabled cameras that are unassigned, not recording, not answering ONVIF or whose clock drifts.
+         *     Node alerts (unreachable, disk, storage) are built by the clients from `GET /api/v1/nodes`.
+         */
+        get: operations["cluster_alerts_api_v1_cluster_alerts_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -741,7 +819,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Backfill Jobs */
+        /** Backfill jobs (paged) */
         get: operations["list_backfill_jobs_api_v1_cameras__camera_id__backfill_jobs_get"];
         put?: never;
         /** Create Backfill Job */
@@ -759,7 +837,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Exports */
+        /** Export jobs, newest first (paged) */
         get: operations["list_exports_api_v1_exports_get"];
         put?: never;
         /** Create Export */
@@ -1109,6 +1187,50 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AlertCounts */
+        AlertCounts: {
+            /** Danger */
+            danger: number;
+            /** Warning */
+            warning: number;
+        };
+        /** AlertOut */
+        AlertOut: {
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "danger" | "warning";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "unassigned" | "stream" | "onvif" | "clock";
+            /** Title */
+            title: string;
+            /** Detail */
+            detail: string;
+            /** Since */
+            since?: string | null;
+            /** Camera Id */
+            camera_id: number;
+            /** Camera Name */
+            camera_name: string;
+            /** Profile */
+            profile?: string | null;
+        };
+        /** AlertPage */
+        AlertPage: {
+            /** Items */
+            items: components["schemas"]["AlertOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            counts: components["schemas"]["AlertCounts"];
+        };
         /** AssignmentHistoryOut */
         AssignmentHistoryOut: {
             /** Camera Id */
@@ -1321,6 +1443,84 @@ export interface components {
          * @enum {string}
          */
         BackfillState: "QUEUED" | "CLAIMED" | "DOWNLOADING" | "INDEXING" | "COMPLETED" | "PARTIAL" | "FAILED" | "CANCELLED";
+        /** BookmarkCreate */
+        BookmarkCreate: {
+            /** Camera Id */
+            camera_id: number;
+            /** Profile */
+            profile?: string | null;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /** End Time */
+            end_time?: string | null;
+            /** Note */
+            note: string;
+            /** Label */
+            label?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Author */
+            author?: string | null;
+        };
+        /** BookmarkOut */
+        BookmarkOut: {
+            /** Id */
+            id: number;
+            /** Camera Id */
+            camera_id: number;
+            /** Camera Name */
+            camera_name: string;
+            /** Profile */
+            profile: string | null;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /** End Time */
+            end_time: string | null;
+            /** Note */
+            note: string;
+            /** Label */
+            label: string | null;
+            /** Color */
+            color: string | null;
+            /** Author */
+            author: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * BookmarkUpdate
+         * @description Only the fields sent are changed. Send end_time=null to turn a range into a point.
+         */
+        BookmarkUpdate: {
+            /** Profile */
+            profile?: string | null;
+            /** Start Time */
+            start_time?: string | null;
+            /** End Time */
+            end_time?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Label */
+            label?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Author */
+            author?: string | null;
+        };
         /** CameraAssignmentOut */
         CameraAssignmentOut: {
             /** Camera Id */
@@ -1365,6 +1565,25 @@ export interface components {
             has_ptz: boolean;
             /** Streams */
             streams: components["schemas"]["StreamIn"][];
+        };
+        /**
+         * CameraOption
+         * @description One row of a camera picker / live sidebar (GET /api/v1/cameras/options).
+         */
+        CameraOption: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Has Ptz */
+            has_ptz: boolean;
+            /** Profiles */
+            profiles: string[];
+            status: components["schemas"]["StreamStatus"];
+            /** Node Id */
+            node_id: number | null;
         };
         /** CameraOut */
         CameraOut: {
@@ -1561,6 +1780,8 @@ export interface components {
             cameras_total: number;
             /** Cameras Enabled */
             cameras_enabled: number;
+            /** Record Streams */
+            record_streams: number;
             /** Streams By Status */
             streams_by_status: {
                 [key: string]: number;
@@ -2497,6 +2718,83 @@ export interface components {
             /** Location */
             location?: string | null;
         };
+        /** Page[AssignmentHistoryOut] */
+        Page_AssignmentHistoryOut_: {
+            /** Items */
+            items: components["schemas"]["AssignmentHistoryOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[AssignmentOut] */
+        Page_AssignmentOut_: {
+            /** Items */
+            items: components["schemas"]["AssignmentOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[BackfillJobOut] */
+        Page_BackfillJobOut_: {
+            /** Items */
+            items: components["schemas"]["BackfillJobOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[BookmarkOut] */
+        Page_BookmarkOut_: {
+            /** Items */
+            items: components["schemas"]["BookmarkOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[CameraOption] */
+        Page_CameraOption_: {
+            /** Items */
+            items: components["schemas"]["CameraOption"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[CameraOut] */
+        Page_CameraOut_: {
+            /** Items */
+            items: components["schemas"]["CameraOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[ExportOut] */
+        Page_ExportOut_: {
+            /** Items */
+            items: components["schemas"]["ExportOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** ProbeOut */
         ProbeOut: {
             /** Node Id */
@@ -3186,7 +3484,20 @@ export interface operations {
     list_cameras_api_v1_cameras_get: {
         parameters: {
             query?: {
+                /** @description Name contains, or the exact camera id */
+                q?: string | null;
                 enabled?: boolean | null;
+                /** @description Cameras assigned to this media node */
+                node_id?: number | null;
+                /** @description Any stream in this state */
+                status?: components["schemas"]["StreamStatus"] | null;
+                /** @description Only these ids, comma-separated (max 200) */
+                ids?: string | null;
+                sort?: "name" | "id";
+                /** @description Rows per page */
+                limit?: number;
+                /** @description Rows to skip */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -3200,7 +3511,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CameraOut"][];
+                    "application/json": components["schemas"]["Page_CameraOut_"];
                 };
             };
             /** @description Validation Error */
@@ -3234,6 +3545,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CameraOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    camera_options_api_v1_cameras_options_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                enabled?: boolean | null;
+                node_id?: number | null;
+                ids?: string | null;
+                /** @description Rows per page */
+                limit?: number;
+                /** @description Rows to skip */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_CameraOption_"];
                 };
             };
             /** @description Validation Error */
@@ -3580,6 +3929,177 @@ export interface operations {
                 };
                 content: {
                     "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_bookmarks_api_v1_bookmarks_get: {
+        parameters: {
+            query?: {
+                camera_id?: number | null;
+                /** @description Also includes camera-wide bookmarks (no profile) */
+                profile?: string | null;
+                /** @description Text search in the note and label */
+                q?: string | null;
+                /** @description Only bookmarks overlapping [start, end) */
+                start?: string | null;
+                end?: string | null;
+                /** @description By start time; desc = newest first */
+                order?: "asc" | "desc";
+                /** @description Up to 1000 (a whole day of timeline markers) */
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_BookmarkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_bookmark_api_v1_bookmarks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookmarkCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_bookmark_api_v1_bookmarks__bookmark_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookmark_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_bookmark_api_v1_bookmarks__bookmark_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookmark_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_bookmark_api_v1_bookmarks__bookmark_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookmark_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookmarkUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookmarkOut"];
                 };
             };
             /** @description Validation Error */
@@ -4042,6 +4562,12 @@ export interface operations {
         parameters: {
             query?: {
                 node_id?: number | null;
+                /** @description Camera name contains */
+                q?: string | null;
+                /** @description Rows per page */
+                limit?: number;
+                /** @description Rows to skip */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -4055,7 +4581,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AssignmentOut"][];
+                    "application/json": components["schemas"]["Page_AssignmentOut_"];
                 };
             };
             /** @description Validation Error */
@@ -4107,7 +4633,10 @@ export interface operations {
     assignment_history_api_v1_assignments__camera_id__history_get: {
         parameters: {
             query?: {
+                /** @description Rows per page */
                 limit?: number;
+                /** @description Rows to skip */
+                offset?: number;
             };
             header?: never;
             path: {
@@ -4123,7 +4652,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AssignmentHistoryOut"][];
+                    "application/json": components["schemas"]["Page_AssignmentHistoryOut_"];
                 };
             };
             /** @description Validation Error */
@@ -4171,6 +4700,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClusterHealthOut"];
+                };
+            };
+        };
+    };
+    cluster_alerts_api_v1_cluster_alerts_get: {
+        parameters: {
+            query?: {
+                /** @description Only this level */
+                level?: ("danger" | "warning") | null;
+                /** @description Rows per page */
+                limit?: number;
+                /** @description Rows to skip */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4873,7 +5438,10 @@ export interface operations {
     list_backfill_jobs_api_v1_cameras__camera_id__backfill_jobs_get: {
         parameters: {
             query?: {
+                /** @description Rows per page */
                 limit?: number;
+                /** @description Rows to skip */
+                offset?: number;
             };
             header?: never;
             path: {
@@ -4889,7 +5457,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BackfillJobOut"][];
+                    "application/json": components["schemas"]["Page_BackfillJobOut_"];
                 };
             };
             /** @description Validation Error */
@@ -4942,7 +5510,10 @@ export interface operations {
         parameters: {
             query?: {
                 camera_id?: number | null;
+                /** @description Rows per page */
                 limit?: number;
+                /** @description Rows to skip */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -4956,7 +5527,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExportOut"][];
+                    "application/json": components["schemas"]["Page_ExportOut_"];
                 };
             };
             /** @description Validation Error */

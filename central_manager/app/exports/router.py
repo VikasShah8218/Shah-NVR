@@ -3,7 +3,7 @@ from datetime import timedelta
 from urllib.parse import urlencode
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 
 from app.cameras.models import Camera, CameraStream
@@ -13,6 +13,7 @@ from app.recordings.models import ExportJob, ExportMode, ExportState
 from app.recordings.utils import compute_gaps, find_segments
 from settings.settings import settings
 from utilities.common import utcnow
+from utilities.pagination import Page, PageParams, paginate
 
 router = APIRouter(prefix="/api/v1/exports", tags=["Exports"])
 internal_router = APIRouter(prefix="/internal/v1/exports", tags=["Internal: Exports"])
@@ -70,13 +71,13 @@ async def create_export(body: ExportCreate):
     return _out(job)
 
 
-@router.get("", response_model=list[ExportOut])
-async def list_exports(camera_id: int | None = None, limit: int = Query(50, ge=1, le=200)):
+@router.get("", response_model=Page[ExportOut], summary="Export jobs, newest first (paged)")
+async def list_exports(camera_id: int | None = None, page: PageParams = Depends()):
     await _expire()
-    query = ExportJob.all()
+    query = ExportJob.all().order_by("-created_at", "-id")
     if camera_id is not None:
         query = query.filter(camera_id=camera_id)
-    return [_out(job) for job in await query.limit(limit)]
+    return await paginate(query, page, lambda rows: [_out(job) for job in rows])
 
 
 @router.get("/{job_id}", response_model=ExportOut)
