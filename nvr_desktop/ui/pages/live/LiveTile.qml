@@ -192,7 +192,6 @@ Rectangle {
         AppMenuItem { text: "LL-HLS"; radio: true; marked: tile.protocolOverride === "hls"; onTriggered: tile.protocolOverride = "hls" }
         MenuSeparator {}
         AppMenuItem { text: "Open main stream"; iconName: "maximize"; onTriggered: tile.expand(tile.cameraId) }
-        AppMenuItem { text: "PTZ controls"; iconName: "crosshair"; onTriggered: ptzDialog.open() }
         AppMenuItem {
             text: "Snapshot"
             iconName: "image-down"
@@ -212,18 +211,6 @@ Rectangle {
         AppMenuItem { text: "Camera details"; iconName: "external-link"; onTriggered: Router.go("camera", tile.cameraId) }
         MenuSeparator {}
         AppMenuItem { text: "Remove from view"; iconName: "x"; onTriggered: Live.clearTile(tile.index) }
-    }
-
-    AppDialog {
-        id: ptzDialog
-        width: Math.min(620, Overlay.overlay.width - 40)
-        title: (tile.camera ? tile.camera.name : "Camera") + " · PTZ"
-        onClosed: Ptz.close()
-        Loader {
-            active: ptzDialog.opened && !!tile.camera
-            Layout.fillWidth: true
-            sourceComponent: PtzPanel { cameraId: tile.cameraId ?? 0; profile: tile.profile }
-        }
     }
 
     component MenuSectionLabel: Text {

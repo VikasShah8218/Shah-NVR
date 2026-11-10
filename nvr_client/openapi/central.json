@@ -662,6 +662,18 @@
               "title": "Access"
             },
             "description": "Node addresses embedded in the playlist"
+          },
+          {
+            "name": "video_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Video track alone, for browsers (audio: audio.m3u8)",
+              "default": false,
+              "title": "Video Only"
+            },
+            "description": "Video track alone, for browsers (audio: audio.m3u8)"
           }
         ],
         "responses": {
@@ -2406,6 +2418,72 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PtzState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cameras/{camera_id}/streams/{profile}/ptz/session": {
+      "post": {
+        "tags": [
+          "PTZ"
+        ],
+        "summary": "Open Ptz Ws",
+        "description": "Mint a direct-to-node PTZ WebSocket session. Central brokers only the open; all\nmove/stop/pose traffic then flows client<->node over the returned ws_url. No pin is\nkept: a dropped WS self-heals by re-minting a ticket, and the node auto-stops on close.",
+        "operationId": "open_ptz_ws_api_v1_cameras__camera_id__streams__profile__ptz_session_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "profile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile"
+            }
+          },
+          {
+            "name": "access",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "lan",
+                "public"
+              ],
+              "type": "string",
+              "default": "lan",
+              "title": "Access"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PtzTicket"
                 }
               }
             }
@@ -4533,6 +4611,11 @@
             ],
             "title": "Retention Days"
           },
+          "has_ptz": {
+            "type": "boolean",
+            "title": "Has Ptz",
+            "default": false
+          },
           "streams": {
             "items": {
               "$ref": "#/components/schemas/StreamIn"
@@ -4592,6 +4675,10 @@
           "expose_via_onvif": {
             "type": "boolean",
             "title": "Expose Via Onvif"
+          },
+          "has_ptz": {
+            "type": "boolean",
+            "title": "Has Ptz"
           },
           "retention_days": {
             "anyOf": [
@@ -4766,6 +4853,7 @@
           "has_password",
           "enabled",
           "expose_via_onvif",
+          "has_ptz",
           "retention_days",
           "created_at",
           "updated_at",
@@ -4843,6 +4931,17 @@
               }
             ],
             "title": "Expose Via Onvif"
+          },
+          "has_ptz": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Has Ptz"
           },
           "retention_days": {
             "anyOf": [
@@ -5415,6 +5514,17 @@
             },
             "type": "array",
             "title": "Services"
+          },
+          "has_ptz": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Has Ptz"
           },
           "ntp": {
             "anyOf": [
@@ -8465,6 +8575,59 @@
         },
         "type": "object",
         "title": "PtzStatus"
+      },
+      "PtzTicket": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "title": "Expires In Seconds",
+            "default": 120
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/PtzCapabilities"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PtzStatus"
+          },
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/PtzPreset"
+            },
+            "type": "array",
+            "title": "Presets",
+            "default": []
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "default": []
+          },
+          "ws_url": {
+            "type": "string",
+            "title": "Ws Url"
+          },
+          "access": {
+            "type": "string",
+            "title": "Access"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "capabilities",
+          "status",
+          "ws_url",
+          "access"
+        ],
+        "title": "PtzTicket",
+        "description": "A ws:// URL the client opens straight to the node for low-latency control."
       },
       "RecoveryOut": {
         "properties": {

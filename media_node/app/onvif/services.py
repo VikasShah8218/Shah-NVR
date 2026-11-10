@@ -213,7 +213,13 @@ class OnvifDevice:
     def __init__(self, host: str, port: int = 80, username: str = "", password: str = "", *,
                  xaddr: str | None = None, timeout: float = 5.0):
         self.host, self.port = host, port
-        self.device_url = xaddr or f"http://{host}:{port}/onvif/device_service"
+        # Port 443 means the camera serves ONVIF over TLS; building an http:// URL there
+        # fails instantly (RemoteProtocolError: plaintext to a TLS socket). Only this
+        # bootstrap device_service URL needs the guess -- advertised service XAddrs keep
+        # their own scheme through rehost(). The client sets verify=False, so a self-signed
+        # camera certificate is fine.
+        scheme = "https" if port == 443 else "http"
+        self.device_url = xaddr or f"{scheme}://{host}:{port}/onvif/device_service"
         self._http = httpx.AsyncClient(timeout=timeout, verify=False)
         self.soap = SoapClient(self._http, username, password)
         self._services: dict[str, str] | None = None

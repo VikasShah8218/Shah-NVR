@@ -101,6 +101,7 @@ class DeviceStateOut(BaseModel):
     clock: ClockOut
     info: dict
     services: list[str]
+    has_ptz: bool | None = None  # a media profile carries a PTZConfiguration; None = profiles couldn't be enumerated
     ntp: NtpOut | None
     hostname: str | None
     network: NetworkOut | None

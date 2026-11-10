@@ -77,8 +77,9 @@ export function PlaybackPage() {
   )
 
   const viewEnd = viewStart + zoom
+  // The browser plays the video track alone (audio: audioSrc); the VLC link keeps every track.
   const src = useMemo(
-    () => (cameraId != null && playFrom ? playbackUrl(settings.centralUrl, cameraId, profile, playFrom, playTo, access) : null),
+    () => (cameraId != null && playFrom ? playbackUrl(settings.centralUrl, cameraId, profile, playFrom, playTo, access, true) : null),
     [settings.centralUrl, cameraId, profile, playFrom, playTo, access],
   )
   const hasRecordedAudio = segments.some((segment) =>
@@ -133,8 +134,9 @@ export function PlaybackPage() {
   }
 
   const copyVlc = () => {
-    if (!src) return
-    navigator.clipboard.writeText(src).then(() => toast.success("Playlist URL copied (open it in VLC)"), () => toast.message(src))
+    if (cameraId == null || !playFrom) return
+    const url = playbackUrl(settings.centralUrl, cameraId, profile, playFrom, playTo, access)
+    navigator.clipboard.writeText(url).then(() => toast.success("Playlist URL copied (open it in VLC)"), () => toast.message(url))
   }
 
   const windowSegments = segments.filter((s) => new Date(s.end_time).getTime() > viewStart && new Date(s.start_time).getTime() < viewEnd)

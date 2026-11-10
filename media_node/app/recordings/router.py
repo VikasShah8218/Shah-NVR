@@ -4,6 +4,9 @@
   /api/v1/media/{segment_id}/part/{n}.m4s  -> n-th part (byte slice of the file,
                                               timestamps rebased to the absolute timeline)
   /api/v1/media/{segment_id}/file.mp4      -> whole chunk (download / export)
+
+`?video_only=true` on init/part drops every non-video track: browsers refuse a whole stream when one
+track is unplayable (see recordings/utils.py), and they get audio from the AAC playlist instead.
 """
 
 import asyncio
@@ -17,7 +20,13 @@ from fastapi.responses import FileResponse
 from app.recordings.models import LocalSegment
 from app.recordings.schemas import LocalSegmentOut
 from app.recordings.services import file_exists, read_slice
-from app.recordings.utils import rebase_timestamps
+from app.recordings.utils import (
+    Mp4IndexError,
+    rebase_timestamps,
+    video_only_init,
+    video_only_part,
+    video_track_ids,
+)
 from app.storage.services import storage
 from settings.settings import settings
 
@@ -44,14 +53,18 @@ async def _segment(segment_id: UUID) -> tuple[LocalSegment, Path]:
 
 
 @router.get("/media/{segment_id}/init.mp4")
-async def media_init(segment_id: UUID):
+async def media_init(segment_id: UUID, video_only: bool = False):
     seg, root = await _segment(segment_id)
     data = await asyncio.to_thread(read_slice, root, seg.rel_path, 0, seg.init_size)
+    if video_only:
+        video_ids = video_track_ids(data)
+        if video_ids:
+            data = video_only_init(data, video_ids)
     return Response(data, media_type="video/mp4", headers=CACHE_HEADERS)
 
 
 @router.get("/media/{segment_id}/part/{index}.m4s")
-async def media_part(segment_id: UUID, index: int):
+async def media_part(segment_id: UUID, index: int, video_only: bool = False):
     seg, root = await _segment(segment_id)
     if not 0 <= index < len(seg.parts):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Part not found")
@@ -59,6 +72,14 @@ async def media_part(segment_id: UUID, index: int):
     data = bytearray(await asyncio.to_thread(read_slice, root, seg.rel_path, part["o"], part["s"]))
     if seg.tracks:
         rebase_timestamps(data, seg.tracks, seg.start_time)
+    if video_only:
+        init = await asyncio.to_thread(read_slice, root, seg.rel_path, 0, seg.init_size)
+        video_ids = video_track_ids(init)
+        if video_ids:
+            try:
+                data = video_only_part(bytes(data), video_ids)
+            except Mp4IndexError as exc:  # not MediaMTX's layout: the original part is still correct
+                logger.warning("Serving segment %s part %d with all tracks: %s", segment_id, index, exc)
     return Response(bytes(data), media_type="video/mp4", headers=CACHE_HEADERS)
 
 

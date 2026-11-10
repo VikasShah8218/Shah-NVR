@@ -42,6 +42,9 @@ class Camera(Model):
     onvif_reachable = fields.BooleanField(null=True)  # last ONVIF check (no login) answered
     clock_offset_seconds = fields.FloatField(null=True)  # camera clock minus node clock
     onvif_checked_at = fields.DatetimeField(null=True)
+    # PTZ-capable. Auto-set from ONVIF detection (a media profile carrying a PTZConfiguration) on add and on each
+    # Device-page re-probe; editable by hand for non-ONVIF cameras. Clients show PTZ controls only when this is true.
+    has_ptz = fields.BooleanField(default=False)
     # L3 edge-storage recovery. Automatic mode is intentionally opt-in.
     backfill_mode = fields.CharField(max_length=16, default="off")  # off | manual | automatic
     backfill_profile = fields.CharField(max_length=32, default="main")

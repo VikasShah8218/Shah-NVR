@@ -660,6 +660,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cameras/{camera_id}/streams/{profile}/ptz/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Ptz Ws
+         * @description Mint a direct-to-node PTZ WebSocket session. Central brokers only the open; all
+         *     move/stop/pose traffic then flows client<->node over the returned ws_url. No pin is
+         *     kept: a dropped WS self-heals by re-minting a ticket, and the node auto-stops on close.
+         */
+        post: operations["open_ptz_ws_api_v1_cameras__camera_id__streams__profile__ptz_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cameras/{camera_id}/streams/{profile}/ptz/command": {
         parameters: {
             query?: never;
@@ -1336,6 +1358,11 @@ export interface components {
             enabled: boolean;
             /** Retention Days */
             retention_days?: number | null;
+            /**
+             * Has Ptz
+             * @default false
+             */
+            has_ptz: boolean;
             /** Streams */
             streams: components["schemas"]["StreamIn"][];
         };
@@ -1355,6 +1382,8 @@ export interface components {
             enabled: boolean;
             /** Expose Via Onvif */
             expose_via_onvif: boolean;
+            /** Has Ptz */
+            has_ptz: boolean;
             /** Retention Days */
             retention_days: number | null;
             /** Onvif Host */
@@ -1407,6 +1436,8 @@ export interface components {
             enabled?: boolean | null;
             /** Expose Via Onvif */
             expose_via_onvif?: boolean | null;
+            /** Has Ptz */
+            has_ptz?: boolean | null;
             /** Retention Days */
             retention_days?: number | null;
         };
@@ -1624,6 +1655,8 @@ export interface components {
             info: components["schemas"]["DeviceInfoOut"];
             /** Services */
             services: string[];
+            /** Has Ptz */
+            has_ptz?: boolean | null;
             ntp: components["schemas"]["NtpOut"] | null;
             /** Hostname */
             hostname: string | null;
@@ -2661,6 +2694,35 @@ export interface components {
              */
             position_valid: boolean;
         };
+        /**
+         * PtzTicket
+         * @description A ws:// URL the client opens straight to the node for low-latency control.
+         */
+        PtzTicket: {
+            /** Session Id */
+            session_id: string;
+            /**
+             * Expires In Seconds
+             * @default 120
+             */
+            expires_in_seconds: number;
+            capabilities: components["schemas"]["PtzCapabilities"];
+            status: components["schemas"]["PtzStatus"];
+            /**
+             * Presets
+             * @default []
+             */
+            presets: components["schemas"]["PtzPreset"][];
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+            /** Ws Url */
+            ws_url: string;
+            /** Access */
+            access: string;
+        };
         /** RecoveryOut */
         RecoveryOut: {
             /** Status */
@@ -3462,6 +3524,8 @@ export interface operations {
                 minutes?: number | null;
                 /** @description Node addresses embedded in the playlist */
                 access?: "lan" | "public";
+                /** @description Video track alone, for browsers (audio: audio.m3u8) */
+                video_only?: boolean;
             };
             header?: never;
             path: {
@@ -4626,6 +4690,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PtzState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_ptz_ws_api_v1_cameras__camera_id__streams__profile__ptz_session_post: {
+        parameters: {
+            query?: {
+                access?: "lan" | "public";
+            };
+            header?: never;
+            path: {
+                camera_id: number;
+                profile: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PtzTicket"];
                 };
             };
             /** @description Validation Error */

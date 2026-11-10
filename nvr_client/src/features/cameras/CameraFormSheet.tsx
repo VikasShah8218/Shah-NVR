@@ -64,6 +64,7 @@ export function CameraFormSheet({
   // null retention = keep recordings until storage is full
   const [untilFull, setUntilFull] = useState(camera ? camera.retention_days == null : false)
   const [enabled, setEnabled] = useState(camera?.enabled ?? true)
+  const [hasPtz, setHasPtz] = useState(camera?.has_ptz ?? false)
   const [streams, setStreams] = useState<StreamDraft[]>(() => draftFromCamera(camera))
   const [errors, setErrors] = useState<string[]>([])
 
@@ -115,6 +116,7 @@ export function CameraFormSheet({
         password: password || null,
         retention_days: untilFull ? null : Number(retention),
         enabled,
+        has_ptz: hasPtz,
         streams: used.map(toIn),
       })
     } else {
@@ -126,6 +128,7 @@ export function CameraFormSheet({
           username: username.trim() || null,
           retention_days: untilFull ? null : Number(retention),
           enabled,
+          has_ptz: hasPtz,
           ...(password ? { password } : {}),
         },
       })
@@ -215,6 +218,13 @@ export function CameraFormSheet({
               <span className="block text-xs text-muted-foreground">Off: the camera is not pulled; no live view, no new recording.</span>
             </span>
             <Switch checked={enabled} onCheckedChange={setEnabled} />
+          </label>
+          <label className="flex items-center justify-between rounded-md border px-3 py-2.5 text-sm">
+            <span>
+              PTZ camera
+              <span className="block text-xs text-muted-foreground">Auto-detected over ONVIF; turn on to show pan/tilt/zoom controls in Live view.</span>
+            </span>
+            <Switch checked={hasPtz} onCheckedChange={setHasPtz} />
           </label>
 
           <Separator />

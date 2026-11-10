@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { onvifErrorText } from "@/lib/onvif"
-import { selectedNodeAccess, useNodeAccessMap } from "@/lib/nodeAccess"
+import { type NodeAccess, selectedNodeAccess, useNodeAccessMap } from "@/lib/nodeAccess"
 import { useSettings } from "@/lib/settings"
 import { ApiError, cancelExport, centralClient, createExport, listExports, nodeClient, nodeGet, unwrap } from "./client"
 import type {
@@ -136,6 +136,17 @@ export function useLive(cameraId: number | null) {
     retry: false,
   })
   return resolvedAccess !== primaryAccess && (alternate.data || alternate.error) ? alternate : primary
+}
+
+/** The lan/public choice for a camera's assigned node, matching how useLive resolves it. */
+export function useResolvedAccess(cameraId: number | null): NodeAccess {
+  const { settings } = useSettings()
+  const nodes = useNodes(30_000)
+  const detected = useNodeAccessMap(nodes.data ?? [])
+  const live = useLive(cameraId)
+  const node = nodes.data?.find((candidate) => candidate.id === live.data?.node_id)
+  const fallback: NodeAccess = settings.nodeAccess === "lan" ? "lan" : "public"
+  return node ? selectedNodeAccess(node, settings.nodeAccess, detected.data) : fallback
 }
 
 export function useTimeline(cameraId: number | null, profile: string, start: Date, end: Date, refetchMs = 30_000) {

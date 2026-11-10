@@ -91,6 +91,7 @@ def build_app():
     from app.features.dashboard.store import DashboardStore
     from app.features.live.store import LiveStore
     from app.features.live.ptz_store import PtzStore
+    from app.features.live.ptz_ws_store import PtzWsStore
     from app.features.nodes.detail_store import NodeDetailStore
     from app.features.nodes.store import NodesStore
     from app.features.onvif.store import DiscoverStore
@@ -127,6 +128,7 @@ def build_app():
         "Assignments": AssignmentsStore(ctx),
         "Live": LiveStore(ctx, cameras, nodes),
         "Ptz": PtzStore(ctx),
+        "PtzWs": PtzWsStore(ctx, cameras, nodes),
         "Playback": PlaybackStore(ctx, cameras, nodes),
         "SettingsPage": SettingsStore(ctx),
     }

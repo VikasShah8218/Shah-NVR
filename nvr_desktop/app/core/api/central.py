@@ -143,6 +143,11 @@ class CentralApi:
         path = f"/api/v1/cameras/{camera_id}/streams/{quote(profile, safe='')}/ptz/command"
         return PtzResult.model_validate(self._request("POST", path, json=body, timeout=60))
 
+    def ptz_session(self, camera_id: int, profile: str, access: str = "lan") -> dict:
+        """Mint a direct-to-node PTZ WebSocket session. Returns the PtzState fields plus ws_url."""
+        path = f"/api/v1/cameras/{camera_id}/streams/{quote(profile, safe='')}/ptz/session"
+        return self._request("POST", path, params={"access": access}, timeout=60)
+
     # ------------------------------------------------------------------ L3 backfill
     def backfill(self, camera_id: int) -> BackfillConfig:
         return BackfillConfig.model_validate(self._request("GET", f"/api/v1/cameras/{camera_id}/backfill"))

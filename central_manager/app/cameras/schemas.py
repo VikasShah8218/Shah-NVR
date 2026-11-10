@@ -57,6 +57,7 @@ class CameraCreate(BaseModel):
     # Days to keep, counted back from the camera's latest recording. Leave out for the default (create) /
     # unchanged (update); send null to keep recordings until storage is full.
     retention_days: int | None = Field(default=None, ge=1, le=3650)
+    has_ptz: bool = False  # PTZ-capable; auto-set from ONVIF detection when added through discovery
     streams: list[StreamIn] = Field(min_length=1)
 
     @field_validator("streams")
@@ -75,6 +76,7 @@ class CameraUpdate(BaseModel):
     password: str | None = None
     enabled: bool | None = None
     expose_via_onvif: bool | None = None
+    has_ptz: bool | None = None  # manual override of the PTZ flag; null = leave unchanged
     # Days to keep, counted back from the camera's latest recording. Leave out for the default (create) /
     # unchanged (update); send null to keep recordings until storage is full.
     retention_days: int | None = Field(default=None, ge=1, le=3650)
@@ -95,6 +97,7 @@ class CameraOut(BaseModel):
     has_password: bool
     enabled: bool
     expose_via_onvif: bool
+    has_ptz: bool
     retention_days: int | None  # None = keep until storage is full
     # ONVIF device (null for cameras never seen over ONVIF)
     onvif_host: str | None = None

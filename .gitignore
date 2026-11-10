@@ -16,8 +16,14 @@ media_node/data/
 *.sqlite3-shm
 *.sqlite3-wal
 
+/bin
+/build
+/dist
 # Desktop client: libmpv DLL (download per nvr_desktop/README.md)
 nvr_desktop/bin/
+# Desktop client: PyInstaller output
+nvr_desktop/build/
+nvr_desktop/dist/
 
 /requirements
 requirements

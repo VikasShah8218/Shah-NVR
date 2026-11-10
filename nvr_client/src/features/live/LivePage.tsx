@@ -38,7 +38,7 @@ import { type LiveProtocol, readStored, useSettings, writeStored } from "@/lib/s
 import { useMediaQuery } from "@/lib/useMediaQuery"
 import { cn } from "@/lib/utils"
 import { LivePlayer, pickStream, saveSnapshot } from "./LivePlayer"
-import { PtzPanel } from "./PtzPanel"
+import { PtzOverlay } from "./PtzOverlay"
 
 const LAYOUTS = [1, 4, 9, 16] as const
 type Layout = (typeof LAYOUTS)[number]
@@ -204,6 +204,7 @@ export function LivePage() {
                       // Fixed policy: one-up uses main; every multi-camera grid uses sub when present.
                       profile={state.layout > 1 && cam.streams.some((s) => s.profile === "sub") ? "sub" : "main"}
                       protocol={protocol}
+                      suspended={fullscreenCam != null}
                       onRemove={() => clearTile(i)}
                       onExpand={() => setFullscreenCam(cam.id)}
                     />
@@ -246,9 +247,9 @@ export function LivePage() {
             <DialogTitle>{fullscreenCam != null ? byId.get(fullscreenCam)?.name : ""} · main stream</DialogTitle>
           </DialogHeader>
           {fullscreenCam != null && (
-            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+            <div className="relative flex min-h-0 flex-1 overflow-hidden">
               <DigitalZoomPlayer key={fullscreenCam} cameraId={fullscreenCam} protocol={protocol} />
-              <FullscreenPtz key={fullscreenCam} cameraId={fullscreenCam} />
+              {byId.get(fullscreenCam)?.has_ptz && <PtzOverlay key={`ptz-${fullscreenCam}`} cameraId={fullscreenCam} />}
             </div>
           )}
         </DialogContent>
@@ -261,20 +262,21 @@ function LiveTile({
   camera,
   profile,
   protocol: gridProtocol,
+  suspended,
   onRemove,
   onExpand,
 }: {
   camera: Camera
   profile: string
   protocol: LiveProtocol
+  /** The main-stream dialog is open: freeze this tile (no network, no decode). */
+  suspended: boolean
   onRemove: () => void
   onExpand: () => void
 }) {
   const navigate = useNavigate()
-  const isMobile = useMediaQuery("(max-width: 767px)")
   const live = useLive(camera.id)
   const [override, setOverride] = useState<LiveProtocol | null>(null)
-  const [ptzOpen, setPtzOpen] = useState(false)
   const videoEl = useRef<HTMLVideoElement | null>(null)
   const setVideo = useCallback((v: HTMLVideoElement | null) => {
     videoEl.current = v
@@ -290,16 +292,7 @@ function LiveTile({
 
   return (
     <div className="group relative size-full" onDoubleClick={onExpand}>
-      <LivePlayer cameraId={camera.id} profile={profile} protocol={protocol} className="size-full" onVideo={setVideo} />
-      {ptzOpen && <div className="absolute inset-x-2 bottom-2 z-10 hidden max-h-[75%] overflow-auto md:block">
-        <PtzPanel cameraId={camera.id} profile={profile} />
-      </div>}
-      {isMobile && <Sheet open={ptzOpen} onOpenChange={setPtzOpen}>
-        <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-2xl pb-[calc(1rem+env(safe-area-inset-bottom))] md:hidden">
-          <SheetHeader><SheetTitle>{camera.name} PTZ</SheetTitle><SheetDescription>Hold a movement control and release it to stop.</SheetDescription></SheetHeader>
-          <div className="px-3 pb-3"><PtzPanel cameraId={camera.id} profile={profile} /></div>
-        </SheetContent>
-      </Sheet>}
+      <LivePlayer cameraId={camera.id} profile={profile} protocol={protocol} suspended={suspended} className="size-full" onVideo={setVideo} />
       <div className="pointer-events-none absolute inset-x-0 top-0 flex min-w-0 items-center gap-2 overflow-hidden bg-gradient-to-b from-black/60 to-transparent px-2 py-1.5 text-xs text-white">
         <span className="min-w-0 flex-1 truncate font-medium">{camera.name}</span>
         {recording && (
@@ -309,7 +302,6 @@ function LiveTile({
         )}
         <span className="shrink-0 text-white/60">{profile}</span>
         <div className="pointer-events-auto flex shrink-0 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
-          <Button variant="ghost" size="sm" className="h-8 min-w-11 text-white md:h-6 md:min-w-0" onClick={() => setPtzOpen((v) => !v)}>PTZ</Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="size-9 text-white hover:bg-white/15 hover:text-white md:size-6">
@@ -354,12 +346,4 @@ function DigitalZoomPlayer({ cameraId, protocol }: { cameraId: number; protocol:
       {(videoStyle) => <LivePlayer cameraId={cameraId} profile="main" protocol={protocol} className="size-full" videoStyle={videoStyle} />}
     </DigitalZoom>
   )
-}
-
-function FullscreenPtz({ cameraId }: { cameraId: number }) {
-  const [open, setOpen] = useState(false)
-  return <div className="shrink-0">
-    <Button size="sm" variant="outline" onClick={() => setOpen((v) => !v)}>{open ? "Close PTZ" : "Open PTZ"}</Button>
-    {open && <div className="mt-2 max-h-[min(42dvh,22rem)] overflow-auto"><PtzPanel cameraId={cameraId} profile="main" /></div>}
-  </div>
 }

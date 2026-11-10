@@ -39,6 +39,13 @@ def test_update_body_keeps_password_when_empty():
     assert update_body(form(password="new"))["password"] == "new"
 
 
+def test_has_ptz_defaults_false_and_passes_through():
+    assert create_body(form())["has_ptz"] is False      # unset -> False
+    assert update_body(form())["has_ptz"] is False
+    assert create_body(form(has_ptz=True))["has_ptz"] is True
+    assert update_body(form(has_ptz=True))["has_ptz"] is True
+
+
 def test_stream_diff():
     original = [
         {"profile": "main", "source_url": "rtsp://10.0.0.5/main", "record": True, "rtsp_transport": "tcp"},

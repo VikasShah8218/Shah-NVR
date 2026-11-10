@@ -1,12 +1,12 @@
 """PTZ API, separate from encoder locks so encoder edits cannot queue Stop."""
 from contextlib import asynccontextmanager
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, WebSocket
 from pydantic import Field
 from app.onvif.schemas import DeviceIn
 from app.onvif.services import OnvifDevice
 from app.onvif.soap import OnvifError
 from app.onvif.ptz_schemas import PtzCommand, PtzState, PtzResult
-from app.onvif import ptz
+from app.onvif import ptz, ptz_ws
 
 router = APIRouter(prefix="/api/v1/onvif/ptz", tags=["PTZ"])
 
@@ -45,3 +45,16 @@ async def open_ptz(body: PtzOpenIn):
 async def ptz_command(body: PtzCommandIn):
     async with device(body) as dev:
         return await ptz.command(dev, body.profile_token, body.command)
+
+
+# --- WebSocket (direct, low-latency) path -----------------------------------
+# Central mints a session here (holding the camera credentials in node memory for
+# the WS lifetime); the browser/desktop then connects to /ws with only the opaque id.
+@router.post("/ws/open", response_model=PtzState)
+async def open_ptz_ws(body: PtzOpenIn):
+    return await ptz_ws.open_ws_session(body.host, body.port, body.username, body.password, body.profile_token)
+
+
+@router.websocket("/ws")
+async def ptz_ws_endpoint(websocket: WebSocket):
+    await ptz_ws.serve(websocket)

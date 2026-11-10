@@ -44,6 +44,7 @@ async def camera_to_out(camera: Camera) -> CameraOut:
         has_password=bool(camera.password),
         enabled=camera.enabled,
         expose_via_onvif=camera.expose_via_onvif,
+        has_ptz=camera.has_ptz,
         retention_days=camera.retention_days,
         **{f: getattr(camera, f) for f in DEVICE_FIELDS},
         created_at=camera.created_at,

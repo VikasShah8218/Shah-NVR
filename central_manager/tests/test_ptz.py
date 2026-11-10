@@ -132,6 +132,36 @@ def test_relay_does_not_retry_unknown_outcome(monkeypatch, calls):
     run(go)
 
 
+def test_ws_ticket_returns_node_ws_url_without_credentials_or_pin(calls):
+    async def go(camera, node, _):
+        result = await api.open_ptz_ws(camera.id, "main")
+        assert result["ws_url"] == f"ws://node-one/api/v1/onvif/ptz/ws?session={SID}"
+        assert result["access"] == "lan" and "secret" not in str(result)
+        assert SID not in api.pins                      # direct WS: central brokers only the open, keeps no pin
+        assert calls[0][1] == "/api/v1/onvif/ptz/ws/open"
+        assert calls[0][2]["password"] == "secret"      # creds go node-ward only
+    run(go)
+
+
+def test_ws_ticket_public_access_uses_public_api_url_and_wss(calls):
+    async def go(camera, node, _):
+        await MediaNode.filter(id=node.id).update(
+            public_enabled=True, public_api_url="https://pub.example:8443", public_media_host="pub.example")
+        result = await api.open_ptz_ws(camera.id, "main", access="public")
+        assert result["ws_url"] == f"wss://pub.example:8443/api/v1/onvif/ptz/ws?session={SID}"
+    run(go)
+
+
+def test_ws_ticket_requires_mapping_and_enabled_camera(calls):
+    async def go(camera, *_):
+        await CameraStream.filter(camera_id=camera.id).update(onvif_profile_token=None)
+        with pytest.raises(HTTPException) as e:
+            await api.open_ptz_ws(camera.id, "main")
+        assert e.value.detail["code"] == "profile_mapping_required"
+        assert not calls
+    run(go)
+
+
 def test_http_contract_no_credentials_and_validation(calls):
     async def go(camera, *_):
         app = FastAPI(); app.include_router(api.router)

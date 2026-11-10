@@ -86,7 +86,11 @@ async def onvif_device_state(body: DeviceIn):
         clock = await dev.clock()
         info = await dev.info()
         services = await dev.services()
-        return {"clock": clock, "info": info, "services": sorted(services), **await dev.settings()}
+        try:
+            has_ptz = any(p.get("has_ptz") for p in await dev.profiles())
+        except Exception:
+            has_ptz = None  # couldn't enumerate profiles; central leaves the saved flag unchanged
+        return {"clock": clock, "info": info, "services": sorted(services), "has_ptz": has_ptz, **await dev.settings()}
 
 
 @router.post("/device/clock", response_model=ClockOut, summary="Camera clock offset (no login needed on most cameras)")

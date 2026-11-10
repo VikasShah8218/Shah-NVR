@@ -68,7 +68,7 @@ def pick_streams(probe: dict, picks: list[dict] | None) -> list[dict]:
 
 
 def device_fields(host: str, port: int, info: dict | None = None, services: list[str] | None = None,
-                  clock: dict | None = None, network: dict | None = None) -> dict:
+                  clock: dict | None = None, network: dict | None = None, has_ptz: bool | None = None) -> dict:
     """Camera columns from a probe / device refresh (only what is known)."""
     out: dict = {"onvif_host": host, "onvif_port": port, "onvif_reachable": True, "onvif_checked_at": utcnow()}
     if info:
@@ -80,6 +80,8 @@ def device_fields(host: str, port: int, info: dict | None = None, services: list
         out["clock_offset_seconds"] = clock.get("offset_seconds")
     if network and network.get("mac"):
         out["mac"] = network["mac"]
+    if has_ptz is not None:  # only when the device refresh could actually determine it (preserves manual override)
+        out["has_ptz"] = has_ptz
     return out
 
 

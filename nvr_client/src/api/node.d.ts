@@ -398,6 +398,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/onvif/ptz/ws/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open Ptz Ws */
+        post: operations["open_ptz_ws_api_v1_onvif_ptz_ws_open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exports/capabilities": {
         parameters: {
             query?: never;
@@ -501,6 +518,8 @@ export interface components {
             };
             /** Services */
             services: string[];
+            /** Has Ptz */
+            has_ptz?: boolean | null;
             ntp: components["schemas"]["NtpOut"] | null;
             /** Hostname */
             hostname: string | null;
@@ -1276,7 +1295,9 @@ export interface operations {
     };
     media_init_api_v1_media__segment_id__init_mp4_get: {
         parameters: {
-            query?: never;
+            query?: {
+                video_only?: boolean;
+            };
             header?: never;
             path: {
                 segment_id: string;
@@ -1307,7 +1328,9 @@ export interface operations {
     };
     media_part_api_v1_media__segment_id__part__index__m4s_get: {
         parameters: {
-            query?: never;
+            query?: {
+                video_only?: boolean;
+            };
             header?: never;
             path: {
                 segment_id: string;
@@ -1883,6 +1906,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PtzResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_ptz_ws_api_v1_onvif_ptz_ws_open_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PtzOpenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PtzState"];
                 };
             };
             /** @description Validation Error */

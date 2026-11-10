@@ -332,6 +332,102 @@ def rebase_timestamps(data: bytearray, tracks: dict[str, dict], start_time: date
     return data
 
 
+# ---------------------------------------------------------------- video-only rendition
+#
+# Browsers (MSE) open one SourceBuffer for all tracks of a fragment, so a track they cannot play refuses
+# the whole stream: G.711 cameras are recorded by MediaMTX as raw PCM (`ipcm`), which no browser accepts,
+# and the video goes with it. Web clients take audio from the separate AAC playlist anyway, so they ask for
+# the video track alone. This only drops boxes and bytes (no decoding); the file on disk is never changed.
+
+
+def video_track_ids(init: bytes) -> set[int]:
+    moov = _find(init, 0, len(init), b"moov")
+    if not moov:
+        return set()
+    return {i for i, t in _parse_moov(init[moov[0] : moov[1]]).items() if t.handler == "vide"}
+
+
+def _box(typ: bytes, payload: bytes) -> bytes:
+    return struct.pack(">I4s", len(payload) + 8, typ) + payload
+
+
+def _trak_id(data: bytes, s: int, e: int) -> int | None:
+    tkhd = _find(data, s, e, b"tkhd")
+    if not tkhd:
+        return None
+    return struct.unpack_from(">I", data, tkhd[0] + (20 if data[tkhd[0]] == 1 else 12))[0]
+
+
+def video_only_init(init: bytes, video_ids: set[int]) -> bytes:
+    """The ftyp+moov of a chunk with every trak/trex of the other tracks removed."""
+    out = bytearray()
+    for typ, s, e in _children(init):
+        if typ != b"moov":
+            out += init[s - 8 : e]
+            continue
+        moov = bytearray()
+        for t2, s2, e2 in _children(init, s, e):
+            if t2 == b"trak":
+                if _trak_id(init, s2, e2) in video_ids:
+                    moov += init[s2 - 8 : e2]
+            elif t2 == b"mvex":
+                kept = b"".join(
+                    init[s3 - 8 : e3] for t3, s3, e3 in _children(init, s2, e2)
+                    if t3 != b"trex" or struct.unpack_from(">I", init, s3 + 4)[0] in video_ids
+                )
+                moov += _box(b"mvex", kept)
+            else:
+                moov += init[s2 - 8 : e2]
+        out += _box(b"moov", bytes(moov))
+    return bytes(out)
+
+
+def _copy_samples(data: bytes, moof_start: int, traf: bytearray, mdat: bytearray, mdat_base: int) -> None:
+    """Move the samples of each trun in `traf` to the end of `mdat` and point its data_offset there."""
+    for typ, s, e in _children(traf, 8):
+        if typ == b"tfhd" and not int.from_bytes(traf[s + 1 : s + 4], "big") & 0x020000:
+            raise Mp4IndexError("tfhd without default-base-is-moof")
+        if typ != b"trun":
+            continue
+        flags = int.from_bytes(traf[s + 1 : s + 4], "big")
+        if not flags & 0x001 or not flags & 0x200:
+            raise Mp4IndexError("trun without data offset or sample sizes")
+        count = struct.unpack_from(">I", traf, s + 4)[0]
+        old_offset = struct.unpack_from(">i", traf, s + 8)[0]
+        p = s + 12 + (4 if flags & 0x004 else 0) + (4 if flags & 0x100 else 0)
+        stride = sum(4 for bit in (0x100, 0x200, 0x400, 0x800) if flags & bit)
+        size = sum(struct.unpack_from(">I", traf, p + i * stride)[0] for i in range(count))
+        struct.pack_into(">i", traf, s + 8, mdat_base + len(mdat))
+        mdat += data[moof_start + old_offset : moof_start + old_offset + size]
+
+
+def video_only_part(data: bytes, video_ids: set[int]) -> bytes:
+    """A run of moof+mdat with only the given tracks and only their sample bytes."""
+    out = bytearray()
+    for typ, s, e in _children(data):
+        if typ != b"moof":
+            continue
+        moof_start = s - 8
+        boxes: list[bytearray] = []
+        trafs: list[bytearray] = []
+        for t2, s2, e2 in _children(data, s, e):
+            box = bytearray(data[s2 - 8 : e2])
+            if t2 == b"traf":
+                tfhd = _find(data, s2, e2, b"tfhd")
+                if not tfhd or struct.unpack_from(">I", data, tfhd[0] + 4)[0] not in video_ids:
+                    continue
+                trafs.append(box)
+            boxes.append(box)
+        if not trafs:  # a fragment that holds audio only
+            continue
+        mdat_base = 8 + sum(len(b) for b in boxes) + 8  # offsets count from the start of the moof
+        mdat = bytearray()
+        for traf in trafs:
+            _copy_samples(data, moof_start, traf, mdat, mdat_base)
+        out += _box(b"moof", b"".join(boxes)) + _box(b"mdat", bytes(mdat))
+    return bytes(out)
+
+
 # ---------------------------------------------------------------- recording paths
 
 # MediaMTX recordPath:  <RECORDINGS_DIR>/%path/%Y-%m-%d/%H-%M-%S-%f.mp4

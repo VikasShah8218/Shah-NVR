@@ -83,6 +83,8 @@ async def add_camera(body: OnvifCameraCreate):
             raise HTTPException(409, {"code": "already_added", "message": f"Already added as '{cam.name}'",
                                       "camera_id": cam.id})
     streams = pick_streams(result, [s.model_dump() for s in body.streams] if body.streams is not None else None)
+    # Auto-detect PTZ: a profile that carries a PTZConfiguration (node sets has_ptz per profile during probe).
+    has_ptz = any((p or {}).get("has_ptz") for p in (result.get("profiles") or []))
     camera = await create_camera_with_streams(
         {
             "name": body.name or default_name(info, body.host),
@@ -90,6 +92,7 @@ async def add_camera(body: OnvifCameraCreate):
             "username": body.username or None,
             "password": body.password or None,
             "enabled": body.enabled,
+            "has_ptz": has_ptz,
             "retention_days": body.retention_days if "retention_days" in body.model_fields_set
             else settings.DEFAULT_RETENTION_DAYS,
             **device_fields(body.host, body.port, info, result.get("services"), result.get("clock")),
@@ -127,7 +130,8 @@ async def camera_device(camera_id: int):
     camera = await _camera(camera_id)
     node, state = await _camera_call(camera, "/api/v1/onvif/device")
     host, port = device_target(camera)
-    fields = device_fields(host, port, state.get("info"), state.get("services"), state.get("clock"), state.get("network"))
+    fields = device_fields(host, port, state.get("info"), state.get("services"), state.get("clock"),
+                           state.get("network"), state.get("has_ptz"))
     await Camera.filter(id=camera.id).update(**fields)
     return {**state, "camera_id": camera.id, "node_id": node.id, "host": host, "port": port,
             "checked_at": fields["onvif_checked_at"]}

@@ -137,6 +137,7 @@ class DeviceStateOut(BaseModel):
     clock: ClockOut
     info: DeviceInfoOut
     services: list[str]
+    has_ptz: bool | None = None
     ntp: NtpOut | None
     hostname: str | None
     network: NetworkOut | None
