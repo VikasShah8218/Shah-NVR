@@ -58,6 +58,7 @@ class CameraCreate(BaseModel):
     # unchanged (update); send null to keep recordings until storage is full.
     retention_days: int | None = Field(default=None, ge=1, le=3650)
     has_ptz: bool = False  # PTZ-capable; auto-set from ONVIF detection when added through discovery
+    group_id: int | None = None  # camera group (docs/GROUPING_PLAN.md); None = no group
     streams: list[StreamIn] = Field(min_length=1)
 
     @field_validator("streams")
@@ -77,6 +78,7 @@ class CameraUpdate(BaseModel):
     enabled: bool | None = None
     expose_via_onvif: bool | None = None
     has_ptz: bool | None = None  # manual override of the PTZ flag; null = leave unchanged
+    group_id: int | None = None  # send null to take the camera out of its group; leave out = unchanged
     # Days to keep, counted back from the camera's latest recording. Leave out for the default (create) /
     # unchanged (update); send null to keep recordings until storage is full.
     retention_days: int | None = Field(default=None, ge=1, le=3650)
@@ -111,6 +113,8 @@ class CameraOut(BaseModel):
     onvif_reachable: bool | None = None
     clock_offset_seconds: float | None = None  # camera clock minus node clock
     onvif_checked_at: datetime | None = None
+    group_id: int | None = None
+    group_path: str | None = None  # "Anantnag › Bijbehara"
     created_at: datetime
     updated_at: datetime
     streams: list[StreamOut]
@@ -127,6 +131,8 @@ class CameraOption(BaseModel):
     profiles: list[str]  # stream profiles, e.g. ["main", "sub"]
     status: StreamStatus  # the recording stream's state (first stream if none records); DISABLED when disabled
     node_id: int | None  # assigned media node, if any
+    group_id: int | None = None
+    group_path: str | None = None  # "Anantnag › Bijbehara"
 
 
 class LiveStreamUrls(BaseModel):

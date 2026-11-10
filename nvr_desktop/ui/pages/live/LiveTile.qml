@@ -82,7 +82,7 @@ Rectangle {
         anchors.centerIn: parent
         spacing: 6
         Icon { name: "plus"; size: 16; color: Theme.mutedForeground; anchors.verticalCenter: parent.verticalCenter }
-        AppText { text: "Click a camera or drop it here"; variant: "small"; anchors.verticalCenter: parent.verticalCenter }
+        AppText { text: "Click a camera or drop it (or a group) here"; variant: "small"; anchors.verticalCenter: parent.verticalCenter }
     }
 
     // selection: click selects, double-click opens the main stream
@@ -180,8 +180,10 @@ Rectangle {
     DropArea {
         id: dropArea
         anchors.fill: parent
-        keys: ["camera"]
-        onDropped: drop => Live.place(drop.source.cameraId, tile.index)
+        keys: ["camera", "group"]
+        // a camera goes into this tile; a group fills the grid with its cameras (Play group)
+        onDropped: drop => drop.source.kind === "group" ? Live.playGroup(drop.source.groupId, drop.source.label)
+                                                       : Live.place(drop.source.cameraId, tile.index)
     }
 
     AppMenu {

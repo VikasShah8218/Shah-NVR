@@ -65,6 +65,18 @@ class Prefs(QObject):
     def save_live_layout(self, layout, tiles):
         pass
 
+    def live_scope(self):
+        return None
+
+    def save_live_scope(self, scope):
+        self.scope = scope
+
+    def group_tree_expanded(self, key):
+        return ""
+
+    def save_group_tree_expanded(self, key, raw):
+        pass
+
 
 class Ctx(QObject):
     centralChanged = Signal()

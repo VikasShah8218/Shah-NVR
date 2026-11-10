@@ -4,22 +4,25 @@ import {
   ChevronRight,
   Copy,
   ExternalLink,
+  Folder,
   ImageDown,
   Maximize,
   MoreVertical,
+  Play,
   Plus,
   Search,
+  Settings2,
   Loader2,
   Trash2,
   X,
 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
-import { useCallback, useMemo, useRef, useState } from "react"
-import { useNavigate } from "react-router"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
-import { unwrap } from "@/api/client"
-import { useCameraOptions, useCamerasByIds, useCentral, useLive } from "@/api/queries"
-import type { Camera, CameraOption } from "@/api/types"
+import { ApiError, unwrap } from "@/api/client"
+import { useCameraOptions, useCamerasByIds, useCentral, useGroupSearch, useLive } from "@/api/queries"
+import type { Camera, CameraGroup, CameraOption, GroupDetail } from "@/api/types"
 import { EmptyState, ErrorState, Loading } from "@/components/common"
 import { DigitalZoom } from "@/components/DigitalZoom"
 import { StatusDot } from "@/components/StatusBadge"
@@ -39,6 +42,9 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { GroupTree } from "@/features/groups/GroupTree"
+import { useTreeExpanded } from "@/features/groups/useTreeExpanded"
+import { revealKeys } from "@/lib/groupTree"
 import { type Paged, pageCount } from "@/lib/pager"
 import { type LiveProtocol, readStored, useSettings, writeStored } from "@/lib/settings"
 import { useMediaQuery } from "@/lib/useMediaQuery"
@@ -57,23 +63,39 @@ interface LiveState {
   tiles: (number | null)[]
   /** grid page last filled with ‹ › (enabled cameras by name, `layout` per page) */
   page?: number
+  /** "Play group": ‹ › page through this group's cameras (its whole subtree) instead of all cameras */
+  scope?: GridScope
 }
+
+interface GridScope {
+  groupId: number
+  name: string
+}
+
+const SIDEBAR_TAB_KEY = "shah-nvr.live.sidebarTab"
+type SidebarTab = "groups" | "all"
+
+const scopeParams = (scope?: GridScope) => (scope ? { group_id: scope.groupId, recursive: true } : {})
 
 type OptionsPage = Paged<CameraOption>
 
-/** Enabled cameras by name, one grid page at a time: ‹ › fill the grid with the next 4 / 9 / 16 cameras. */
-function useGridPages() {
+/** Enabled cameras by name, one grid page at a time: ‹ › fill the grid with the next 4 / 9 / 16 cameras.
+ *  With a group scope only that group's cameras (and its sub-groups') are paged. */
+function useGridPages(scope?: GridScope) {
   const { url, api, poll } = useCentral()
   const count = useQuery({
-    queryKey: [url, "cameras", "options", "enabled-count"],
-    queryFn: () => unwrap<OptionsPage>(api.GET("/api/v1/cameras/options", { params: { query: { enabled: true, limit: 1 } } })),
+    queryKey: [url, "cameras", "options", "enabled-count", scope?.groupId ?? null],
+    queryFn: () => unwrap<OptionsPage>(api.GET("/api/v1/cameras/options", {
+      params: { query: { enabled: true, limit: 1, ...scopeParams(scope) } },
+    })),
     refetchInterval: poll,
+    retry: (n, err) => !(err instanceof ApiError && err.status === 404) && n < 2,
   })
-  const fetchPage = (page: number, layout: number) =>
+  const fetchPage = (page: number, layout: number, s: GridScope | undefined) =>
     unwrap<OptionsPage>(api.GET("/api/v1/cameras/options", {
-      params: { query: { enabled: true, limit: layout, offset: (page - 1) * layout } },
+      params: { query: { enabled: true, limit: layout, offset: (page - 1) * layout, ...scopeParams(s) } },
     }))
-  return { total: count.data?.total, fetchPage }
+  return { total: count.data?.total, error: count.error, fetchPage }
 }
 
 export function LivePage() {
@@ -88,6 +110,14 @@ export function LivePage() {
   const [fullscreenCam, setFullscreenCam] = useState<number | null>(null)
   const [cameraPicker, setCameraPicker] = useState(false)
   const gridRef = useRef<HTMLDivElement>(null)
+  const { api } = useCentral()
+  const navigate = useNavigate()
+  const [tab, setTabNow] = useState<SidebarTab>(() => (readStored<string>(SIDEBAR_TAB_KEY, "groups") === "all" ? "all" : "groups"))
+  const setTab = (t: SidebarTab) => {
+    setTabNow(t)
+    writeStored(SIDEBAR_TAB_KEY, t)
+  }
+  const treeExpanded = useTreeExpanded("shah-nvr.live.groups.expanded")
 
   const save = useCallback((next: LiveState) => {
     if (isMobile) {
@@ -104,21 +134,31 @@ export function LivePage() {
   // Only the cameras on screen are loaded in full (never the whole camera list).
   const tileCameras = useCamerasByIds(visible.filter((id): id is number => id != null))
   const byId = useMemo(() => new Map((tileCameras.data ?? []).map((c) => [c.id, c])), [tileCameras.data])
-  const options = useCameraOptions(useDebounced(search))
+  const query = useDebounced(search).trim()
+  const searching = query !== ""
+  // the flat list only loads when it is shown (All tab, or a search)
+  const options = useCameraOptions(query, { active: tab === "all" || searching })
   const optionRows = useMemo(() => options.data?.pages.flatMap((p) => p.items) ?? [], [options.data])
   const optionTotal = options.data?.pages[0]?.total
-  const grid = useGridPages()
+  const grid = useGridPages(state.scope)
   const gridPages = grid.total != null ? pageCount(grid.total, state.layout) : null
   const [paging, setPaging] = useState(false)
-  const showGridPage = async (page: number) => {
-    if (gridPages == null) return
-    const target = ((page - 1 + gridPages) % gridPages) + 1 // wraps around: last page › first page
+  const showGridPage = async (page: number, scope: GridScope | undefined = state.scope) => {
+    let target = page
+    if (scope?.groupId === state.scope?.groupId) {
+      if (gridPages == null) return
+      target = ((page - 1 + gridPages) % gridPages) + 1 // wraps around: last page › first page
+    }
     setPaging(true)
     try {
-      const rows = await grid.fetchPage(target, state.layout)
+      const rows = await grid.fetchPage(target, state.layout, scope)
+      if (rows.total === 0) {
+        toast.info(scope ? `No enabled cameras in ${scope.name}` : "No enabled cameras")
+        return
+      }
       const tiles = Array(16).fill(null)
       rows.items.forEach((c, i) => { tiles[i] = c.id })
-      save({ ...state, tiles, page: target })
+      save({ ...state, tiles, page: target, scope })
       setSelected(0)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error))
@@ -126,6 +166,30 @@ export function LivePage() {
       setPaging(false)
     }
   }
+  const playGroup = (g: { id: number; name: string }) => {
+    setCameraPicker(false)
+    void showGridPage(1, { groupId: g.id, name: g.name })
+  }
+  const playGroupById = async (groupId: number) => {
+    try {
+      playGroup(await unwrap<GroupDetail>(api.GET("/api/v1/groups/{group_id}", { params: { path: { group_id: groupId } } })))
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error))
+    }
+  }
+  const revealGroup = (g: CameraGroup) => {
+    treeExpanded.open([...revealKeys(g.path), String(g.id)])
+    setTab("groups")
+    setSearch("")
+  }
+  // the played group was deleted: back to all cameras
+  const scopeGone = !!state.scope && grid.error instanceof ApiError && grid.error.status === 404
+  useEffect(() => {
+    if (!scopeGone) return
+    toast.info(`Group "${state.scope?.name}" no longer exists: showing all cameras`)
+    save({ ...state, scope: undefined, page: undefined })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the scope disappears
+  }, [scopeGone])
 
   const place = (cameraId: number, index?: number) => {
     const tiles = [...state.tiles]
@@ -145,7 +209,49 @@ export function LivePage() {
   const cameraList = (big: boolean) => (
     <CameraOptionList rows={optionRows} total={optionTotal} visible={visible} big={big} onPick={(id) => place(id)}
       loading={options.isLoading} error={options.error} hasMore={!!options.hasNextPage}
-      loadingMore={options.isFetchingNextPage} onMore={() => void options.fetchNextPage()} searching={search.trim() !== ""} />
+      loadingMore={options.isFetchingNextPage} onMore={() => void options.fetchNextPage()} searching={searching} />
+  )
+
+  const groupTree = (big: boolean) => (
+    <GroupTree
+      expanded={treeExpanded}
+      showCameras
+      showUngrouped
+      countMode="online"
+      onPickCamera={(c) => place(c.id)}
+      dragGroups={!big}
+      dragCameras={!big}
+      actionsVisible={big}
+      cameraBadge={(c) => (visible.includes(c.id) ? <span className="text-[10px] text-primary">on view</span> : null)}
+      groupActions={(g) => (
+        <>
+          <Button variant="ghost" size="icon-sm" title={`Play ${g.name} on the grid`} aria-label={`Play ${g.name}`}
+            disabled={g.cameras_total === 0} onClick={() => playGroup(g)}><Play /></Button>
+          {!big && (
+            <Button variant="ghost" size="icon-sm" title="Manage group" aria-label={`Manage ${g.name}`}
+              onClick={() => navigate(`/groups?group=${g.id}`)}><Settings2 /></Button>
+          )}
+        </>
+      )}
+      emptyText={<>No groups yet. <Link className="text-primary hover:underline" to="/groups">Create groups</Link> or use the All tab.</>}
+    />
+  )
+
+  const sidebarBody = (big: boolean) => (
+    searching ? (
+      <>
+        <GroupSearchResults q={query} big={big} onReveal={revealGroup} onPlay={playGroup} />
+        {cameraList(big)}
+      </>
+    ) : tab === "groups" ? groupTree(big) : cameraList(big)
+  )
+
+  const sidebarTabs = (
+    <ToggleGroup type="single" variant="outline" size="sm" className="w-full" value={tab}
+      onValueChange={(v) => v && setTab(v as SidebarTab)}>
+      <ToggleGroupItem value="groups" className="flex-1">Groups</ToggleGroupItem>
+      <ToggleGroupItem value="all" className="flex-1">All cameras</ToggleGroupItem>
+    </ToggleGroup>
   )
 
   return (
@@ -155,10 +261,11 @@ export function LivePage() {
         <div className="p-3">
           <div className="relative">
             <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
-            <Input className="pl-8" placeholder="Search cameras" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input className="pl-8" placeholder="Search cameras or groups" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
+          {!searching && <div className="mt-2">{sidebarTabs}</div>}
         </div>
-        <div className="flex-1 overflow-auto px-2 pb-3">{cameraList(false)}</div>
+        <div className="flex-1 overflow-auto px-2 pb-3">{sidebarBody(false)}</div>
       </aside>
 
       {/* grid */}
@@ -192,8 +299,17 @@ export function LivePage() {
               <SelectItem value="hls">LL-HLS only</SelectItem>
             </SelectContent>
           </Select>
+          {state.scope && (
+            <span className="flex items-center gap-1 rounded-lg border bg-accent/40 py-0.5 pr-0.5 pl-2 text-xs" title="Grid pages run through this group (and its sub-groups)">
+              <Folder className="size-3.5 shrink-0 text-primary/80" />
+              <span className="max-w-40 truncate">{state.scope.name}</span>
+              <Button variant="ghost" size="icon-sm" aria-label="Stop playing this group"
+                onClick={() => save({ ...state, scope: undefined, page: undefined })}><X /></Button>
+            </span>
+          )}
           {gridPages != null && grid.total! > 0 && (
-            <div className="flex items-center gap-0.5 rounded-lg border px-0.5" title="Fill the grid with the next cameras (by name)">
+            <div className="flex items-center gap-0.5 rounded-lg border px-0.5"
+              title={state.scope ? `Fill the grid with the next cameras of ${state.scope.name}` : "Fill the grid with the next cameras (by name)"}>
               <Button variant="ghost" size="icon-sm" aria-label="Previous cameras" disabled={paging}
                 onClick={() => void showGridPage((state.page ?? 1) - 1)}><ChevronLeft /></Button>
               <span className="min-w-[4.5rem] text-center text-xs tabular-nums text-muted-foreground">
@@ -213,7 +329,7 @@ export function LivePage() {
           </div>
         </div>
 
-        {grid.total === 0 && !search && optionTotal === 0 ? (
+        {!state.scope && grid.total === 0 && !searching && (tab === "groups" || optionTotal === 0) ? (
           <div className="p-6">
             <EmptyState icon={CameraIcon} title="No cameras yet">
               Add a camera on the Cameras page, then come back here to watch it live.
@@ -235,6 +351,8 @@ export function LivePage() {
                   onDrop={(e) => {
                     const id = Number(e.dataTransfer.getData("text/camera-id"))
                     if (id) place(id, i)
+                    const groupId = Number(e.dataTransfer.getData("text/group-id"))
+                    if (groupId) void playGroupById(groupId)
                   }}
                   className={cn(
                     "relative min-h-0 overflow-hidden rounded-md ring-1 ring-border",
@@ -256,7 +374,7 @@ export function LivePage() {
                   ) : (
                     <div className="grid size-full place-items-center bg-video text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
-                        <Plus className="size-4" /> Click a camera or drop it here
+                        <Plus className="size-4" /> Click a camera or drop it (or a group) here
                       </span>
                     </div>
                   )}
@@ -273,8 +391,8 @@ export function LivePage() {
             <SheetTitle>Choose a camera</SheetTitle>
             <SheetDescription>Camera will be placed in selected tile {selected + 1}.</SheetDescription>
           </SheetHeader>
-          <div className="px-4"><div className="relative"><Search className="absolute top-3 left-3 size-4 text-muted-foreground" /><Input className="h-11 pl-9" placeholder="Search cameras" value={search} onChange={(e) => setSearch(e.target.value)} /></div></div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">{cameraList(true)}</div>
+          <div className="space-y-2 px-4"><div className="relative"><Search className="absolute top-3 left-3 size-4 text-muted-foreground" /><Input className="h-11 pl-9" placeholder="Search cameras or groups" value={search} onChange={(e) => setSearch(e.target.value)} /></div>{!searching && sidebarTabs}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">{sidebarBody(true)}</div>
         </SheetContent>
       </Sheet>
 
@@ -291,6 +409,41 @@ export function LivePage() {
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+/** Groups matching the sidebar search (top 8, with their path): click shows it in the tree, ▶ plays it. */
+function GroupSearchResults({ q, big, onReveal, onPlay }: {
+  q: string
+  big: boolean
+  onReveal: (g: CameraGroup) => void
+  onPlay: (g: CameraGroup) => void
+}) {
+  const found = useGroupSearch(q, 8)
+  const rows = found.data?.items ?? []
+  if (rows.length === 0) return null
+  return (
+    <div className="mb-2 border-b pb-2">
+      <div className="px-2.5 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+        Groups{found.data!.total > rows.length ? ` (${rows.length} of ${found.data!.total})` : ""}
+      </div>
+      {rows.map((g) => (
+        <div key={g.id} className={cn("flex items-center gap-1 rounded-md hover:bg-accent", big ? "min-h-12 px-2" : "px-1")}>
+          <button type="button" onClick={() => onReveal(g)} title="Show in the group tree"
+            className="flex min-w-0 flex-1 items-start gap-2 py-1.5 pl-1.5 text-left text-sm">
+            <Folder className="mt-0.5 size-4 shrink-0 text-primary/80" />
+            <span className="min-w-0">
+              <span className="block truncate">{g.name}</span>
+              <span className="block truncate text-[11px] text-muted-foreground">
+                {g.path_label}{g.cameras_total ? ` · ${g.online_total}/${g.cameras_total}` : ""}
+              </span>
+            </span>
+          </button>
+          <Button variant="ghost" size="icon-sm" aria-label={`Play ${g.name}`} title="Play on the grid"
+            disabled={g.cameras_total === 0} onClick={() => onPlay(g)}><Play /></Button>
+        </div>
+      ))}
     </div>
   )
 }
@@ -330,7 +483,10 @@ function CameraOptionList({
           title={big ? undefined : "Click or drag onto a tile"}
         >
           <StatusDot status={c.status} />
-          <span className="min-w-0 flex-1 truncate">{c.name}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate">{c.name}</span>
+            {searching && c.group_path && <span className="block truncate text-[11px] text-muted-foreground">{c.group_path}</span>}
+          </span>
           {visible.includes(c.id) && <span className={cn("text-primary", big ? "text-xs" : "text-[10px]")}>on view</span>}
         </button>
       ))}

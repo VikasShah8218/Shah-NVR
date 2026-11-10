@@ -10,6 +10,9 @@ import "../../video"
 // layouts 1 / 2×2 / 3×3 / 4×4, grid protocol, clear, fullscreen, double-click → main stream.
 // Layout and tiles are remembered (LiveStore → Preferences). The camera list is searched on the server and
 // loaded 50 at a time (LiveCameras); ‹ › fill the grid with the next page of cameras.
+// Sidebar tabs (docs/GROUPING_PLAN.md): Groups = the lazy group tree (LiveGroups: each expanded group loads its own
+// sub-groups and cameras), All cameras = the flat list. ▶ / dragging a group onto a tile plays the group: ‹ › then
+// page through that group's cameras.
 Item {
     id: root
     objectName: "livePage"
@@ -22,6 +25,8 @@ Item {
     // Set by Main.qml: the page is kept loaded but hidden after leaving Live View. Tiles pause (no network,
     // last frame kept) and resume quietly on return, so page switches are instant both ways.
     property bool away: false
+    readonly property bool searching: sidebarSearch.text.trim() !== ""
+
     // Tiles [0, releasedTiles) have destroyed their players (keep-alive expired), one per tick so the
     // UI-thread cost (~100 ms each) never shows up as one long freeze.
     property int releasedTiles: 0
@@ -33,6 +38,7 @@ Item {
     }
 
     onAwayChanged: {
+        LiveGroups.setActive(!away)
         if (away) {
             expandDialog.close()
             Live.muteAll()
@@ -70,8 +76,8 @@ Item {
         expandDialog.open()
     }
 
-    Component.onCompleted: { for (const id of Live.onView) Live.ensureUrls(id) }
-    Component.onDestruction: { Live.muteAll(); Ptz.close(); PtzWs.close(); if (appWindow) appWindow.immersive = false }
+    Component.onCompleted: { LiveGroups.setActive(true); for (const id of Live.onView) Live.ensureUrls(id) }
+    Component.onDestruction: { LiveGroups.setActive(false); Live.muteAll(); Ptz.close(); PtzWs.close(); if (appWindow) appWindow.immersive = false }
     Connections {
         target: Qt.application
         function onStateChanged() { if (Qt.application.state !== Qt.ApplicationActive) Live.muteAll() }
@@ -95,18 +101,117 @@ Item {
                 spacing: 0
 
                 AppInput {
+                    id: sidebarSearch
+                    objectName: "liveSearch"
                     Layout.fillWidth: true
                     Layout.margins: 12
+                    Layout.bottomMargin: 8
                     iconName: "search"
-                    placeholderText: "Search cameras"
-                    onTextChanged: LiveCameras.setSearch(text)
+                    placeholderText: "Search cameras or groups"
+                    onTextChanged: { LiveCameras.setSearch(text); LiveGroups.setSearch(text) }
                 }
 
-                LoadingState { visible: LiveCameras.loading && LiveCameras.listModel.count === 0 && LiveCameras.error === "" }
-                ErrorState { text: LiveCameras.error; Layout.margins: 8 }
+                ToggleGroup {
+                    objectName: "liveSidebarTabs"
+                    visible: !root.searching
+                    Layout.leftMargin: 12
+                    Layout.bottomMargin: 8
+                    options: [{ value: "groups", label: "Groups" }, { value: "all", label: "All cameras" }]
+                    value: Prefs.liveSidebarTab
+                    onPicked: v => Prefs.liveSidebarTab = v
+                }
+
+                GroupTree {
+                    objectName: "liveGroupTree"
+                    visible: !root.searching && Prefs.liveSidebarTab === "groups"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.leftMargin: 8
+                    Layout.rightMargin: 8
+                    Layout.bottomMargin: 12
+                    store: LiveGroups
+                    showActions: true
+                    dragItems: true
+                    dragGhost: ghost
+                    dragRoot: root
+                    onView: Live.onView
+                    emptyText: "No groups yet. Create them on the Groups page, or use All cameras."
+                    onCameraClicked: row => Live.place(row.id)
+                    onPlayGroup: row => Live.playGroup(row.id, row.name)
+                    onManageGroup: row => Router.go("groups", row.id)
+                }
+
+                // search: matching groups (click = show in the tree, ▶ = play) above the matching cameras
+                ColumnLayout {
+                    visible: root.searching && LiveGroups.searchModel.count > 0
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 8
+                    Layout.rightMargin: 8
+                    spacing: 0
+                    AppText {
+                        text: "GROUPS" + (LiveGroups.searchTotal > LiveGroups.searchModel.count
+                                          ? " (" + LiveGroups.searchModel.count + " of " + LiveGroups.searchTotal + ")" : "")
+                        variant: "small"
+                        font.letterSpacing: 0.6
+                        Layout.leftMargin: 6
+                        Layout.bottomMargin: 2
+                    }
+                    Repeater {
+                        model: LiveGroups.searchModel
+                        delegate: Rectangle {
+                            id: groupHit
+                            required property var model
+                            Layout.fillWidth: true
+                            implicitHeight: 42
+                            radius: Theme.radiusSm
+                            color: groupHitHover.hovered ? Theme.accent : "transparent"
+                            HoverHandler { id: groupHitHover }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    LiveGroups.reveal(groupHit.model.path, true)
+                                    Prefs.liveSidebarTab = "groups"
+                                    sidebarSearch.text = ""
+                                }
+                            }
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 4
+                                spacing: 8
+                                Icon { name: "folder"; size: 15; color: Theme.alpha(Theme.primary, 0.85) }
+                                ColumnLayout {
+                                    spacing: 0
+                                    Layout.fillWidth: true
+                                    AppText { text: groupHit.model.name; Layout.fillWidth: true }
+                                    AppText {
+                                        text: groupHit.model.pathLabel + (groupHit.model.countLabel ? " · " + groupHit.model.countLabel : "")
+                                        variant: "small"
+                                        Layout.fillWidth: true
+                                    }
+                                }
+                                AppButton {
+                                    variant: "ghost"; size: "icon"; iconName: "play"; implicitHeight: 26
+                                    tip: "Play on the grid"
+                                    enabled: groupHit.model.camerasTotal > 0
+                                    onClicked: Live.playGroup(groupHit.model.id, groupHit.model.name)
+                                }
+                            }
+                        }
+                    }
+                    Separator { Layout.fillWidth: true; Layout.topMargin: 4; Layout.bottomMargin: 4 }
+                }
+
+                LoadingState {
+                    visible: (root.searching || Prefs.liveSidebarTab === "all")
+                             && LiveCameras.loading && LiveCameras.listModel.count === 0 && LiveCameras.error === ""
+                }
+                ErrorState { visible: root.searching || Prefs.liveSidebarTab === "all"; text: LiveCameras.error; Layout.margins: 8 }
 
                 ListView {
                     id: cameraList
+                    visible: root.searching || Prefs.liveSidebarTab === "all"
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     leftMargin: 8
@@ -121,7 +226,7 @@ Item {
                         required property var model
 
                         width: cameraList.width - 16
-                        height: 36
+                        height: root.searching && !!model.group_path ? 44 : 36
                         radius: Theme.radiusSm
                         color: entryArea.containsMouse && model.enabled ? Theme.accent : "transparent"
                         opacity: model.enabled ? 1 : 0.5
@@ -132,7 +237,17 @@ Item {
                             anchors.rightMargin: 10
                             spacing: 10
                             StatusDot { status: entry.model.status }
-                            AppText { text: entry.model.name; Layout.fillWidth: true }
+                            ColumnLayout {
+                                spacing: 0
+                                Layout.fillWidth: true
+                                AppText { text: entry.model.name; Layout.fillWidth: true }
+                                AppText {
+                                    visible: root.searching && !!entry.model.group_path
+                                    text: entry.model.group_path ?? ""
+                                    variant: "small"
+                                    Layout.fillWidth: true
+                                }
+                            }
                             AppText {
                                 visible: Live.onView.includes(entry.model.id)
                                 text: "on view"
@@ -149,13 +264,8 @@ Item {
                             cursorShape: Qt.PointingHandCursor
                             drag.target: ghost
                             drag.threshold: 6
-                            onPressed: mouse => {
-                                ghost.cameraId = entry.model.id
-                                ghost.label = entry.model.name
-                                const p = entry.mapToItem(root, mouse.x, mouse.y)
-                                ghost.x = p.x - ghost.width / 2
-                                ghost.y = p.y - ghost.height / 2
-                            }
+                            onPressed: mouse => ghost.begin("camera", entry.model.id, entry.model.name,
+                                                            entry.mapToItem(root, mouse.x, mouse.y))
                             // drop while the ghost's Drag is still active, then end the drag
                             drag.onActiveChanged: {
                                 if (!drag.active)
@@ -225,6 +335,29 @@ Item {
                         value: root.protocol
                         onPicked: v => root.protocol = v
                     }
+                    // the played group: ‹ › page through its cameras; ✕ = back to all cameras
+                    Rectangle {
+                        objectName: "liveScopeChip"
+                        visible: Live.scopeId > 0
+                        implicitHeight: 30
+                        implicitWidth: scopeRow.implicitWidth + 12
+                        radius: Theme.radiusSm
+                        color: Theme.alpha(Theme.accent, 0.5)
+                        border.color: Theme.border
+                        RowLayout {
+                            id: scopeRow
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: 8
+                            spacing: 4
+                            Icon { name: "folder"; size: 14; color: Theme.alpha(Theme.primary, 0.85) }
+                            AppText { text: Live.scopeName; Layout.maximumWidth: 160 }
+                            AppButton {
+                                variant: "ghost"; size: "icon"; iconName: "x"; implicitHeight: 24
+                                tip: "Stop playing this group"
+                                onClicked: Live.clearScope()
+                            }
+                        }
+                    }
                     // grid pages: the next 4 / 9 / 16 enabled cameras by name
                     RowLayout {
                         visible: Live.gridTotal > 0
@@ -232,7 +365,7 @@ Item {
                         AppButton {
                             objectName: "gridPrev"
                             variant: "ghost"; size: "icon"; iconName: "chevron-left"; implicitHeight: 30
-                            tip: "Previous cameras"
+                            tip: Live.scopeId > 0 ? "Previous cameras of " + Live.scopeName : "Previous cameras"
                             enabled: !Live.gridPaging
                             onClicked: Live.prevGridPage()
                         }
@@ -247,7 +380,7 @@ Item {
                         AppButton {
                             objectName: "gridNext"
                             variant: "ghost"; size: "icon"; iconName: "chevron-right"; implicitHeight: 30
-                            tip: "Next cameras"
+                            tip: Live.scopeId > 0 ? "Next cameras of " + Live.scopeName : "Next cameras"
                             enabled: !Live.gridPaging
                             onClicked: Live.nextGridPage()
                         }
@@ -267,7 +400,7 @@ Item {
             }
 
             EmptyState {
-                visible: Live.gridTotal === 0 && LiveCameras.query === "" && LiveCameras.total === 0
+                visible: Live.scopeId === 0 && Live.gridTotal === 0 && LiveCameras.query === "" && LiveCameras.total === 0
                 Layout.margins: 24
                 iconName: "camera"
                 title: "No cameras yet"
@@ -278,7 +411,7 @@ Item {
             // own size back into the layout.
             Item {
                 id: gridArea
-                visible: Live.gridTotal !== 0 || LiveCameras.total > 0
+                visible: Live.scopeId > 0 || Live.gridTotal !== 0 || LiveCameras.total > 0
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
@@ -313,25 +446,8 @@ Item {
         }
     }
 
-    // drag ghost: follows the mouse while a camera is dragged from the list onto a tile
-    Rectangle {
-        id: ghost
-        property int cameraId: 0
-        property string label: ""
-        property bool dragging: false
-        visible: dragging
-        width: ghostText.implicitWidth + 24
-        height: 30
-        radius: Theme.radiusSm
-        color: Theme.popover
-        border.color: Theme.primary
-        z: 100
-        Drag.active: dragging
-        Drag.keys: ["camera"]
-        Drag.hotSpot.x: width / 2
-        Drag.hotSpot.y: height / 2
-        AppText { id: ghostText; anchors.centerIn: parent; text: ghost.label }
-    }
+    // drag ghost: follows the mouse while a camera or a group is dragged from the sidebar onto a tile
+    DragGhost { id: ghost }
 
     // main stream of one camera (double-click a tile / "Open main stream")
     AppDialog {

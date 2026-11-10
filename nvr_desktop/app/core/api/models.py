@@ -54,6 +54,30 @@ class CameraOption(ApiModel):
     profiles: list[str] = []
     status: str = "UNKNOWN"  # the recording stream's state; DISABLED when the camera is disabled
     node_id: int | None = None
+    group_id: int | None = None
+    group_path: str | None = None  # "Anantnag › Bijbehara"
+
+
+class CameraGroup(ApiModel):
+    """One group of the camera tree (GET /api/v1/groups, docs/GROUPING_PLAN.md)."""
+    id: int
+    name: str
+    description: str | None = None
+    parent_id: int | None = None
+    depth: int = 0
+    path: str = ""  # "/3/17/" ids from the top, ending with this group
+    path_label: str = ""  # "Anantnag › Bijbehara"
+    sort_order: int = 0
+    child_groups: int = 0  # direct sub-groups
+    cameras_direct: int = 0  # cameras directly in this group
+    cameras_total: int = 0  # cameras in the whole subtree
+    online_total: int = 0  # of those: enabled and streaming / recording
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class GroupDetail(CameraGroup):
+    breadcrumb: list[dict] = []  # [{id, name}] ancestors from the top (not the group itself)
 
 
 class CameraAlert(ApiModel):
@@ -100,6 +124,8 @@ class Camera(ApiModel):
     onvif_reachable: bool | None = None
     clock_offset_seconds: float | None = None
     onvif_checked_at: datetime | None = None
+    group_id: int | None = None
+    group_path: str | None = None
 
 
 class LiveUrls(ApiModel):

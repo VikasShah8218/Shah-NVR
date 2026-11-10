@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from app.cameras.models import Camera
 from app.cameras.schemas import CameraOut
 from app.cameras.services import create_camera_with_streams
+from app.groups.services import check_group_id
 from app.cameras.utils import camera_to_out
 from app.nodes.client import call_node, online_nodes, pick_node
 from app.onvif.schemas import (ClockOut, DeviceIn, DeviceStateOut, DiscoveredOut, DiscoverIn, MessageOut, NtpIn,
@@ -74,6 +75,7 @@ async def snapshot(body: SnapshotIn):
 @router.post("/cameras", response_model=CameraOut, status_code=status.HTTP_201_CREATED,
              summary="Add a camera from ONVIF: streams filled from its profiles (main recorded, sub live)")
 async def add_camera(body: OnvifCameraCreate):
+    await check_group_id(body.group_id)
     node = await pick_node(body.node_id)
     result = await call_node(node, "/api/v1/onvif/probe", _device_body(body), timeout=PROBE_TIMEOUT)
     info = result.get("info") or {}
@@ -93,6 +95,7 @@ async def add_camera(body: OnvifCameraCreate):
             "password": body.password or None,
             "enabled": body.enabled,
             "has_ptz": has_ptz,
+            "group_id": body.group_id,
             "retention_days": body.retention_days if "retention_days" in body.model_fields_set
             else settings.DEFAULT_RETENTION_DAYS,
             **device_fields(body.host, body.port, info, result.get("services"), result.get("clock")),

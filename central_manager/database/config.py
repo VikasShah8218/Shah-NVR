@@ -2,6 +2,7 @@ from settings.settings import settings
 
 APP_MODELS = [
     "app.cameras.models",
+    "app.groups.models",
     "app.nodes.models",
     "app.assignments.models",
     "app.recordings.models",

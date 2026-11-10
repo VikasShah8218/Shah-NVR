@@ -13,7 +13,7 @@ from app.core.list_model import DictListModel
 from app.core.poller import Poller
 from app.core.store import BaseStore
 
-OPTION_ROLES = ["id", "name", "enabled", "has_ptz", "profiles", "status", "node_id"]
+OPTION_ROLES = ["id", "name", "enabled", "has_ptz", "profiles", "status", "node_id", "group_id", "group_path"]
 PAGE = 50
 MAX_RELOAD = 200  # a poll reloads what is shown, up to this many rows
 SEARCH_DEBOUNCE_MS = 300

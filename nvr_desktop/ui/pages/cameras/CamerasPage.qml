@@ -10,9 +10,10 @@ import "../../components"
 PageScroll {
     id: root
 
-    readonly property bool filtered: Cameras.query !== "" || Cameras.filter !== "all"
+    readonly property bool filtered: Cameras.query !== "" || Cameras.filter !== "all" || Cameras.groupFilter > 0
+    property string groupFilterLabel: ""
     readonly property var columns: [
-        { title: "#", width: 40 }, { title: "Name", width: 0 }, { title: "Streams", width: 280 },
+        { title: "#", width: 40 }, { title: "Name", width: 0 }, { title: "Group", width: 150 }, { title: "Streams", width: 280 },
         { title: "Media node", width: 150 }, { title: "Retention", width: 90 }, { title: "Last recording", width: 120 },
         { title: "Enabled", width: 70 }, { title: "", width: 36 }
     ]
@@ -33,6 +34,14 @@ PageScroll {
             options: Cameras.filterOptions
             value: Cameras.filter
             onPicked: v => Cameras.setFilter(v)
+        }
+        GroupPicker {
+            objectName: "cameraGroupFilter"
+            implicitWidth: 180
+            value: Cameras.filter === "ungrouped" ? 0 : Cameras.groupFilter
+            label: root.groupFilterLabel
+            noneLabel: "Any group"
+            onPicked: (id, label) => { root.groupFilterLabel = label; Cameras.setGroupFilter(id) }
         }
         AppButton { text: "Discover"; iconName: "search"; variant: "outline"; onClicked: Router.go("discover") }
         AppButton { text: "Add camera"; iconName: "plus"; onClicked: form.openFor(null) }
@@ -79,6 +88,20 @@ PageScroll {
                             text: model.description ?? ""
                             variant: "small"
                             Layout.fillWidth: true
+                        }
+                    }
+                    Item {
+                        Layout.preferredWidth: 150
+                        implicitHeight: groupLink.implicitHeight
+                        LinkText {
+                            id: groupLink
+                            text: row.model.group_path ?? "—"
+                            active: !!row.model.group_id
+                            variant: "small"
+                            color: !active ? Theme.mutedForeground : hovered ? Theme.primary : Theme.foreground
+                            width: Math.min(implicitWidth, parent.width)
+                            onActivated: Router.go("groups", row.model.group_id)
+                            AppToolTip { visible: groupLink.hovered && groupLink.truncated; text: row.model.group_path ?? "" }
                         }
                     }
                     Flow {

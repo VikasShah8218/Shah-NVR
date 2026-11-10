@@ -18,6 +18,7 @@ from app.cameras.schemas import (
 )
 from app.cameras.services import create_camera_with_streams
 from app.cameras.utils import camera_options_out, camera_to_out, cameras_to_out
+from app.groups.services import camera_scope, check_group_id
 from app.recordings.models import RecordingSegment
 from settings.settings import settings
 from utilities.pagination import MAX_LIMIT, Page, PageParams, paginate
@@ -34,6 +35,7 @@ async def _get_camera(camera_id: int) -> Camera:
 
 @router.post("", response_model=CameraOut, status_code=status.HTTP_201_CREATED)
 async def create_camera(body: CameraCreate):
+    await check_group_id(body.group_id)
     camera = await create_camera_with_streams(
         {
             "name": body.name,
@@ -42,6 +44,7 @@ async def create_camera(body: CameraCreate):
             "password": body.password,
             "enabled": body.enabled,
             "has_ptz": body.has_ptz,
+            "group_id": body.group_id,
             # omitted -> default; explicit null -> keep until storage is full
             "retention_days": body.retention_days if "retention_days" in body.model_fields_set
             else settings.DEFAULT_RETENTION_DAYS,
@@ -64,9 +67,9 @@ def _parse_ids(ids: str | None) -> list[int] | None:
 
 
 def _camera_query(q: str | None, enabled: bool | None, node_id: int | None, stream_status: StreamStatus | None,
-                  ids: list[int] | None, sort: str):
+                  ids: list[int] | None, sort: str, scope: Q | None = None):
     """Shared filters of the camera list and the picker list. Ordered on a unique key so pages are stable."""
-    qs = Camera.all()
+    qs = Camera.all() if scope is None else Camera.filter(scope)
     if ids is not None:
         qs = qs.filter(id__in=ids)
     if enabled is not None:
@@ -90,8 +93,12 @@ async def list_cameras(
     stream_status: StreamStatus | None = Query(default=None, alias="status", description="Any stream in this state"),
     ids: str | None = Query(default=None, description="Only these ids, comma-separated (max 200)"),
     sort: Literal["name", "id"] = "name",
+    group_id: int | None = Query(default=None, description="Cameras directly in this group"),
+    ungrouped: bool = Query(default=False, description="Only cameras in no group"),
+    recursive: bool = Query(default=False, description="With group_id: also every sub-group's cameras"),
 ):
-    qs = _camera_query(q, enabled, node_id, stream_status, _parse_ids(ids), sort)
+    scope = await camera_scope(group_id, ungrouped, recursive)
+    qs = _camera_query(q, enabled, node_id, stream_status, _parse_ids(ids), sort, scope)
     return await paginate(qs, page, cameras_to_out)
 
 
@@ -102,9 +109,13 @@ async def camera_options(
     enabled: bool | None = None,
     node_id: int | None = None,
     ids: str | None = None,
+    group_id: int | None = Query(default=None, description="Cameras directly in this group"),
+    ungrouped: bool = Query(default=False, description="Only cameras in no group"),
+    recursive: bool = Query(default=False, description="With group_id: also every sub-group's cameras"),
 ):
     """`id`, `name` and what a picker or a live tile needs, without the full camera (streams, ONVIF details)."""
-    qs = _camera_query(q, enabled, node_id, None, _parse_ids(ids), "name")
+    scope = await camera_scope(group_id, ungrouped, recursive)
+    qs = _camera_query(q, enabled, node_id, None, _parse_ids(ids), "name", scope)
     return await paginate(qs, page, camera_options_out)
 
 
@@ -117,6 +128,8 @@ async def get_camera(camera_id: int):
 async def update_camera(camera_id: int, body: CameraUpdate):
     camera = await _get_camera(camera_id)
     data = body.model_dump(exclude_unset=True)
+    if "group_id" in data:
+        await check_group_id(data["group_id"])
     if data:
         await camera.update_from_dict(data).save()
         if data.get("enabled") is False:
