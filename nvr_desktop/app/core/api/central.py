@@ -21,8 +21,10 @@ from app.core.api.models import (
     BackfillProbe,
     Bookmark,
     ExportJob,
+    GroupDetail,
     Camera,
     CameraAlert,
+    CameraGroup,
     CameraOption,
     ClusterHealth,
     LiveInfo,
@@ -48,6 +50,12 @@ def _page(body: dict, model) -> tuple[list, int]:
 def _clean(params: dict) -> dict:
     """Drop empty filters so the server applies its defaults."""
     return {k: v for k, v in params.items() if v is not None and v != ""}
+
+
+def _scope(group_id: int | None, ungrouped: bool, recursive: bool) -> dict:
+    """Camera group filter: directly in a group, its whole subtree (recursive) or no group (ungrouped)."""
+    return {"group_id": group_id, "ungrouped": True if ungrouped else None,
+            "recursive": True if recursive and group_id is not None else None}
 
 
 class CentralApi:
@@ -108,10 +116,11 @@ class CentralApi:
 
     # ------------------------------------------------------------------ cameras
     def cameras(self, *, q: str | None = None, enabled: bool | None = None, node_id: int | None = None,
-                status: str | None = None, limit: int = 50, offset: int = 0) -> tuple[list[Camera], int]:
+                status: str | None = None, limit: int = 50, offset: int = 0, group_id: int | None = None,
+                ungrouped: bool = False, recursive: bool = False) -> tuple[list[Camera], int]:
         """One page of full camera rows, ordered by name. Returns (cameras, total)."""
         params = _clean({"q": (q or "").strip(), "enabled": enabled, "node_id": node_id, "status": status,
-                         "limit": limit, "offset": offset})
+                         "limit": limit, "offset": offset, **_scope(group_id, ungrouped, recursive)})
         return _page(self._request("GET", "/api/v1/cameras", params=params), Camera)
 
     def cameras_by_ids(self, ids: list[int]) -> list[Camera]:
@@ -123,11 +132,42 @@ class CentralApi:
                                                                      "limit": 200}), Camera)[0]
 
     def camera_options(self, *, q: str | None = None, enabled: bool | None = None, node_id: int | None = None,
-                       limit: int = 50, offset: int = 0) -> tuple[list[CameraOption], int]:
-        """Small searchable camera rows for pickers and the live sidebar. Returns (rows, total)."""
+                       limit: int = 50, offset: int = 0, group_id: int | None = None, ungrouped: bool = False,
+                       recursive: bool = False) -> tuple[list[CameraOption], int]:
+        """Small searchable camera rows for pickers, the live sidebar and the group tree. Returns (rows, total)."""
         params = _clean({"q": (q or "").strip(), "enabled": enabled, "node_id": node_id, "limit": limit,
-                         "offset": offset})
+                         "offset": offset, **_scope(group_id, ungrouped, recursive)})
         return _page(self._request("GET", "/api/v1/cameras/options", params=params), CameraOption)
+
+    # ------------------------------------------------------------------ camera groups (lazy tree)
+    def groups(self, parent_id: int | None = None, limit: int = 50, offset: int = 0) -> tuple[list[CameraGroup], int]:
+        """Direct sub-groups of one group (None = the top level). Returns (rows, total)."""
+        params = _clean({"parent_id": parent_id, "limit": limit, "offset": offset})
+        return _page(self._request("GET", "/api/v1/groups", params=params), CameraGroup)
+
+    def group(self, group_id: int) -> GroupDetail:
+        return GroupDetail.model_validate(self._request("GET", f"/api/v1/groups/{group_id}"))
+
+    def group_search(self, q: str, limit: int = 20, offset: int = 0) -> tuple[list[CameraGroup], int]:
+        params = {"q": q.strip(), "limit": limit, "offset": offset}
+        return _page(self._request("GET", "/api/v1/groups/search", params=params), CameraGroup)
+
+    def create_group(self, name: str, description: str | None = None, parent_id: int | None = None) -> GroupDetail:
+        body = {"name": name, "description": description, "parent_id": parent_id}
+        return GroupDetail.model_validate(self._request("POST", "/api/v1/groups", json=body))
+
+    def update_group(self, group_id: int, body: dict) -> GroupDetail:
+        """Send only the keys to change; `{"parent_id": None}` moves the group to the top level."""
+        return GroupDetail.model_validate(self._request("PATCH", f"/api/v1/groups/{group_id}", json=body))
+
+    def delete_group(self, group_id: int, move_children: bool = False) -> None:
+        params = {"move_children": "parent"} if move_children else None
+        self._request("DELETE", f"/api/v1/groups/{group_id}", params=params)
+
+    def assign_cameras(self, camera_ids: list[int], group_id: int | None) -> int:
+        """Move cameras into a group (None = out of every group), at most 500. Returns how many changed."""
+        body = {"camera_ids": sorted(set(camera_ids))[:500], "group_id": group_id}
+        return self._request("POST", "/api/v1/groups/assign", json=body)["updated"]
 
     def alerts(self, *, level: str | None = None, limit: int = 10, offset: int = 0) -> tuple[list[CameraAlert], int, dict]:
         """Camera alerts built by central, danger first. Returns (rows, total, {"danger": n, "warning": n})."""

@@ -73,6 +73,7 @@ def create_body(form: dict) -> dict:
         "retention_days": retention_value(form),
         "enabled": bool(form.get("enabled", True)),
         "has_ptz": bool(form.get("has_ptz", False)),
+        "group_id": _group_id(form),
         "streams": [_stream_body(s) for s in used_streams(form)],
     }
 
@@ -88,7 +89,14 @@ def update_body(form: dict) -> dict:
     }
     if form.get("password"):  # empty = keep the current password
         body["password"] = form["password"]
+    if "group_id" in form:  # sent only when the form shows the field (0 = take it out of its group)
+        body["group_id"] = _group_id(form)
     return body
+
+
+def _group_id(form: dict) -> int | None:
+    value = form.get("group_id") or 0
+    return int(value) if int(value) > 0 else None
 
 
 def stream_diff(original_streams: list[dict], form: dict) -> dict:

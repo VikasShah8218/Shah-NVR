@@ -90,6 +90,8 @@ def build_app():
     from app.features.cameras.store import CamerasStore
     from app.features.dashboard.cluster_store import ClusterStore
     from app.features.dashboard.store import DashboardStore
+    from app.features.groups.store import GroupsStore
+    from app.features.groups.tree_store import LiveGroupsStore, ManageGroupsStore, PickerGroupsStore
     from app.features.live.store import LiveStore
     from app.features.live.ptz_store import PtzStore
     from app.features.live.ptz_ws_store import PtzWsStore
@@ -113,6 +115,7 @@ def build_app():
     nodes = NodesStore(ctx)
     playback_cameras = PlaybackCamerasStore(ctx)
     playback = PlaybackStore(ctx, cameras, nodes, playback_cameras)
+    live_groups, manage_groups, picker_groups = LiveGroupsStore(ctx), ManageGroupsStore(ctx), PickerGroupsStore(ctx)
     singletons = {
         "Prefs": prefs,
         "Toasts": toasts,
@@ -125,6 +128,10 @@ def build_app():
         "LiveCameras": LiveCamerasStore(ctx),
         "PlaybackCameras": playback_cameras,
         "EncoderCameras": EncoderCamerasStore(ctx),
+        "LiveGroups": live_groups,
+        "ManageGroups": manage_groups,
+        "PickerGroups": picker_groups,
+        "Groups": GroupsStore(ctx, [live_groups, manage_groups, picker_groups]),
         "Nodes": nodes,
         "Discover": DiscoverStore(ctx, cameras, nodes),
         "Dashboard": DashboardStore(ctx, cluster, nodes),

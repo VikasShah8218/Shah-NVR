@@ -39,6 +39,7 @@ class DiscoverStore(BaseStore):
         self._scan_error = ""
         self._generation = 0
         self._server_generation = 0
+        self._add_group = 0  # camera group the added cameras go into (0 = none)
         ctx.centralChanged.connect(self._reset)
 
     def _reset(self):
@@ -158,6 +159,12 @@ class DiscoverStore(BaseStore):
         self._set_busy(False)
         self._add_rows = []
         self.addRowsChanged.emit()
+
+    @Slot(int)
+    def setAddGroup(self, group_id: int) -> None:
+        """Camera group for the cameras added from the sheet (0 = none)."""
+        self._add_group = max(0, group_id)
+        self.stateChanged.emit()
 
     @Slot(str, str)
     def checkAll(self, username: str, password: str) -> None:
@@ -280,7 +287,7 @@ class DiscoverStore(BaseStore):
                     body = {
                         **self._device_body(device, username, password), "name": row["name"].strip() or None,
                         "enabled": bool(row["enabled"]), "retention_days": retention, "streams": streams,
-                        "allow_duplicate": False,
+                        "allow_duplicate": False, "group_id": self._add_group or None,
                     }
                     camera = api.create_onvif_camera(body)
                     results[endpoint] = {
@@ -343,6 +350,7 @@ class DiscoverStore(BaseStore):
     scanning = Property(bool, lambda self: self._scanning, notify=stateChanged)
     scanned = Property(bool, lambda self: self._scanned, notify=stateChanged)
     busy = Property(bool, lambda self: self._busy, notify=stateChanged)
+    addGroup = Property(int, lambda self: self._add_group, notify=stateChanged)
     scanError = Property(str, lambda self: self._scan_error, notify=stateChanged)
     readyCount = Property(int, lambda self: sum(row["status"] == "ready" for row in self._add_rows),
                           notify=addRowsChanged)

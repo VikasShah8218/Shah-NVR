@@ -21,7 +21,7 @@ CAMERA_ROLES = [
     "created_at", "updated_at", "streams", "assignment", "lastSegment", "recordStatus",
     "onvif_host", "onvif_port", "manufacturer", "deviceModel", "firmware", "serial", "mac",
     "onvif_services", "onvif_reachable", "clock_offset_seconds", "onvif_checked_at",
-    "expose_via_onvif", "has_ptz",
+    "expose_via_onvif", "has_ptz", "group_id", "group_path",
 ]
 
 # Server-side filters of the Cameras page (same as the web).
@@ -31,6 +31,7 @@ FILTERS = {
     "disabled": {"enabled": False},
     "not_recording": {"enabled": True, "status": "NOT_RECORDING"},
     "connecting": {"enabled": True, "status": "CONNECTING"},
+    "ungrouped": {"ungrouped": True},
 }
 FILTER_OPTIONS = [
     {"value": "all", "label": "All cameras"},
@@ -38,6 +39,7 @@ FILTER_OPTIONS = [
     {"value": "disabled", "label": "Disabled"},
     {"value": "not_recording", "label": "Not recording"},
     {"value": "connecting", "label": "Connecting"},
+    {"value": "ungrouped", "label": "Ungrouped"},
 ]
 
 
@@ -61,6 +63,7 @@ class CamerasStore(PagedStore):
     def __init__(self, ctx: AppContext, parent=None):
         super().__init__(ctx, CAMERA_ROLES, poll_seconds=ctx.prefs.pollSeconds, parent=parent)
         self._filter = "all"
+        self._group_filter = 0  # camera group filter (the group and its sub-groups); 0 = any group
         self._known: dict[int, dict] = {}  # id -> camera (current page + tracked cameras)
         self._tracked: dict[str, set[int]] = {}  # consumer -> camera ids it shows
         self._revision = 0
@@ -70,7 +73,8 @@ class CamerasStore(PagedStore):
 
     # ------------------------------------------------------------------ the Cameras page (paged)
     def _load(self, limit: int, offset: int):
-        rows, total = self.api.cameras(q=self._query, limit=limit, offset=offset, **FILTERS[self._filter])
+        scope = {"group_id": self._group_filter, "recursive": True} if self._group_filter and self._filter != "ungrouped" else {}
+        rows, total = self.api.cameras(q=self._query, limit=limit, offset=offset, **FILTERS[self._filter], **scope)
         return [_decorate(c.to_qml()) for c in rows], total
 
     def _apply(self, rows: list[dict], total: int) -> None:
@@ -93,7 +97,18 @@ class CamerasStore(PagedStore):
             self.filterChanged.emit()
             self.reset()
 
+    @Slot(int)
+    def setGroupFilter(self, group_id: int) -> None:
+        group_id = max(0, group_id)
+        if group_id != self._group_filter:
+            self._group_filter = group_id
+            if group_id and self._filter == "ungrouped":
+                self._filter = "all"
+            self.filterChanged.emit()
+            self.reset()
+
     filter = Property(str, lambda self: self._filter, notify=filterChanged)
+    groupFilter = Property(int, lambda self: self._group_filter, notify=filterChanged)
     filterOptions = Property("QVariantList", lambda self: FILTER_OPTIONS, constant=True)
 
     # ------------------------------------------------------------------ cache of cameras shown elsewhere

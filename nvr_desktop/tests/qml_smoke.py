@@ -114,7 +114,9 @@ Item {
             second = next(o for o in walk(role_root) if o.objectName() == "role-2")
             assert second.property("cameraEnabled") is False
 
-            for page in ("cameras", "live", "playback", "dashboard", "discover", "nodes", "assignments", "settings"):
+            stores["Prefs"].liveSidebarTab = "all"  # the flat camera list (the group tree is checked below)
+            for page in ("cameras", "live", "playback", "dashboard", "discover", "nodes", "assignments", "groups",
+                         "settings"):
                 router.go(page)
                 settle()
                 if page in ("cameras", "live", "playback"):
@@ -164,6 +166,46 @@ Item {
             assert window.grabWindow().save(str(output / "playback-bookmarks.png"))
             QTest.keyClick(window, Qt.Key.Key_Escape)
             settle()
+
+            # Camera groups (2026-11-10): the live sidebar tree, the Play-group chip and the Groups page.
+            group = {"id": 7, "name": "Anantnag", "description": "District", "parent_id": None, "depth": 0,
+                     "path": "/7/", "path_label": "Anantnag", "sort_order": 0, "child_groups": 1,
+                     "cameras_direct": 1, "cameras_total": 3, "online_total": 2}
+            sub_group = {**group, "id": 8, "name": "Bijbehara", "parent_id": 7, "depth": 1, "path": "/7/8/",
+                         "path_label": "Anantnag › Bijbehara", "child_groups": 0, "cameras_total": 2}
+            live_groups = stores["LiveGroups"]
+            live_groups._lists.update({"g:root": [group], "g:7": [sub_group], "c:7": [options[0]], "c:ungrouped": []})
+            live_groups._totals.update({"g:root": 1, "g:7": 1, "c:7": 1, "c:ungrouped": 0})
+            live_groups._expanded = ["7"]
+            live_groups._rebuild()
+            stores["Prefs"].liveSidebarTab = "groups"
+            stores["Live"]._scope = {"groupId": 7, "name": "Anantnag"}
+            stores["Live"].pagesChanged.emit()
+            router.go("live")
+            settle()
+            assert "Anantnag" in texts() and "Bijbehara" in texts() and "2/3" in texts(), texts()
+            chip = window.findChild(QObject, "liveScopeChip")
+            assert chip is not None and chip.property("visible")
+            assert window.grabWindow().save(str(output / "live-groups.png"))
+            stores["Live"]._scope = None
+            stores["Live"].pagesChanged.emit()
+            stores["Prefs"].liveSidebarTab = "all"
+
+            groups, manage = stores["Groups"], stores["ManageGroups"]
+            manage._lists.update({"g:root": [group], "g:7": [sub_group]})
+            manage._totals.update({"g:root": 1, "g:7": 1})
+            manage._expanded = ["7"]
+            manage._rebuild()
+            router.go("groups", 7)
+            settle()
+            groups._detail = {**group, "breadcrumb": []}
+            groups.changed.emit()
+            groups.sub_groups._apply([{**sub_group, "countLabel": "2/2"}], 1)
+            groups.cameras._apply([{**options[0], "group_id": 7, "group_path": "Anantnag"}], 1)
+            settle()
+            assert "Cameras in this group" in texts() and "Bijbehara" in texts() and "Gate" in texts(), texts()
+            assert window.findChild(QObject, "manageGroupTree") is not None
+            assert window.grabWindow().save(str(output / "groups.png"))
 
             router.go("live")
             stores["Live"].place(1, 0)

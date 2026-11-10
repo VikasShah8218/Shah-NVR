@@ -8,6 +8,8 @@ recreated (no flicker, scroll position and hover state survive). Otherwise the m
 
 from __future__ import annotations
 
+from difflib import SequenceMatcher
+
 from PySide6.QtCore import QAbstractListModel, QByteArray, QModelIndex, Qt, Property, Signal, Slot
 
 
@@ -50,6 +52,34 @@ class DictListModel(QAbstractListModel):
         self.beginResetModel()
         self._items = list(items)
         self.endResetModel()
+        self.countChanged.emit()
+
+    def sync_items(self, items: list[dict]) -> None:
+        """Like set_items, but rows that appear or disappear are inserted / removed in place instead of resetting
+        the model, so a ListView keeps its scroll position and the other delegates (the group tree: expanding a
+        group inserts its children). Keys must be unique."""
+        old_keys = [row.get(self._key) for row in self._items]
+        new_keys = [row.get(self._key) for row in items]
+        if old_keys == new_keys:
+            self.set_items(items)
+            return
+        ops = SequenceMatcher(a=old_keys, b=new_keys, autojunk=False).get_opcodes()
+        for tag, i1, i2, j1, j2 in reversed(ops):  # back to front: earlier indexes stay valid
+            if tag == "equal":
+                for k in range(i2 - i1):
+                    if items[j1 + k] != self._items[i1 + k]:
+                        self._items[i1 + k] = items[j1 + k]
+                        idx = self.index(i1 + k)
+                        self.dataChanged.emit(idx, idx)
+                continue
+            if i2 > i1:  # delete / replace: drop the old rows
+                self.beginRemoveRows(QModelIndex(), i1, i2 - 1)
+                del self._items[i1:i2]
+                self.endRemoveRows()
+            if j2 > j1:  # insert / replace: add the new rows
+                self.beginInsertRows(QModelIndex(), i1, i1 + j2 - j1 - 1)
+                self._items[i1:i1] = list(items[j1:j2])
+                self.endInsertRows()
         self.countChanged.emit()
 
     def items(self) -> list[dict]:

@@ -12,6 +12,8 @@ Sheet {
 
     property var camera: null // null = add
     property var errors: []
+    property int groupId: 0          // camera group (0 = none)
+    property string groupLabel: ""
 
     title: camera ? "Edit " + camera.name : "Add camera"
     description: "The scheduler assigns the camera to a media node within a few seconds; recorded streams start recording right away."
@@ -28,6 +30,8 @@ Sheet {
         retentionField.text = String(cam && cam.retention_days ? cam.retention_days : 7)
         enabledSwitch.checked = cam ? cam.enabled : true
         ptzSwitch.checked = cam ? !!cam.has_ptz : false
+        groupId = cam && cam.group_id ? cam.group_id : 0
+        groupLabel = cam && cam.group_path ? cam.group_path : ""
         streams.clear()
         if (cam) {
             for (const s of cam.streams)
@@ -48,7 +52,7 @@ Sheet {
         return {
             name: nameField.text, description: descField.text, username: userField.text, password: passField.text,
             retention_days: retentionField.text, keep_until_full: untilFullSwitch.checked,
-            enabled: enabledSwitch.checked, has_ptz: ptzSwitch.checked, streams: list
+            enabled: enabledSwitch.checked, has_ptz: ptzSwitch.checked, group_id: groupId, streams: list
         }
     }
 
@@ -75,6 +79,17 @@ Sheet {
     FormField {
         label: "Description"
         AppTextArea { id: descField; placeholderText: "Optional"; Layout.fillWidth: true; Layout.preferredHeight: 64 }
+    }
+    FormField {
+        label: "Group"
+        GroupPicker {
+            objectName: "cameraGroupPicker"
+            Layout.fillWidth: true
+            value: sheet.groupId
+            label: sheet.groupLabel
+            noneLabel: "No group"
+            onPicked: (id, label) => { sheet.groupId = id; sheet.groupLabel = label }
+        }
     }
     RowLayout {
         Layout.fillWidth: true

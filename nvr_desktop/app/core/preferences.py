@@ -31,6 +31,7 @@ class Preferences(QObject):
     nodeAccessChanged = Signal()
     liveVolumeChanged = Signal()
     playbackVolumeChanged = Signal()
+    liveSidebarTabChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -117,6 +118,12 @@ class Preferences(QObject):
     def _set_sidebar(self, value: bool) -> None:
         self._set("sidebarCollapsed", bool(value), self.sidebarCollapsedChanged)
 
+    def _get_live_sidebar_tab(self) -> str:
+        return "all" if self._get("live/sidebarTab", "groups") == "all" else "groups"
+
+    def _set_live_sidebar_tab(self, value: str) -> None:
+        self._set("live/sidebarTab", "all" if value == "all" else "groups", self.liveSidebarTabChanged)
+
     def _get_node_access(self) -> str:
         value = self._get("nodeAccess", "auto")
         return value if value in NODE_ACCESS_MODES else "auto"
@@ -143,6 +150,8 @@ class Preferences(QObject):
     hlsBufferSeconds = Property(int, _get_hls_buffer, _set_hls_buffer, notify=hlsBufferSecondsChanged)
     hwdec = Property(str, _get_hwdec, _set_hwdec, notify=hwdecChanged)
     sidebarCollapsed = Property(bool, _get_sidebar, _set_sidebar, notify=sidebarCollapsedChanged)
+    # Live View sidebar tab: "groups" (the group tree) or "all" (flat camera list); docs/GROUPING_PLAN.md
+    liveSidebarTab = Property(str, _get_live_sidebar_tab, _set_live_sidebar_tab, notify=liveSidebarTabChanged)
     renderMode = Property(str, _get_render_mode, _set_render_mode, notify=renderModeChanged)
     activeRenderMode = Property(str, lambda self: self._active_render_mode, constant=True)
     renderModeAtStart = Property(str, lambda self: self._render_mode_at_start, constant=True)
@@ -168,6 +177,26 @@ class Preferences(QObject):
         self._store.setValue("live/layout", int(layout))
         self._store.setValue("live/tiles", json.dumps(tiles))
 
+    def group_tree_expanded(self, key: str) -> str:
+        """Expanded group keys of one group tree (a JSON list; app/features/groups/tree_store.py)."""
+        return str(self._store.value(f"groupTrees/{key}", "") or "")
+
+    def save_group_tree_expanded(self, key: str, raw: str) -> None:
+        self._store.setValue(f"groupTrees/{key}", raw)
+
+    def live_scope(self) -> dict | None:
+        """The group played on the grid ({"groupId", "name"}; docs/GROUPING_PLAN.md), or None."""
+        try:
+            scope = json.loads(self._store.value("live/scope", "null"))
+        except (TypeError, ValueError):
+            return None
+        if isinstance(scope, dict) and isinstance(scope.get("groupId"), int) and scope["groupId"] > 0:
+            return {"groupId": scope["groupId"], "name": str(scope.get("name") or "")}
+        return None
+
+    def save_live_scope(self, scope: dict | None) -> None:
+        self._store.setValue("live/scope", json.dumps(scope))
+
     # ------------------------------------------------------------------ window state
     def window_state(self) -> tuple[QRect | None, bool]:
         """(last normal geometry or None, was maximized)."""
@@ -187,5 +216,5 @@ class Preferences(QObject):
                        self.hlsBufferSecondsChanged,
                        self.hwdecChanged, self.sidebarCollapsedChanged,
                        self.renderModeChanged, self.nodeAccessChanged, self.liveVolumeChanged,
-                       self.playbackVolumeChanged):
+                       self.playbackVolumeChanged, self.liveSidebarTabChanged):
             signal.emit()

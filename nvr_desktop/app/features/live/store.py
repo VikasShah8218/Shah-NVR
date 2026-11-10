@@ -4,6 +4,9 @@ another media node reconnects to the new node). URL choice per protocol: feature
 
 Grid pages (docs/PAGINATION_PLAN.md): ‹ › fill the grid with the next 4 / 9 / 16 enabled cameras (by name).
 Only the cameras on view are loaded in full (CamerasStore.track), never the whole camera list.
+
+Play group (docs/GROUPING_PLAN.md): `playGroup(id, name)` sets a scope; ‹ › then page through that group's
+cameras (its whole subtree). The scope is remembered; a deleted group clears it.
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Property, QStandardPaths, Signal, Slot
 
+from app.core.api.errors import ApiError
 from app.core.context import AppContext
 from app.core.paging import page_count
 from app.core.poller import Poller
@@ -22,6 +26,10 @@ from app.features.cameras.store import CamerasStore
 from app.features.nodes.store import NodesStore
 
 LAYOUTS = (1, 4, 9, 16)
+
+
+def _scope_params(scope: dict | None) -> dict:
+    return {"group_id": scope["groupId"], "recursive": True} if scope else {}
 
 
 class LiveStore(BaseStore):
@@ -42,6 +50,7 @@ class LiveStore(BaseStore):
         self._grid_total: int | None = None  # enabled cameras (for "Page 2 / 63")
         self._grid_page = 0  # 0 = the grid was filled by hand
         self._paging = False
+        self._scope: dict | None = ctx.prefs.live_scope()  # {"groupId", "name"}: grid pages run in this group
         self.urlsChanged.connect(self._bump_revision)
         self.gridChanged.connect(self._track_tiles)
         self._poller = Poller(self.refresh, 15, self)
@@ -57,13 +66,24 @@ class LiveStore(BaseStore):
     def refresh(self) -> None:
         for camera_id in {t for t in self._tiles if t}:
             self.ensureUrls(camera_id, force=True)
-        self.fetch("grid-total", lambda: self.api.camera_options(enabled=True, limit=1)[1], self._set_grid_total,
-                   track_error=False)
+        scope = self._scope
+        self.fetch("grid-total", lambda: self._count(scope), lambda total: self._set_grid_total(total, scope),
+                   track_error=False, on_err=lambda exc: self._grid_total_failed(exc, scope))
 
-    def _set_grid_total(self, total: int) -> None:
+    def _count(self, scope: dict | None) -> int:
+        return self.api.camera_options(enabled=True, limit=1, **_scope_params(scope))[1]
+
+    def _set_grid_total(self, total: int, scope: dict | None = None) -> None:
+        if scope != self._scope:
+            return  # the scope changed while counting
         if total != self._grid_total:
             self._grid_total = total
             self.pagesChanged.emit()
+
+    def _grid_total_failed(self, exc: Exception, scope: dict | None) -> None:
+        if scope and scope == self._scope and isinstance(exc, ApiError) and exc.status == 404:
+            self.ctx.toasts.info(f'Group "{scope["name"]}" no longer exists: showing all cameras')
+            self.clearScope()
 
     @Slot(int)
     @Slot(int, bool)
@@ -151,11 +171,28 @@ class LiveStore(BaseStore):
 
     @Slot(int)
     def showGridPage(self, page: int) -> None:
-        """Fill the grid with page `page` of the enabled cameras (wraps around at both ends)."""
+        """Fill the grid with page `page` of the enabled cameras (or of the played group; wraps around)."""
         if self._paging or not self._grid_total:
             return
-        pages = self._grid_pages()
-        target = (page - 1) % pages + 1
+        self._show_page((page - 1) % self._grid_pages() + 1, self._scope)
+
+    @Slot(int, str)
+    def playGroup(self, group_id: int, name: str) -> None:
+        """Fill the grid with the first page of a group's enabled cameras (sub-groups included)."""
+        if group_id > 0 and not self._paging:
+            self._show_page(1, {"groupId": group_id, "name": name})
+
+    @Slot()
+    def clearScope(self) -> None:
+        if self._scope is not None:
+            self._scope = None
+            self._grid_total = None
+            self._grid_page = 0
+            self.ctx.prefs.save_live_scope(None)
+            self.pagesChanged.emit()
+            self.refresh()
+
+    def _show_page(self, target: int, scope: dict | None) -> None:
         layout = self._layout
         self._paging = True
         self.pagesChanged.emit()
@@ -163,6 +200,13 @@ class LiveStore(BaseStore):
         def ok(result):
             rows, total = result
             self._paging = False
+            if total == 0:
+                self.ctx.toasts.info(f'No enabled cameras in {scope["name"]}' if scope else "No enabled cameras")
+                self.pagesChanged.emit()
+                return
+            if scope != self._scope:
+                self._scope = scope
+                self.ctx.prefs.save_live_scope(scope)
             self._grid_total = total
             if layout == self._layout:
                 self.muteAll()
@@ -180,10 +224,12 @@ class LiveStore(BaseStore):
             self.ctx.toasts.error(str(exc))
 
         def load():
-            rows, total = self.api.camera_options(enabled=True, limit=layout, offset=(target - 1) * layout)
+            rows, total = self.api.camera_options(enabled=True, limit=layout, offset=(target - 1) * layout,
+                                                  **_scope_params(scope))
             return [r.to_qml() for r in rows], total
 
-        self.fetch(f"grid-page-{target}-{layout}", load, ok, track_error=False, on_err=err)
+        group = scope["groupId"] if scope else 0
+        self.fetch(f"grid-page-{group}-{target}-{layout}", load, ok, track_error=False, on_err=err)
 
     @Slot()
     def nextGridPage(self) -> None:
@@ -197,6 +243,8 @@ class LiveStore(BaseStore):
     gridPage = Property(int, lambda self: self._grid_page, notify=pagesChanged)
     gridPages = Property(int, lambda self: self._grid_pages(), notify=pagesChanged)
     gridPaging = Property(bool, lambda self: self._paging, notify=pagesChanged)
+    scopeId = Property(int, lambda self: self._scope["groupId"] if self._scope else 0, notify=pagesChanged)
+    scopeName = Property(str, lambda self: self._scope["name"] if self._scope else "", notify=pagesChanged)
 
     layout = Property(int, lambda self: self._layout, notify=gridChanged)
     selected = Property(int, lambda self: self._selected, notify=gridChanged)

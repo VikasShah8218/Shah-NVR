@@ -15,6 +15,7 @@ Sheet {
     width: Math.min(parent ? parent.width * 0.95 : 760, 760)
     closePolicy: Discover.busy ? Popup.NoAutoClose : Popup.CloseOnEscape | Popup.CloseOnPressOutside
     onClosed: { password.text = ""; Discover.closeAdd() }
+    property string addGroupLabel: ""
 
     Card {
         Layout.fillWidth: true
@@ -40,6 +41,20 @@ Sheet {
                 iconName: Discover.busy ? "loader-circle" : "check"
                 enabled: !Discover.busy && Discover.uncheckedCount > 0
                 onClicked: Discover.checkAll(username.text, password.text)
+            }
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 10
+            AppText { text: "Add to group"; font.weight: Font.Medium }
+            GroupPicker {
+                objectName: "onvifGroupPicker"
+                Layout.fillWidth: true
+                enabled: !Discover.busy
+                value: Discover.addGroup
+                label: sheet.addGroupLabel
+                noneLabel: "No group"
+                onPicked: (id, label) => { sheet.addGroupLabel = label; Discover.setAddGroup(id) }
             }
         }
         RowLayout {
