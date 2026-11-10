@@ -21,6 +21,13 @@ How it works
   RTSP paused <= RESUME_UNPAUSE_SECONDS just unpauses (it catches up to live); anything else reloads.
   For QUIET_RECONNECT_SECONDS after a resume, (re)connecting keeps the frozen frame and no
   "Connecting/Reconnecting" state; only a stream still without video after that shows "Reconnecting".
+* "No picture" watchdog (live): every WATCHDOG_INTERVAL_MS the player checks when the last new frame arrived
+  (libmpv's frame-ready callback or a moving time-pos; no pixel analysis, ~free). A stream that connected but
+  delivers no frames for NO_PICTURE_SECONDS (LL-HLS: its buffer x2 + a margin) is treated like a dropped stream:
+  "Reconnecting…" and a fresh connection with the normal backoff. Before this, such a stream stayed black forever.
+  The same timer covers a load that waits for the render context ("render-ready"), which used to be a silent,
+  overlay-less "idle" state. `reconnect()` (the ↻ button) drops the connection and starts a fresh one at once.
+  The last state changes are kept per player and logged when the watchdog fires (diagnosis on real systems).
 * Playback extras: `frameStep()` / `frameBackStep()` use mpv's exact frame stepping. Reverse play
   (`startReverse` / `stopReverse`) pauses and chains seeks backwards from a QTimer, anchored to wall
   time (maths in app/features/playback/transport.py); a tick waits for the previous seek to finish
@@ -52,7 +59,8 @@ from datetime import timedelta
 from functools import partial
 
 import mpv
-from PySide6.QtCore import Property, QObject, Qt, QTimer, Signal, Slot
+from PySide6.QtCore import Property, QCoreApplication, QObject, Qt, QTimer, Signal, Slot
+from PySide6.QtGui import QGuiApplication
 
 from app.features.playback.transport import (
     REVERSE_TICK_MS, ReverseAnchor, reverse_done, reverse_target, seek_precision,
@@ -67,7 +75,19 @@ RESUME_UNPAUSE_SECONDS = 8      # measured: MediaMTX drops a paused RTSP reader 
 QUIET_RECONNECT_SECONDS = 60    # after a resume, reconnect silently behind the frozen frame this long
 QUIET_RETRY_SECONDS = 2
 REVERSE_SEEK_TIMEOUT = 1.0      # give up waiting for a seek to finish after this (s) and seek again
+WATCHDOG_INTERVAL_MS = 2000     # live: how often the "no picture" watchdog looks at the last frame time
+NO_PICTURE_SECONDS = 8          # live RTSP: no new frame this long -> reconnect
+NO_PICTURE_HLS_MARGIN = 4       # live LL-HLS: buffer x2 + this (the player fills its buffer before showing frames)
+STATE_LOG_SIZE = 16             # recent state changes kept per player (logged on a watchdog reconnect)
 OBSERVED_PROPERTIES = ("video-params", "hwdec-current", "time-pos", "duration", "pause", "speed", "eof-reached")
+
+
+def _window_shown() -> bool:
+    """Is any app window on screen (not minimized)? Without a GUI application (tests) assume yes."""
+    if not isinstance(QCoreApplication.instance(), QGuiApplication):
+        return True
+    windows = QGuiApplication.topLevelWindows()
+    return not windows or any(w.isExposed() for w in windows)
 
 
 def _log_mpv_message(level: str, prefix: str, text: str) -> None:
@@ -168,6 +188,7 @@ class MpvPlayer(QObject):
     # for the surface (GUI thread)
     mpvCreated = Signal()  # the mpv.MPV now exists: create the render context
     frameReady = Signal()  # a new frame can be drawn
+    renderWanted = Signal()  # a load waits for the render context: draw (create it) now
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -196,6 +217,12 @@ class MpvPlayer(QObject):
         self._reload_on_resume = False  # the stream ended/failed (or a load was due) while suspended
         self._quiet = False             # resumed: reconnect behind the frozen frame, no overlays
         self._quiet_time_pos: float | None = None
+        self._last_progress = 0.0       # monotonic time of the last new frame (or of the last load)
+        self._state_log: deque[tuple[float, str]] = deque(maxlen=STATE_LOG_SIZE)
+
+        self._watchdog = QTimer(self)
+        self._watchdog.setInterval(WATCHDOG_INTERVAL_MS)
+        self._watchdog.timeout.connect(self._watchdog_tick)
 
         self._quiet_timer = QTimer(self)
         self._quiet_timer.setSingleShot(True)
@@ -252,6 +279,7 @@ class MpvPlayer(QObject):
         for kind, payload in events:
             self._handle_mpv_event(kind, payload)
         if frame:
+            self._last_progress = time.monotonic()
             self.frameReady.emit()
 
     def _handle_mpv_event(self, kind: str, payload) -> None:
@@ -276,6 +304,8 @@ class MpvPlayer(QObject):
             self.hwdecCurrentChanged.emit()
         elif kind == "prop:time-pos":
             if payload is not None:
+                if float(payload) != self._time_pos:
+                    self._last_progress = time.monotonic()
                 self._time_pos = float(payload)
                 self.timePosChanged.emit()
                 if self._quiet and self._quiet_time_pos is not None and self._time_pos != self._quiet_time_pos:
@@ -320,6 +350,10 @@ class MpvPlayer(QObject):
         if self._suspended:
             self._reload_on_resume = True  # reconnect when the grid is visible again
             return
+        self._retry_live("Stream unavailable. Retrying…")
+
+    def _retry_live(self, message: str) -> None:
+        """Live: retry with backoff (switching to the fallback protocol if any)."""
         self._failures += 1
         if self._fallback_source and self._active_source != self._fallback_source:
             logger.info("Live stream failed, falling back to %s", self._fallback_source)
@@ -328,15 +362,51 @@ class MpvPlayer(QObject):
             self._retry_timer.start(QUIET_RETRY_SECONDS * 1000)
             return
         delay = min(MAX_BACKOFF_SECONDS, 2 * 2 ** min(self._failures - 1, 4))
-        self._error_text = "Stream unavailable. Retrying…"
+        self._error_text = message
         self.errorTextChanged.emit()
         self._set_state("reconnecting")
         self._retry_timer.start(int(delay * 1000))
+
+    # ------------------------------------------------------------------ "no picture" watchdog (live)
+    def _no_picture_limit(self) -> float:
+        if ".m3u8" in self._active_source.lower():
+            return max(NO_PICTURE_SECONDS, self._live_buffer_seconds * 2 + NO_PICTURE_HLS_MARGIN)
+        return NO_PICTURE_SECONDS
+
+    @Slot()
+    def _watchdog_tick(self) -> None:
+        if self._mode != "live" or self._stopped or self._suspended or not self._active_source:
+            self._watchdog.stop()
+            return
+        if self._quiet or self._retry_timer.isActive():  # the quiet window / a scheduled retry handles it
+            return
+        if not _window_shown():
+            # Minimized: Qt draws nothing, so mpv may hold frames back. Not a dead stream: restart the clock.
+            self._last_progress = time.monotonic()
+            return
+        idle = time.monotonic() - self._last_progress
+        if idle < self._no_picture_limit():
+            return
+        logger.info("No picture for %.0f s from %s (state %s, render ready %s): reconnecting. Recent: %s",
+                    idle, self._active_source, self._state, self._render_ready, self.timeline())
+        if self.mpv is not None:
+            self.mpv.command("stop")  # drop the dead connection now (frees the node's reader)
+        self._last_progress = time.monotonic()
+        self._retry_live("No picture. Reconnecting…")
+
+    def timeline(self) -> str:
+        """Recent state changes, e.g. "connecting@0.0s playing@0.8s reconnecting@31.2s"."""
+        if not self._state_log:
+            return "-"
+        start = self._state_log[0][0]
+        return " ".join(f"{state}@{at - start:.1f}s" for at, state in self._state_log)
 
     # ------------------------------------------------------------------ helpers
     def _set_state(self, state: str) -> None:
         if state != self._state:
             self._state = state
+            self._state_log.append((time.monotonic(), state))
+            logger.debug("%s -> %s (%s)", id(self), state, self._active_source)
             self.playStateChanged.emit()
         if state == "playing" and self._error_text:
             self._error_text = ""
@@ -384,6 +454,7 @@ class MpvPlayer(QObject):
     def _suspend(self) -> None:
         self._suspended = True
         self._suspended_at = time.monotonic()
+        self._watchdog.stop()
         self._end_quiet()
         if self._retry_timer.isActive():  # failing stream: try again once the grid is visible
             self._retry_timer.stop()
@@ -400,6 +471,8 @@ class MpvPlayer(QObject):
         self._quiet = True
         self._quiet_time_pos = self._time_pos
         self._quiet_timer.start()
+        self._last_progress = time.monotonic()
+        self._watchdog.start()
         if not self._reload_on_resume and not is_hls and paused_for <= RESUME_UNPAUSE_SECONDS:
             self.mpv["pause"] = False  # RTSP still connected: continues, catching up to live
             return
@@ -414,13 +487,21 @@ class MpvPlayer(QObject):
 
     @Slot()
     def _load_active_source(self) -> None:
-        if self._stopped or not self._active_source or not self._render_ready:
+        if self._stopped or not self._active_source:
             return
         if self._suspended:
             self._reload_on_resume = True
             return
         if not self._quiet:
             self._set_state("connecting" if self._failures == 0 else "reconnecting")
+        if self._mode == "live":
+            self._last_progress = time.monotonic()
+            self._watchdog.start()
+        if not self._render_ready:
+            # mpv's video output needs the surface's render context first. Used to wait silently ("idle", no
+            # overlay); now it shows "Connecting", asks the surface to draw, and the watchdog retries if it never comes.
+            self.renderWanted.emit()
+            return
         self._apply_mode_options()
         logger.debug("Loading %s (%s)", self._active_source, self._mode)
         self.mpv.loadfile(self._active_source)
@@ -442,10 +523,23 @@ class MpvPlayer(QObject):
         self._load_active_source()
 
     @Slot()
+    def reconnect(self) -> None:
+        """↻: drop the current connection and start a fresh one now (preferred protocol, no backoff)."""
+        if not self._source:
+            return
+        logger.info("Reconnect requested: %s (recent: %s)", self._source, self.timeline())
+        self._end_quiet()
+        self._reload_on_resume = False
+        if self.mpv is not None:
+            self.mpv.command("stop")
+        self.play()
+
+    @Slot()
     def stop(self) -> None:
         self.stopReverse()
         self._stopped = True
         self._retry_timer.stop()
+        self._watchdog.stop()
         if self.mpv is not None:
             self.mpv.command("stop")
         self._set_state("idle")

@@ -497,6 +497,16 @@ Item {
                 z: 2
             }
 
+            // ↻ fresh connection for the main stream (above the zoom / PTZ layers)
+            RefreshButton {
+                objectName: "expandRefresh"
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.margins: 8
+                z: 4
+                player: expandedVideo.player
+            }
+
             PtzOverlay {
                 id: ptzOverlay
                 anchors.fill: parent

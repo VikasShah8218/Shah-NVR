@@ -110,6 +110,7 @@ class MpvGlSurface(QQuickFramebufferObject):
         self._player = player
         self._link.bridge = player.bridge
         player.mpvCreated.connect(self.update)  # the renderer creates the context on its next render
+        player.renderWanted.connect(self.update)  # a load waits for the context (e.g. after "render-lost")
         player.frameReady.connect(self.update)
         self.playerChanged.emit()
         self.update()

@@ -151,6 +151,7 @@ class MpvSwSurface(QQuickPaintedItem):
         self._player = player
         self._state.bridge = player.bridge
         player.mpvCreated.connect(self._create_context)
+        player.renderWanted.connect(self._create_context)  # no-op when the context exists
         player.frameReady.connect(self.update)
         self.playerChanged.emit()
         if player.bridge.player is not None:
