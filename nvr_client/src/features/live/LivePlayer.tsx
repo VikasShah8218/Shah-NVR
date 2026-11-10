@@ -1,11 +1,12 @@
 import Hls from "hls.js"
-import { Loader2, Pause, VideoOff, Volume2, VolumeX } from "lucide-react"
+import { Loader2, Pause, RotateCw, VideoOff, Volume2, VolumeX } from "lucide-react"
 import type { CSSProperties } from "react"
-import { useEffect, useId, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useRef, useState } from "react"
 import { useLive } from "@/api/queries"
 import type { LiveInfo } from "@/api/types"
 import { useSettings, type LiveProtocol } from "@/lib/settings"
 import { cn } from "@/lib/utils"
+import { noPictureLimitMs, pushEvent, WATCHDOG_INTERVAL_MS } from "./watchdog"
 import { startWhep, webrtcDelayMs, type WhepSession } from "./whep"
 
 type Phase = "loading" | "playing" | "error"
@@ -30,6 +31,12 @@ export function pickStream(live: LiveInfo | undefined, profile: string) {
 /**
  * Live video for one camera profile. Tries WebRTC (MediaMTX WHEP) first and falls back to
  * LL-HLS; reconnects with backoff when the stream drops or the camera moves to another node.
+ *
+ * "No picture" watchdog: every 2 s it compares the browser's decoded-frame counter and the playback
+ * position with the previous check (no pixel analysis). A stream that connected but shows no new frame
+ * for 8 s (LL-HLS: buffer x2 + 4 s) reconnects. Before, a WebRTC session that was "connected" without
+ * video, or an HLS stall without a fatal error, stayed black forever. ↻ (corner button, the error overlay or
+ * `reconnectSignal` from the parent) starts a fresh connection at once.
  */
 export function LivePlayer({
   cameraId,
@@ -40,6 +47,8 @@ export function LivePlayer({
   onVideo,
   overlay = true,
   suspended = false,
+  showRefresh = false,
+  reconnectSignal = 0,
 }: {
   cameraId: number
   profile: string
@@ -50,6 +59,10 @@ export function LivePlayer({
   overlay?: boolean
   /** The expand / main-stream dialog is open: tear the stream down (no network, no decode) until it closes. */
   suspended?: boolean
+  /** ↻ in the top-right corner (on hover). Tiles put theirs in their own header and use `reconnectSignal`. */
+  showRefresh?: boolean
+  /** Bump to force a fresh connection from outside (a tile's header button). */
+  reconnectSignal?: number
 }) {
   const { settings } = useSettings()
   const hlsBufferSeconds = Math.max(2, Math.min(10, Number(settings.hlsBufferSeconds) || 5))
@@ -68,6 +81,23 @@ export function LivePlayer({
   const volumeRef = useRef(volume)
   const webrtcUrl = stream?.webrtc
   const hlsUrl = stream?.hls
+  const events = useRef<string[]>([]) // recent player steps, logged when the watchdog fires (diagnosis)
+  const startedAt = useRef(0) // when the current connection attempt started (step times are relative to it)
+
+  /** ↻: drop the connection and start a fresh one now (preferred protocol, no backoff). */
+  const reconnect = useCallback(() => {
+    console.info(`[live] reconnect requested: camera ${cameraId} ${profile}`, events.current.join(" "))
+    failures.current = 0
+    setInfo(EMPTY)
+    setAttempt((a) => a + 1)
+  }, [cameraId, profile])
+
+  const lastSignal = useRef(reconnectSignal)
+  useEffect(() => {
+    if (reconnectSignal === lastSignal.current) return // only a new bump reconnects
+    lastSignal.current = reconnectSignal
+    reconnect()
+  }, [reconnectSignal, reconnect])
 
   useEffect(() => {
     const container = containerRef.current
@@ -111,20 +141,30 @@ export function LivePlayer({
     const video = videoRef.current
     if (!video || !webrtcUrl || !hlsUrl || !active || suspended) return
     let cancelled = false
+    let retrying = false // one retry per attempt (a lost WebRTC link and the watchdog may both fire)
     let whep: WhepSession | null = null
     let hls: Hls | null = null
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     let statsTimer: ReturnType<typeof setInterval> | undefined
     let hlsStartTimer: ReturnType<typeof setTimeout> | undefined
+    let watchdogTimer: ReturnType<typeof setInterval> | undefined
+    let mode: "webrtc" | "hls" = protocol === "hls" ? "hls" : "webrtc"
+    startedAt.current = performance.now()
+    const note = (step: string) => pushEvent(events.current, step, performance.now() - startedAt.current)
 
     const retry = (message: string) => {
-      if (cancelled) return
+      if (cancelled || retrying) return
+      retrying = true
+      note(`retry(${message})`)
       setInfo((i) => ({ ...i, phase: "error", error: message }))
       const backoff = Math.min(30_000, 2000 * 2 ** Math.min(failures.current++, 4))
       retryTimer = setTimeout(() => !cancelled && setAttempt((a) => a + 1), backoff)
     }
 
     const playHls = () => {
+      mode = "hls"
+      lastProgress = performance.now()
+      note("hls")
       setInfo((i) => ({ ...i, protocol: "HLS", phase: "loading", error: null }))
       if (Hls.isSupported()) {
         // Stay deliberately behind the live edge. The configured safety window absorbs short
@@ -191,6 +231,7 @@ export function LivePlayer({
     }
 
     const playWebrtc = async () => {
+      note("webrtc")
       setInfo((i) => ({ ...i, protocol: "WebRTC", phase: "loading", error: null }))
       try {
         const session = await startWhep(`${webrtcUrl}/whep`, video)
@@ -199,6 +240,7 @@ export function LivePlayer({
           return
         }
         whep = session
+        note("webrtc-connected")
         video.play().catch(() => {})
         session.pc.addEventListener("connectionstatechange", () => {
           const st = session.pc.connectionState
@@ -215,6 +257,33 @@ export function LivePlayer({
       }
     }
 
+    // "No picture" watchdog: new decoded frames = alive. Only the frame counter: with WebRTC (a MediaStream)
+    // currentTime keeps running in real time even when no frame arrives. currentTime is the fallback only for
+    // browsers without getVideoPlaybackQuality.
+    const progressMark = () => video.getVideoPlaybackQuality ? video.getVideoPlaybackQuality().totalVideoFrames : video.currentTime
+    let lastMark = progressMark()
+    let lastProgress = performance.now()
+    watchdogTimer = setInterval(() => {
+      if (cancelled || retrying) return
+      const mark = progressMark()
+      const now = performance.now()
+      if (mark !== lastMark) {
+        lastMark = mark
+        lastProgress = now
+        return
+      }
+      const limit = noPictureLimitMs(mode, hlsBufferSeconds)
+      if (now - lastProgress < limit) return
+      note("no-picture")
+      console.info(`[live] no picture for ${Math.round((now - lastProgress) / 1000)} s (${mode}, camera ${cameraId} ${profile}): reconnecting`,
+        events.current.join(" "))
+      whep?.close()
+      whep = null
+      hls?.destroy()
+      hls = null
+      retry("No picture. Reconnecting…")
+    }, WATCHDOG_INTERVAL_MS)
+
     video.muted = mutedRef.current
     video.volume = volumeRef.current
     if (protocol === "hls") playHls()
@@ -225,13 +294,14 @@ export function LivePlayer({
       clearTimeout(retryTimer)
       clearTimeout(hlsStartTimer)
       clearInterval(statsTimer)
+      clearInterval(watchdogTimer)
       whep?.close()
       hls?.destroy()
       video.removeAttribute("src")
       video.srcObject = null
     }
     // `attempt` re-runs the effect for reconnects; URLs change when the camera moves node.
-  }, [webrtcUrl, hlsUrl, protocol, attempt, active, suspended, hlsBufferSeconds])
+  }, [webrtcUrl, hlsUrl, protocol, attempt, active, suspended, hlsBufferSeconds, cameraId, profile])
 
   const showAudio = stream?.audio_state === "available" || stream?.audio_state === "advertised_not_observed" || stream?.audio_state === "unsupported"
   const audioPlayable = showAudio && stream?.audio_state !== "unsupported" && (info.protocol !== "HLS" || stream.audio_codec === "aac")
@@ -244,6 +314,7 @@ export function LivePlayer({
   }
 
   const onPlaying = () => {
+    pushEvent(events.current, "playing", performance.now() - startedAt.current)
     failures.current = 0
     setInfo((i) => ({ ...i, phase: "playing", error: null, width: videoRef.current?.videoWidth ?? 0, height: videoRef.current?.videoHeight ?? 0 }))
   }
@@ -255,7 +326,7 @@ export function LivePlayer({
   const errorText = suspended ? null : (liveError ?? (info.phase === "error" ? info.error : null))
 
   return (
-    <div ref={containerRef} className={cn("relative overflow-hidden bg-video", className)}>
+    <div ref={containerRef} className={cn("group/player relative overflow-hidden bg-video", className)}>
       <video
         ref={videoRef}
         className="size-full object-contain"
@@ -279,8 +350,28 @@ export function LivePlayer({
             <VideoOff className="size-5" />
             {errorText}
             {!liveError && <span className="text-[11px]">Retrying…</span>}
+            {!liveError && (
+              <button type="button" className="mt-1 flex items-center gap-1 rounded bg-white/10 px-2 py-0.5 text-[11px] text-white/90 hover:bg-white/20"
+                onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); reconnect() }}>
+                <RotateCw className="size-3" /> Reconnect now
+              </button>
+            )}
           </span>
         </div>
+      )}
+      {showRefresh && !suspended && (
+        <button
+          type="button"
+          className="absolute top-2 right-2 z-10 grid size-7 place-items-center rounded bg-black/55 text-white opacity-0 transition-opacity group-hover/player:opacity-100 hover:bg-white/20 focus-visible:opacity-100"
+          title="Reconnect (fresh connection)"
+          aria-label="Reconnect"
+          onPointerDown={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); reconnect() }}
+        >
+          <RotateCw className="size-4" />
+        </button>
       )}
       {suspended && (
         <div className="absolute inset-0 grid place-items-center bg-video/60 text-xs text-white/85">

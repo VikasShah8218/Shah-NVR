@@ -15,6 +15,7 @@
     "test:thumbs": "node --experimental-strip-types --test tests/thumbs.test.ts",
     "test:pager": "node --experimental-strip-types --test tests/pager.test.ts",
     "test:groups": "node --experimental-strip-types --test tests/groupTree.test.ts",
+    "test:watchdog": "node --experimental-strip-types --test tests/watchdog.test.ts",
     "preview": "vite preview",
     "gen:api": "openapi-typescript openapi/central.json -o src/api/central.d.ts && openapi-typescript openapi/node.json -o src/api/node.d.ts"
   },

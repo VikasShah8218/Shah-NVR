@@ -155,6 +155,14 @@ Rectangle {
                 tip: Live.activeAudioCameraId === tile.cameraId ? "Mute audio" : "Listen to this camera"
                 onClicked: Live.toggleAudio(tile.cameraId)
             }
+            RefreshButton {
+                objectName: "tileRefresh"
+                readonly property string playState: tile.video ? tile.video.player.playState : ""
+                visible: !tile.suspended && (hover.hovered || playState === "reconnecting" || playState === "error")
+                implicitWidth: 24
+                implicitHeight: 24
+                player: tile.video ? tile.video.player : null
+            }
             AppButton {
                 id: menuButton
                 visible: hover.hovered || menu.visible
@@ -194,6 +202,12 @@ Rectangle {
         AppMenuItem { text: "LL-HLS"; radio: true; marked: tile.protocolOverride === "hls"; onTriggered: tile.protocolOverride = "hls" }
         MenuSeparator {}
         AppMenuItem { text: "Open main stream"; iconName: "maximize"; onTriggered: tile.expand(tile.cameraId) }
+        AppMenuItem {
+            text: "Reconnect"
+            iconName: "refresh-cw"
+            enabled: !!tile.video && !tile.suspended
+            onTriggered: tile.video.player.reconnect()
+        }
         AppMenuItem {
             text: "Snapshot"
             iconName: "image-down"

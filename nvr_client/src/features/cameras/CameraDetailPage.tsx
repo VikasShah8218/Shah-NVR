@@ -112,7 +112,7 @@ function Overview({ camera: c }: { camera: Camera }) {
         </CardHeader>
         <CardContent>
           {c.enabled ? (
-            <LivePlayer cameraId={c.id} profile={profile} protocol={settings.liveProtocol} className="aspect-video w-full rounded-md" />
+            <LivePlayer cameraId={c.id} profile={profile} protocol={settings.liveProtocol} className="aspect-video w-full rounded-md" showRefresh />
           ) : (
             <div className="grid aspect-video place-items-center rounded-md bg-video text-sm text-muted-foreground">Camera is disabled</div>
           )}

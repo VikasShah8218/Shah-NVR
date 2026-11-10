@@ -17,6 +17,7 @@ Rectangle {
     property bool showInfo: true
     property string waitingText: "" // shown while there is no source yet (e.g. "Camera is disabled")
     property bool suspended: false  // live only: pause (keep the last frame, stop downloading); see MpvPlayer
+    property bool showRefresh: false // live: ↻ in the top-right corner (on hover, always while reconnecting)
     readonly property alias player: mpv
     readonly property string protocolLabel: mpv.activeSource.startsWith("rtsp") ? "RTSP"
         : mpv.activeSource.includes(".m3u8") ? (mode === "live" ? "LL-HLS" : "HLS") : ""
@@ -73,6 +74,19 @@ Rectangle {
             wrapMode: Text.WordWrap
             elide: Text.ElideNone
         }
+    }
+
+    // ↻ fresh connection (callers whose overlays cover the video place their own RefreshButton)
+    HoverHandler { id: viewHover }
+    RefreshButton {
+        objectName: "videoRefresh"
+        visible: view.showRefresh && view.mode === "live" && view.source !== "" && !view.suspended
+                 && (viewHover.hovered || mpv.playState === "reconnecting" || mpv.playState === "error")
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: 6
+        z: 2
+        player: mpv
     }
 
     // info overlay

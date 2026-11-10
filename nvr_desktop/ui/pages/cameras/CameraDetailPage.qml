@@ -112,6 +112,7 @@ PageScroll {
                     source: active ? urls.source : ""
                     fallbackSource: active ? urls.fallback : ""
                     player.muted: true
+                    showRefresh: true
                     waitingText: !root.c.enabled ? "Camera is disabled" : urls.error !== "" ? urls.error : "Loading stream URLs…"
                 }
             }
