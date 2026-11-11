@@ -55,6 +55,7 @@ import logging
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 from datetime import timedelta
 from functools import partial
 
@@ -65,6 +66,7 @@ from PySide6.QtGui import QGuiApplication
 from app.features.playback.transport import (
     REVERSE_TICK_MS, ReverseAnchor, reverse_done, reverse_target, seek_precision,
 )
+from app.core.redact import redact
 from app.video import render_mode
 from app.video.profiles import BASE_OPTIONS, TIMELINE_EPOCH, options_for
 
@@ -91,7 +93,22 @@ def _window_shown() -> bool:
 
 
 def _log_mpv_message(level: str, prefix: str, text: str) -> None:
-    logger.debug("mpv[%s] %s: %s", level, prefix, text.strip())
+    logger.debug("mpv[%s] %s: %s", level, prefix, redact(text.strip()))
+
+
+# Sign-in (docs/DESKTOP_AUTH_PLAN.md §6): central playback playlists need `access_token` in the URL, because mpv
+# cannot send our Authorization header. The token lasts 10 minutes, so it is added on *every* load (play, reconnect,
+# retry), never stored in `source`. main.py installs AuthSession.sign_url; without sign-in URLs pass unchanged.
+_source_signer: Callable[[str], str] | None = None
+
+
+def set_source_signer(signer: Callable[[str], str] | None) -> None:
+    global _source_signer
+    _source_signer = signer
+
+
+def _signed(url: str) -> str:
+    return _source_signer(url) if _source_signer else url
 
 
 class MpvBridge(QObject):
@@ -504,7 +521,7 @@ class MpvPlayer(QObject):
             return
         self._apply_mode_options()
         logger.debug("Loading %s (%s)", self._active_source, self._mode)
-        self.mpv.loadfile(self._active_source)
+        self.mpv.loadfile(_signed(self._active_source))
 
     # ------------------------------------------------------------------ QML API
     @Slot()

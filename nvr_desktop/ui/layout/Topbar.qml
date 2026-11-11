@@ -1,10 +1,11 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import App
 import "../theme"
 import "../components"
 
-// Top bar (port of AppLayout.tsx Topbar): central status, nodes healthy, cameras recording, clock.
+// Top bar (port of AppLayout.tsx Topbar): central status, nodes healthy, cameras recording, clock, user menu.
 Rectangle {
     id: bar
 
@@ -70,6 +71,14 @@ Rectangle {
 
         Item { Layout.fillWidth: true }
 
+        // token refresh failed because of the network: the session is kept and retried
+        Row {
+            visible: Auth.reconnecting
+            spacing: 6
+            Spinner { anchors.verticalCenter: parent.verticalCenter }
+            AppText { text: "Reconnecting…"; color: Theme.warning; font.pixelSize: Theme.textXs }
+        }
+
         Row {
             spacing: 8
             Icon { name: "clock"; size: 16; color: Theme.mutedForeground; anchors.verticalCenter: parent.verticalCenter }
@@ -78,6 +87,50 @@ Rectangle {
                 color: Theme.mutedForeground
                 font.features: { "tnum": 1 }
             }
+        }
+
+        // signed-in user (only when sign-in is on)
+        AppButton {
+            id: userButton
+            objectName: "userMenuButton"
+            visible: Auth.enabled && Auth.state === "signed_in"
+            variant: "ghost"
+            size: "sm"
+            iconName: "circle-user"
+            text: Auth.user.display_name || Auth.user.username || ""
+            onClicked: userMenu.popup(userButton, userButton.width - userMenu.width, userButton.height + 4)
+        }
+    }
+
+    AppMenu {
+        id: userMenu
+        implicitWidth: 260
+        Item {
+            implicitWidth: 260
+            implicitHeight: header.implicitHeight + 16
+            ColumnLayout {
+                id: header
+                x: 12
+                y: 8
+                width: parent.width - 24
+                spacing: 2
+                AppText { text: Auth.user.display_name || ""; font.weight: Font.Medium; Layout.fillWidth: true }
+                AppText {
+                    text: (Auth.user.username || "") + ((Auth.user.roles || []).length ? " · " + Auth.user.roles.join(", ") : "")
+                    variant: "small"
+                    Layout.fillWidth: true
+                }
+                AppText { text: "Signed in to " + Auth.serverUrl; variant: "small"; Layout.fillWidth: true }
+            }
+        }
+        MenuSeparator {}
+        AppMenuItem { text: "Account"; iconName: "user"; onTriggered: Router.go("settings") }
+        AppMenuItem {
+            objectName: "signOutItem"
+            text: "Sign out (all devices)"
+            iconName: "log-out"
+            danger: true
+            onTriggered: Auth.signOut()
         }
     }
 }

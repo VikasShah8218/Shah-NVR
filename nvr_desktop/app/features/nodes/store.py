@@ -36,6 +36,8 @@ class NodesStore(BaseStore):
 
     @Slot()
     def refresh(self) -> None:
+        if not self.allowed(23, 40, 24):  # NODES_MANAGE, DASHBOARD, ASSIGNMENTS (central's rule for GET /nodes)
+            return
         self.fetch("nodes", lambda: [n.to_qml() for n in self.api.nodes()], self._apply)
 
     def _apply(self, nodes: list[dict]) -> None:

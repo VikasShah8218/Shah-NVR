@@ -15,6 +15,7 @@ ListView {
     property bool ungroupedSelected: false
     property bool selectable: false      // a click on a group selects it (management, pickers); else it expands
     property bool showActions: false     // ▶ play / manage buttons on group rows (live)
+    property bool canManage: true        // show the manage button (false without the groups permission)
     property bool dragItems: false       // cameras and groups can be dragged (needs dragGhost + dragRoot)
     property bool dropGroups: false      // a group can be dropped on another group (management: move)
     property var onView: []              // camera ids on the live grid ("on view" badge)
@@ -181,6 +182,7 @@ ListView {
                     onClicked: tree.playGroup(row.model)
                 }
                 AppButton {
+                    visible: tree.canManage
                     variant: "ghost"; size: "icon"; iconName: "settings"; implicitHeight: 24
                     tip: "Manage group"
                     onClicked: tree.manageGroup(row.model)

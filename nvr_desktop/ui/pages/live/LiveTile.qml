@@ -149,7 +149,7 @@ Rectangle {
                 font.pixelSize: Theme.textXs
             }
             AppButton {
-                visible: (hover.hovered || Live.activeAudioCameraId === tile.cameraId) && (tile.urls.audio_state === "available" || tile.urls.audio_state === "advertised_not_observed")
+                visible: Auth.allowed["7"] === true && (hover.hovered || Live.activeAudioCameraId === tile.cameraId) && (tile.urls.audio_state === "available" || tile.urls.audio_state === "advertised_not_observed")
                 variant: "ghost"; size: "icon"; implicitWidth: 24; implicitHeight: 24
                 iconName: Live.activeAudioCameraId === tile.cameraId ? "volume-2" : "volume-x"
                 tip: Live.activeAudioCameraId === tile.cameraId ? "Mute audio" : "Listen to this camera"

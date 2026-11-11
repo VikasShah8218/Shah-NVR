@@ -204,7 +204,7 @@ class PlaybackStore(BaseStore):
 
     def _refresh_exports(self, camera_id: int | None = None) -> None:
         cid = camera_id or self._camera_id
-        if not cid:
+        if not cid or not self.allowed(3):  # Perm.EXPORT
             return
         page = self._export_page
 
@@ -345,6 +345,12 @@ class PlaybackStore(BaseStore):
         return self.api.playlist_url(self._camera_id, self._profile, _utc(self._play_from), _utc(self._play_to), self._access)
 
     playlistUrl = Property(str, _playlist_url, notify=playChanged)
+
+    @Slot(result=str)
+    def shareUrl(self) -> str:
+        """The playlist URL for another player (VLC). With sign-in it carries a token that works for ~10 minutes."""
+        url = self._playlist_url()
+        return self.ctx.auth.sign_url(url) if url and self.ctx.auth else url
     playhead = Property(float, lambda self: self._playhead, notify=playChanged)
     playFrom = Property(float, lambda self: self._play_from, notify=playChanged)
     playTo = Property(float, lambda self: self._play_to, notify=playChanged)
@@ -376,7 +382,8 @@ class PlaybackStore(BaseStore):
         target = downloads_folder() / (output_name or f"export-{export_id}.mp4")
         url = self.api.export_download_url(export_id, self._access)
         self.ctx.toasts.info(f"Downloading {target.name}…")
-        run_task(lambda: node_api.download(url, target),
+        api = self.api
+        run_task(lambda: node_api.download(url, target, headers=api.auth_headers()),
                  lambda path: self.ctx.toasts.success(f"Saved {path}"),
                  lambda exc: self.ctx.toasts.error(str(exc)))
 

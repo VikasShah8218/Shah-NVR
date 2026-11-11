@@ -18,6 +18,8 @@ Rectangle {
         { page: "discover", label: "Discover", icon: "search" },
         { page: "nodes", label: "Media Nodes", icon: "server" },
         { page: "assignments", label: "Assignments", icon: "arrow-left-right" },
+        { page: "access", label: "Access", icon: "key-round" },
+        { page: "audit", label: "Audit log", icon: "scroll-text" },
         { page: "settings", label: "Settings", icon: "settings" }
     ]
     // detail pages highlight their parent section
@@ -74,6 +76,8 @@ Rectangle {
                     required property var modelData
                     readonly property bool active: sidebar.section === modelData.page
 
+                    visible: Auth.pages[modelData.page] === true  // only pages the user's role allows
+                    objectName: "nav-" + modelData.page
                     Layout.fillWidth: true
                     implicitHeight: 36
                     radius: Theme.radiusSm + 2

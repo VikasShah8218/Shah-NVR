@@ -6,7 +6,9 @@ on a worker thread, so the UI thread never waits on the network.
 
 from __future__ import annotations
 
+import time
 from datetime import datetime
+from typing import Protocol
 from urllib.parse import quote, urlencode
 
 import httpx
@@ -58,9 +60,19 @@ def _scope(group_id: int | None, ungrouped: bool, recursive: bool) -> dict:
             "recursive": True if recursive and group_id is not None else None}
 
 
+class TokenSource(Protocol):
+    """The sign-in session (app/core/auth/session.py::AuthSession); None when the client has none."""
+
+    def token(self) -> str | None: ...
+    def valid_token(self) -> str | None: ...
+    def refresh_after_expired(self, stale: str | None) -> str: ...
+    def report(self, code: str | None) -> None: ...
+
+
 class CentralApi:
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, auth: TokenSource | None = None):
         self.base_url = base_url.rstrip("/")
+        self.auth = auth
         self._http = httpx.Client(base_url=self.base_url, timeout=settings.HTTP_TIMEOUT_SECONDS)
 
     def close(self) -> None:
@@ -97,11 +109,31 @@ class CentralApi:
         return self._request("POST", self._encoder_path(camera_id, profile) + "/resolve", timeout=75)
 
     # ------------------------------------------------------------------ plumbing
-    def _request(self, method: str, path: str, *, raw: bool = False, **kwargs):
+    def _send(self, method: str, path: str, token: str | None, kwargs: dict) -> httpx.Response:
+        headers = dict(kwargs.pop("headers", None) or {})
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
         try:
-            response = self._http.request(method, path, **kwargs)
+            return self._http.request(method, path, headers=headers, **kwargs)
         except httpx.HTTPError as exc:
             raise ApiError(0, f"Central manager unreachable ({self.base_url})") from exc
+
+    def _request(self, method: str, path: str, *, raw: bool = False, **kwargs):
+        """One call. With a sign-in session: Bearer token; an expired token is refreshed once and the call repeated
+        (safe for writes too: central's guard refuses before the handler runs); other 401s end the session."""
+        token = self.auth.token() if self.auth else None
+        response = self._send(method, path, token, dict(kwargs))
+        code = response.headers.get("X-Auth-Error")
+        if response.status_code == 401 and self.auth:
+            if code == "token_expired":
+                token = self.auth.refresh_after_expired(token)
+                response = self._send(method, path, token, dict(kwargs))
+                code = response.headers.get("X-Auth-Error")
+            if response.status_code == 401:
+                self.auth.report(code)
+        elif response.status_code == 503 and code == "auth_syncing":  # central just started: one short retry
+            time.sleep(1.5)
+            response = self._send(method, path, token, dict(kwargs))
         raise_for_response(response)
         if raw:
             return response
@@ -265,6 +297,11 @@ class CentralApi:
     def export_download_url(self, export_id: str, access: str = "lan") -> str:
         return f"{self.base_url}/api/v1/exports/{export_id}/download?{urlencode({'access': access})}"
 
+    def auth_headers(self) -> dict:
+        """Authorization header for a download made outside this client (worker thread: may refresh first)."""
+        token = self.auth.valid_token() if self.auth else None
+        return {"Authorization": f"Bearer {token}"} if token else {}
+
     # ------------------------------------------------------------------ bookmarks
     def bookmarks(self, *, camera_id: int | None = None, profile: str | None = None, q: str | None = None,
                   start: datetime | None = None, end: datetime | None = None, order: str = "asc",
@@ -395,3 +432,33 @@ class CentralApi:
 
     def run_scheduler(self) -> None:
         self._request("POST", "/api/v1/assignments/run-scheduler")
+
+    # ------------------------------------------------------------------ sign-in, access grants, audit
+    # (docs/DESKTOP_AUTH_PLAN.md; plain dicts: QML shows them as they come)
+    def me(self) -> dict:
+        return self._request("GET", "/api/v1/auth/me")
+
+    def access_subjects(self) -> dict:
+        """{roles: [name], users: [{id, username, display_name, roles, is_active}]}"""
+        return self._request("GET", "/api/v1/access/subjects")
+
+    def access_summary(self) -> list[dict]:
+        """[{subject_type, subject, all_cameras, groups: count, cameras: count}]"""
+        return self._request("GET", "/api/v1/access/grants")
+
+    def access_grants(self, subject_type: str, subject: str) -> dict:
+        """{subject_type, subject, all_cameras, groups: [{id, name}], cameras: [{id, name}]}"""
+        return self._request("GET", "/api/v1/access/grants", params={"subject_type": subject_type, "subject": subject})
+
+    def put_access_grants(self, body: dict) -> dict:
+        return self._request("PUT", "/api/v1/access/grants", json=body)
+
+    def audit(self, *, username: str | None = None, action: str | None = None, camera_id: int | None = None,
+              status: str | None = None, start: datetime | None = None, end: datetime | None = None,
+              limit: int = 50, offset: int = 0) -> tuple[list[dict], int]:
+        params = _clean({"username": (username or "").strip(), "action": (action or "").strip(),
+                         "camera_id": camera_id or None, "status": status,
+                         "start": start.isoformat() if start else None, "end": end.isoformat() if end else None,
+                         "limit": limit, "offset": offset})
+        body = self._request("GET", "/api/v1/audit", params=params)
+        return body["items"], body["total"]

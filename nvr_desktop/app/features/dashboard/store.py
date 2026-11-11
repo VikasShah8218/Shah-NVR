@@ -46,6 +46,8 @@ class DashboardStore(BaseStore):
     # ------------------------------------------------------------------ camera alerts (paged by central)
     @Slot()
     def refreshAlerts(self) -> None:
+        if not self.allowed(40):  # Perm.DASHBOARD; polls in the background, so never ask without permission
+            return
         self._seq += 1
         seq, level, page = self._seq, self._level, self._page
 

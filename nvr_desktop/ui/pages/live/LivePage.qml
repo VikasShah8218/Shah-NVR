@@ -138,6 +138,7 @@ Item {
                     emptyText: "No groups yet. Create them on the Groups page, or use All cameras."
                     onCameraClicked: row => Live.place(row.id)
                     onPlayGroup: row => Live.playGroup(row.id, row.name)
+                    canManage: Auth.allowed["22"] === true  // GROUPS_MANAGE
                     onManageGroup: row => Router.go("groups", row.id)
                 }
 
@@ -511,7 +512,7 @@ Item {
                 id: ptzOverlay
                 anchors.fill: parent
                 z: 3
-                visible: !!root.expandedCamera && root.expandedCamera.has_ptz
+                visible: !!root.expandedCamera && root.expandedCamera.has_ptz && Auth.allowed["5"] === true
                 cameraId: root.expandedCamera ? root.expandedCamera.id : 0
                 profile: "main"
             }
@@ -521,7 +522,7 @@ Item {
             AppButton {
                 text: root.expandedCamera && Live.activeAudioCameraId === root.expandedCamera.id ? "Mute audio" : "Listen"
                 iconName: root.expandedCamera && Live.activeAudioCameraId === root.expandedCamera.id ? "volume-2" : "volume-x"
-                visible: expandedVideo.urls.audio_state === "available" || expandedVideo.urls.audio_state === "advertised_not_observed"
+                visible: Auth.allowed["7"] === true && (expandedVideo.urls.audio_state === "available" || expandedVideo.urls.audio_state === "advertised_not_observed")
                 onClicked: if (root.expandedCamera) Live.toggleAudio(root.expandedCamera.id)
             }
             Item { Layout.fillWidth: true }

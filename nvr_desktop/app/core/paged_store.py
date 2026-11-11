@@ -22,6 +22,9 @@ SEARCH_DEBOUNCE_MS = 300
 class PagedStore(BaseStore):
     pageChanged = Signal()  # page, size, total, rows
     searchChanged = Signal()
+    # permissions that may load this list (any one; empty = everyone). Lists poll in the background, so a user
+    # without them never asks (each refused request would also be written to the audit log).
+    PERMS: tuple[int, ...] = ()
 
     def __init__(self, ctx: AppContext, roles: list[str], *, page_size: int = DEFAULT_PAGE_SIZE,
                  poll_seconds: float | None = None, key: str = "id", parent=None):
@@ -57,6 +60,8 @@ class PagedStore(BaseStore):
 
     @Slot()
     def refresh(self) -> None:
+        if not self.allowed(*self.PERMS):
+            return
         if not self._can_load():
             self._apply([], 0)
             return

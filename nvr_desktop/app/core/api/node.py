@@ -59,10 +59,13 @@ def media_file_url(api_url: str, segment_id: str) -> str:
     return f"{api_url.rstrip('/')}/api/v1/media/{segment_id}/file.mp4"
 
 
-def download(url: str, target: Path, on_progress: Callable[[int, int], None] | None = None) -> Path:
-    """Stream a file to disk (used for chunk downloads). Returns the saved path."""
+def download(url: str, target: Path, on_progress: Callable[[int, int], None] | None = None,
+             headers: dict | None = None) -> Path:
+    """Stream a file to disk (chunk and export downloads). Returns the saved path.
+    httpx drops the Authorization header when a redirect leaves the original host."""
     try:
-        with httpx.stream("GET", url, timeout=settings.HTTP_TIMEOUT_SECONDS * 60, follow_redirects=True) as response:
+        with httpx.stream("GET", url, timeout=settings.HTTP_TIMEOUT_SECONDS * 60, follow_redirects=True,
+                          headers=headers or {}) as response:
             if response.status_code >= 400:
                 response.read()  # load the error body so its message can be shown
                 raise_for_response(response)

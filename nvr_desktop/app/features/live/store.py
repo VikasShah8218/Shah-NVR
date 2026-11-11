@@ -54,9 +54,23 @@ class LiveStore(BaseStore):
         self.urlsChanged.connect(self._bump_revision)
         self.gridChanged.connect(self._track_tiles)
         self._poller = Poller(self.refresh, 15, self)
+        ctx.centralChanged.connect(self._reload_grid)  # another user / server: their own saved grid
         ctx.centralChanged.connect(self.refresh)
         self._track_tiles()
         self._poller.start()
+
+    def _reload_grid(self) -> None:
+        layout, tiles = self.ctx.prefs.live_layout()
+        scope = self.ctx.prefs.live_scope()
+        if (layout, tiles, scope) == (self._layout, self._tiles, self._scope):
+            return
+        self._layout, self._tiles, self._scope = layout, tiles, scope
+        self._urls.clear()
+        self._url_errors.clear()
+        self._grid_total, self._grid_page = None, 0
+        self.gridChanged.emit()
+        self.urlsChanged.emit()
+        self.pagesChanged.emit()
 
     def _track_tiles(self) -> None:
         self._cameras.track("live", [t for t in self._tiles[: self._layout] if t])
@@ -64,6 +78,8 @@ class LiveStore(BaseStore):
     # ------------------------------------------------------------------ live URLs
     @Slot()
     def refresh(self) -> None:
+        if not self.allowed(1):  # Perm.LIVE; polls in the background
+            return
         for camera_id in {t for t in self._tiles if t}:
             self.ensureUrls(camera_id, force=True)
         scope = self._scope

@@ -115,6 +115,7 @@ PageScroll {
         Item { Layout.fillWidth: true }
         AppButton {
             objectName: "addBookmarkButton"
+            visible: Auth.allowed["4"] === true
             text: "Bookmark"
             iconName: "bookmark-plus"
             variant: "outline"
@@ -122,6 +123,7 @@ PageScroll {
             onClicked: bookmarkDialog.openAdd(root.hasSource ? Playback.playhead : 0)
         }
         AppButton {
+            visible: Auth.allowed["3"] === true
             text: "Export"
             iconName: "download"
             enabled: Playback.cameraId > 0 && Playback.hasTimeline
@@ -132,7 +134,7 @@ PageScroll {
             iconName: "copy"
             variant: "outline"
             enabled: root.hasSource
-            onClicked: Utils.copy(Playback.playlistUrl, "Playlist URL copied (open it in VLC)")
+            onClicked: Utils.copy(Playback.shareUrl(), Auth.enabled ? "Playlist URL copied (open it in VLC within 10 minutes)" : "Playlist URL copied (open it in VLC)")
         }
     }
 
@@ -473,6 +475,7 @@ PageScroll {
                 AppText { text: modelData.origin === "CAMERA_SD" ? "Camera SD" : "NVR"; color: modelData.origin === "CAMERA_SD" ? Theme.primary : Theme.foreground; Layout.preferredWidth: 100 }
                 AppText { text: "node " + modelData.node_id; variant: "muted"; Layout.preferredWidth: 90 }
                 AppButton {
+                    enabled: Auth.allowed["3"] === true  // chunk download = EXPORT
                     variant: "ghost"; size: "icon"; iconName: "download"; tip: "Download MP4"
                     Layout.preferredWidth: 36
                     onClicked: Playback.download(modelData.id, modelData.node_id)

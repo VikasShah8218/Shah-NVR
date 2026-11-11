@@ -40,6 +40,7 @@ class Preferences(QObject):
         self._render_mode_at_start = "auto"
         self._active_gpu = ""  # OpenGL renderer name probed at startup ("" in CPU mode)
         self._gpu_preference_at_start = gpu_preference.read()
+        self._profile = ""  # per-user prefix of the Live grid keys ("" = shared, auth off; see set_profile)
 
     # ------------------------------------------------------------------ helpers
     def _get(self, key: str, default, kind=str):
@@ -164,18 +165,22 @@ class Preferences(QObject):
     playbackVolume = Property(float, _get_playback_volume, _set_playback_volume, notify=playbackVolumeChanged)
 
     # ------------------------------------------------------------------ live grid (used by LiveStore)
+    def set_profile(self, key: str) -> None:
+        """Keep the Live grid per signed-in user (docs/DESKTOP_AUTH_PLAN.md DD4): "" = today's shared keys."""
+        self._profile = f"profiles/{key}/" if key else ""
+
     def live_layout(self) -> tuple[int, list[int | None]]:
-        layout = self._get("live/layout", 4, int)
+        layout = self._get(f"{self._profile}live/layout", 4, int)
         try:
-            tiles = json.loads(self._store.value("live/tiles", "null")) or DEFAULT_TILES
+            tiles = json.loads(self._store.value(f"{self._profile}live/tiles", "null")) or DEFAULT_TILES
         except (TypeError, ValueError):
             tiles = DEFAULT_TILES
         tiles = (list(tiles) + DEFAULT_TILES)[:16]
         return (layout if layout in (1, 4, 9, 16) else 4), tiles
 
     def save_live_layout(self, layout: int, tiles: list[int | None]) -> None:
-        self._store.setValue("live/layout", int(layout))
-        self._store.setValue("live/tiles", json.dumps(tiles))
+        self._store.setValue(f"{self._profile}live/layout", int(layout))
+        self._store.setValue(f"{self._profile}live/tiles", json.dumps(tiles))
 
     def group_tree_expanded(self, key: str) -> str:
         """Expanded group keys of one group tree (a JSON list; app/features/groups/tree_store.py)."""
@@ -187,7 +192,7 @@ class Preferences(QObject):
     def live_scope(self) -> dict | None:
         """The group played on the grid ({"groupId", "name"}; docs/GROUPING_PLAN.md), or None."""
         try:
-            scope = json.loads(self._store.value("live/scope", "null"))
+            scope = json.loads(self._store.value(f"{self._profile}live/scope", "null"))
         except (TypeError, ValueError):
             return None
         if isinstance(scope, dict) and isinstance(scope.get("groupId"), int) and scope["groupId"] > 0:
@@ -195,7 +200,7 @@ class Preferences(QObject):
         return None
 
     def save_live_scope(self, scope: dict | None) -> None:
-        self._store.setValue("live/scope", json.dumps(scope))
+        self._store.setValue(f"{self._profile}live/scope", json.dumps(scope))
 
     # ------------------------------------------------------------------ window state
     def window_state(self) -> tuple[QRect | None, bool]:
