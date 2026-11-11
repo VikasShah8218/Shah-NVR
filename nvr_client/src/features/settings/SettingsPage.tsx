@@ -1,14 +1,71 @@
-import { CheckCircle2, Loader2, RotateCcw, XCircle } from "lucide-react"
+import { CheckCircle2, Loader2, LogOut, RotateCcw, XCircle } from "lucide-react"
 import { useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/common"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Perm, PERM_LABELS, summaryText } from "@/lib/auth/permissions"
+import { useAuth } from "@/lib/auth/useAuth"
 import { type LiveProtocol, type NodeAccessPreference, useSettings } from "@/lib/settings"
+
+/** Who is signed in, their roles, camera scope and permissions (same as the desktop Settings → Account). */
+function AccountCard() {
+  const { enabled, user, logout } = useAuth()
+  const { settings } = useSettings()
+  if (!enabled) return null
+  const perms = user.is_admin ? Object.values(Perm) : [...user.permissions].sort((a, b) => a - b)
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+        <CardTitle className="text-base">Account</CardTitle>
+        <Button variant="outline" size="sm" onClick={() => void logout()}>
+          <LogOut className="size-4" /> Sign out (all devices)
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+          <div className="min-w-0">
+            <p className="font-medium">{user.display_name || user.username}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {user.roles.join(", ") || "No role"} · signed in to {settings.centralUrl}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {user.roles.map((role) => (
+              <Badge key={role} variant="outline">
+                <span className="size-1.5 rounded-full bg-primary" /> {role}
+              </Badge>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+          <div>
+            <Label>Cameras</Label>
+            <p className="text-xs text-muted-foreground">Set on the Access page by an administrator.</p>
+          </div>
+          <p className="text-sm">{user.scope || user.is_admin ? summaryText(user.scope, user.is_admin) : "…"}</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Permissions</Label>
+          {perms.length === 0 ? (
+            <p className="text-sm text-muted-foreground">None</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {perms.map((p) => (
+                <Badge key={p} variant="secondary">{PERM_LABELS[p] ?? `#${p}`}</Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 type TestState = { kind: "idle" } | { kind: "testing" } | { kind: "ok"; text: string } | { kind: "fail"; text: string }
 
@@ -38,6 +95,8 @@ export function SettingsPage() {
   return (
     <div className="max-w-3xl space-y-4">
       <PageHeader title="Settings" description="Stored in this browser only." />
+
+      <AccountCard />
 
       <Card>
         <CardHeader>

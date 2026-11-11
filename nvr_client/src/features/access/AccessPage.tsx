@@ -1,7 +1,7 @@
 import { Camera as CameraIcon, Folder, KeyRound, Loader2, Save, ShieldCheck, User, Users, X } from "lucide-react"
 import { useState } from "react"
 import { useAccessGrants, useAccessSubjects, useAccessSummary, usePutGrants } from "@/api/queries"
-import type { AccessGrants, AccessSummary } from "@/api/types"
+import type { AccessGrants } from "@/api/types"
 import { CameraPicker } from "@/components/CameraPicker"
 import { EmptyState, ErrorState, Loading, PageHeader } from "@/components/common"
 import { GroupPicker } from "@/components/GroupPicker"
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
+import { summaryText } from "@/lib/auth/permissions"
 import { cn } from "@/lib/utils"
 
 /** Which cameras each role / user may see (docs/AUTH_INTEGRATION_PLAN.md §6). What they may *do* comes from their
@@ -18,14 +19,6 @@ type Subject = { type: "role" | "user"; name: string; label: string }
 type Item = { id: number; name: string }
 
 const ADMIN_ROLE = "Admin"
-
-function summaryText(s: AccessSummary | undefined, isAdmin: boolean): string {
-  if (isAdmin) return "Everything (admin)"
-  if (!s) return "No cameras"
-  if (s.all_cameras) return "All cameras"
-  const parts = [s.groups && `${s.groups} group${s.groups === 1 ? "" : "s"}`, s.cameras && `${s.cameras} camera${s.cameras === 1 ? "" : "s"}`]
-  return parts.filter(Boolean).join(" · ") || "No cameras"
-}
 
 export function AccessPage() {
   const subjects = useAccessSubjects()

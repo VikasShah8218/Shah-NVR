@@ -19,6 +19,8 @@ export interface AuthUser {
   permissions: number[]
   is_admin: boolean
   local?: boolean
+  /** which cameras the user may see (from /auth/me; not in the login answer) */
+  scope?: { all_cameras: boolean; groups: number; cameras: number }
 }
 
 export interface Session {

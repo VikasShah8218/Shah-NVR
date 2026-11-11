@@ -29,6 +29,15 @@ export const PERM_LABELS: Record<number, string> = {
   30: "Access manage", 31: "Audit view", 40: "Dashboard",
 }
 
+/** "All cameras", "1 group · 3 cameras", ... (Access page and the Settings account card). */
+export function summaryText(s: { all_cameras?: boolean; groups?: number; cameras?: number } | undefined | null, isAdmin: boolean): string {
+  if (isAdmin) return "Everything (admin)"
+  if (!s) return "No cameras"
+  if (s.all_cameras) return "All cameras"
+  const plural = (n: number | undefined, word: string) => (n ? `${n} ${word}${n === 1 ? "" : "s"}` : "")
+  return [plural(s.groups, "group"), plural(s.cameras, "camera")].filter(Boolean).join(" · ") || "No cameras"
+}
+
 /** Does a user with these permissions pass a check that needs any one of `anyOf`? Empty = any signed-in user. */
 export function allows(user: { is_admin: boolean; permissions: number[] } | null, anyOf: readonly number[] = []): boolean {
   if (!user) return false

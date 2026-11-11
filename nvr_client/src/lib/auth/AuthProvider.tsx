@@ -16,7 +16,7 @@ import { AuthContext } from "./useAuth"
 
 const LOCAL_ADMIN: AuthUser = {
   id: 0, username: "local", display_name: "Local admin", roles: ["Admin"], is_admin: true, local: true,
-  permissions: Object.values(Perm),
+  permissions: Object.values(Perm), scope: { all_cameras: true, groups: 0, cameras: 0 },
 }
 
 
@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // permissions may have changed since sign-in: read them once per session
   useEffect(() => {
     if (!signedIn) return
-    unwrap<AuthUser>(centralClient(centralUrl).GET("/api/v1/auth/me")).then(updateUser).catch(() => undefined)
+    unwrap(centralClient(centralUrl).GET("/api/v1/auth/me")).then((me) => updateUser(me as AuthUser)).catch(() => undefined)
   }, [signedIn, userId, centralUrl])
 
   // another user's cached data must never show
