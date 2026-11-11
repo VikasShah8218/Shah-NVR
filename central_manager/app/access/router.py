@@ -67,7 +67,10 @@ async def subjects():
     runtime = get_runtime()
     users = await runtime.store.list_users() if runtime else []
     roles = {r for u in users for r in u.roles}
-    roles.update(await AccessGrant.filter(subject_type="role").distinct().values_list("subject", flat=True))
+    # order by the selected column: with Meta.ordering (id) PostgreSQL refuses DISTINCT ("ORDER BY expressions must
+    # appear in select list"); SQLite allows it, so the tests did not catch it
+    roles.update(await AccessGrant.filter(subject_type="role").order_by("subject").distinct()
+                 .values_list("subject", flat=True))
     return SubjectsOut(
         roles=sorted(roles, key=str.lower),
         users=[SubjectUser(id=u.id, username=u.username, display_name=u.display_name, roles=list(u.roles),
