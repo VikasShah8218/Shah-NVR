@@ -1,48 +1,33 @@
-import {
-  ArrowLeftRight,
-  Camera,
-  Clock,
-  FolderTree,
-  Gauge,
-  History,
-  Menu,
-  MoreHorizontal,
-  MonitorPlay,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Radar,
-  Server,
-  Settings,
-} from "lucide-react"
+import { Clock, LogOut, Menu, MoreHorizontal, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import { Suspense, useEffect, useState } from "react"
 import { NavLink, Outlet, useLocation } from "react-router"
 import { useClusterHealth } from "@/api/queries"
 import { Loading } from "@/components/common"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useAuth } from "@/lib/auth/useAuth"
 import { PRODUCT_LOGO, PRODUCT_NAME } from "@/lib/branding"
 import { readStored, useSettings, writeStored } from "@/lib/settings"
 import { fmtTime } from "@/lib/time"
 import { cn } from "@/lib/utils"
-
-const NAV = [
-  { to: "/", label: "Dashboard", icon: Gauge, end: true },
-  { to: "/live", label: "Live View", icon: MonitorPlay },
-  { to: "/playback", label: "Playback", icon: History },
-  { to: "/cameras", label: "Cameras", icon: Camera },
-  { to: "/groups", label: "Groups", icon: FolderTree },
-  { to: "/discover", label: "Discover", icon: Radar },
-  { to: "/nodes", label: "Media Nodes", icon: Server },
-  { to: "/assignments", label: "Assignments", icon: ArrowLeftRight },
-  { to: "/settings", label: "Settings", icon: Settings },
-]
+import { NAV } from "./nav"
 
 const COLLAPSE_KEY = "shah-nvr.sidebar"
-const PRIMARY_MOBILE = NAV.slice(0, 4)
-const SECONDARY_MOBILE = NAV.slice(4)
 
 export function AppLayout() {
+  const { can } = useAuth()
+  const nav = NAV.filter((item) => can(...item.perms))
+  const PRIMARY_MOBILE = nav.slice(0, 4)
+  const SECONDARY_MOBILE = nav.slice(4)
   const [collapsed, setCollapsed] = useState(() => readStored(COLLAPSE_KEY, { collapsed: false }).collapsed)
   const [mobileMenu, setMobileMenu] = useState(false)
   const location = useLocation()
@@ -65,7 +50,7 @@ export function AppLayout() {
           {!collapsed && <span className="font-semibold tracking-tight">{PRODUCT_NAME}</span>}
         </div>
         <nav className="flex-1 space-y-1 px-2 py-2">
-          {NAV.map(({ to, label, icon: Icon, end }) => {
+          {nav.map(({ to, label, icon: Icon, end }) => {
             const link = (
               <NavLink
                 key={to}
@@ -135,7 +120,7 @@ export function AppLayout() {
             <SheetDescription>Monitoring and administration</SheetDescription>
           </SheetHeader>
           <nav className="space-y-1 p-3">
-            {NAV.map(({ to, label, icon: Icon, end }) => (
+            {nav.map(({ to, label, icon: Icon, end }) => (
               <NavLink key={to} to={to} end={end} onClick={() => setMobileMenu(false)} className={({ isActive }) => cn("flex min-h-12 items-center gap-3 rounded-lg px-3 text-sm", isActive ? "bg-accent font-medium text-primary" : "text-foreground/85")}>
                 <Icon className="size-5" /> {label}
               </NavLink>
@@ -186,7 +171,35 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
       <div className="hidden items-center gap-2 tabular-nums text-muted-foreground lg:ml-auto lg:flex">
         <Clock className="size-4" /> {fmtTime(now)}
       </div>
+      <UserMenu />
     </header>
+  )
+}
+
+/** Signed-in user + sign out (only when central requires sign-in). */
+function UserMenu() {
+  const { enabled, user, logout } = useAuth()
+  if (!enabled) return null
+  const initials = (user.display_name || user.username).split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="h-9 gap-2 px-1.5 sm:px-2" aria-label="Account">
+          <span className="grid size-7 place-items-center rounded-full bg-primary/15 text-xs font-semibold text-primary">{initials}</span>
+          <span className="hidden max-w-32 truncate text-sm md:inline">{user.display_name || user.username}</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="font-normal">
+          <div className="truncate text-sm font-medium">{user.display_name || user.username}</div>
+          <div className="truncate text-xs text-muted-foreground">{user.username} · {user.roles.join(", ") || "no role"}</div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => void logout()}>
+          <LogOut className="size-4" /> Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

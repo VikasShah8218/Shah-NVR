@@ -1,8 +1,9 @@
 """Camera groups: a lazy tree. Each call returns one level (direct sub-groups), paged; the cameras of a group come
 from GET /api/v1/cameras/options?group_id= (docs/GROUPING_PLAN.md)."""
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.auth import scope
 from app.groups import services
 from app.groups.models import CameraGroup
 from app.groups.schemas import AssignIn, AssignOut, GroupCreate, GroupDetail, GroupOut, GroupUpdate
@@ -17,14 +18,21 @@ async def list_groups(
     parent_id: int | None = Query(default=None, description="Omit for the top-level groups"),
 ):
     if parent_id is not None:
-        await services.get_group(parent_id)
-    return await paginate(services.children_query(parent_id), page, services.groups_out)
+        await _visible_group(parent_id)
+    groups, cameras = await scope.group_q(), await scope.camera_q()
+    qs = services.children_query(parent_id)
+    if groups is not None:
+        qs = qs.filter(groups)
+    return await paginate(qs, page, lambda rows: services.groups_out(rows, groups, cameras))
 
 
 @router.get("/search", response_model=Page[GroupOut], summary="Groups whose name contains `q`, anywhere in the tree")
 async def search_groups(page: PageParams = Depends(), q: str = Query(min_length=1, max_length=128)):
+    groups, cameras = await scope.group_q(), await scope.camera_q()
     qs = CameraGroup.filter(name__icontains=q.strip()).order_by("name", "id")
-    return await paginate(qs, page, services.groups_out)
+    if groups is not None:
+        qs = qs.filter(groups)
+    return await paginate(qs, page, lambda rows: services.groups_out(rows, groups, cameras))
 
 
 @router.post("/assign", response_model=AssignOut, summary="Move cameras into a group (group_id null = no group)")
@@ -40,7 +48,16 @@ async def create_group(body: GroupCreate):
 
 @router.get("/{group_id}", response_model=GroupDetail)
 async def get_group(group_id: int):
-    return await services.group_detail(await services.get_group(group_id))
+    group = await _visible_group(group_id)
+    return await services.group_detail(group, await scope.group_q(), await scope.camera_q())
+
+
+async def _visible_group(group_id: int) -> CameraGroup:
+    """404 for a group the caller may not see (same answer as a missing one)."""
+    groups = await scope.group_q()
+    if groups is not None and not await CameraGroup.filter(groups, id=group_id).exists():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Group not found")
+    return await services.get_group(group_id)
 
 
 @router.patch("/{group_id}", response_model=GroupDetail, summary="Rename / describe / move (parent_id)")

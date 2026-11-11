@@ -4,6 +4,143 @@
  */
 
 export interface paths {
+    "/api/v1/auth/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Is sign-in required? (no token needed) */
+        get: operations["auth_config_api_v1_auth_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign in (proxied to the Auth Server, app SNVR) */
+        post: operations["login_api_v1_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** New access + refresh tokens (refresh tokens rotate) */
+        post: operations["refresh_api_v1_auth_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign out (everywhere: the user's token version is bumped) */
+        post: operations["logout_api_v1_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in user, permissions and camera scope */
+        get: operations["me_api_v1_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/access/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Roles and users that grants can be given to */
+        get: operations["subjects_api_v1_access_subjects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/access/grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Grants of one role / user (with subject_type + subject), or a summary of all */
+        get: operations["get_grants_api_v1_access_grants_get"];
+        /** Replace the grants of one role / user */
+        put: operations["put_grants_api_v1_access_grants_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Audit events, newest first (paged) */
+        get: operations["list_audit_api_v1_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cameras": {
         parameters: {
             query?: never;
@@ -1386,6 +1523,43 @@ export interface components {
             /** Channels */
             channels?: number | null;
         };
+        /** AuditOut */
+        AuditOut: {
+            /** Id */
+            id: number;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** User Id */
+            user_id: number | null;
+            /** Username */
+            username: string;
+            /** Action */
+            action: string;
+            /** Method */
+            method: string | null;
+            /** Path */
+            path: string;
+            /** Camera Id */
+            camera_id: number | null;
+            /** Status */
+            status: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            } | null;
+            /** Ip */
+            ip: string | null;
+        };
+        /** AuthConfigOut */
+        AuthConfigOut: {
+            /** Enabled */
+            enabled: boolean;
+            /** App Key */
+            app_key: string;
+        };
         /** BackfillConfigOut */
         BackfillConfigOut: {
             /** Camera Id */
@@ -2353,6 +2527,64 @@ export interface components {
             /** Memory Total Bytes */
             memory_total_bytes?: number | null;
         };
+        /** GrantRef */
+        GrantRef: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** GrantSummary */
+        GrantSummary: {
+            /**
+             * Subject Type
+             * @enum {string}
+             */
+            subject_type: "role" | "user";
+            /** Subject */
+            subject: string;
+            /** All Cameras */
+            all_cameras: boolean;
+            /** Groups */
+            groups: number;
+            /** Cameras */
+            cameras: number;
+        };
+        /** GrantsIn */
+        GrantsIn: {
+            /**
+             * Subject Type
+             * @enum {string}
+             */
+            subject_type: "role" | "user";
+            /** Subject */
+            subject: string;
+            /**
+             * All Cameras
+             * @default false
+             */
+            all_cameras: boolean;
+            /** Group Ids */
+            group_ids?: number[];
+            /** Camera Ids */
+            camera_ids?: number[];
+        };
+        /** GrantsOut */
+        GrantsOut: {
+            /**
+             * Subject Type
+             * @enum {string}
+             */
+            subject_type: "role" | "user";
+            /** Subject */
+            subject: string;
+            /** All Cameras */
+            all_cameras: boolean;
+            /** Groups */
+            groups: components["schemas"]["GrantRef"][];
+            /** Cameras */
+            cameras: components["schemas"]["GrantRef"][];
+        };
         /** GroupCreate */
         GroupCreate: {
             /** Name */
@@ -2652,6 +2884,30 @@ export interface components {
             /** Audio Channels */
             audio_channels?: number | null;
         };
+        /** LoginIn */
+        LoginIn: {
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
+            /** Totp */
+            totp?: string | null;
+        };
+        /** LoginOut */
+        LoginOut: {
+            /** Access Token */
+            access_token: string;
+            /** Refresh Token */
+            refresh_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
+            /** Expires In */
+            expires_in: number;
+            user: components["schemas"]["UserOut"];
+        };
         /** ManualAssignIn */
         ManualAssignIn: {
             /** Node Id */
@@ -2661,6 +2917,30 @@ export interface components {
         MappingIn: {
             /** Profile Token */
             profile_token: string;
+        };
+        /** MeOut */
+        MeOut: {
+            /** Id */
+            id: number;
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string;
+            /** Roles */
+            roles: string[];
+            /** Permissions */
+            permissions: number[];
+            /** Is Admin */
+            is_admin: boolean;
+            /**
+             * Local
+             * @default false
+             */
+            local: boolean;
+            /** Scope */
+            scope: {
+                [key: string]: unknown;
+            };
         };
         /** MessageOut */
         MessageOut: {
@@ -2934,6 +3214,17 @@ export interface components {
         Page_AssignmentOut_: {
             /** Items */
             items: components["schemas"]["AssignmentOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[AuditOut] */
+        Page_AuditOut_: {
+            /** Items */
+            items: components["schemas"]["AuditOut"][];
             /** Total */
             total: number;
             /** Limit */
@@ -3250,6 +3541,11 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** RefreshIn */
+        RefreshIn: {
+            /** Refresh Token */
+            refresh_token: string;
+        };
         /** SegmentBatchIn */
         SegmentBatchIn: {
             /** Node Id */
@@ -3526,6 +3822,26 @@ export interface components {
             /** Rtsp Transport */
             rtsp_transport?: string | null;
         };
+        /** SubjectUser */
+        SubjectUser: {
+            /** Id */
+            id: number;
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string;
+            /** Roles */
+            roles: string[];
+            /** Is Active */
+            is_active: boolean;
+        };
+        /** SubjectsOut */
+        SubjectsOut: {
+            /** Roles */
+            roles: string[];
+            /** Users */
+            users: components["schemas"]["SubjectUser"][];
+        };
         /** SuggestedOut */
         SuggestedOut: {
             /** Main */
@@ -3559,6 +3875,40 @@ export interface components {
             segments: components["schemas"]["SegmentOut"][];
             /** Gaps */
             gaps: components["schemas"]["GapOut"][];
+        };
+        /** TokensOut */
+        TokensOut: {
+            /** Access Token */
+            access_token: string;
+            /** Refresh Token */
+            refresh_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
+            /** Expires In */
+            expires_in: number;
+        };
+        /** UserOut */
+        UserOut: {
+            /** Id */
+            id: number;
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string;
+            /** Roles */
+            roles: string[];
+            /** Permissions */
+            permissions: number[];
+            /** Is Admin */
+            is_admin: boolean;
+            /**
+             * Local
+             * @default false
+             */
+            local: boolean;
         };
         /** ValidationError */
         ValidationError: {
@@ -3693,6 +4043,256 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    auth_config_api_v1_auth_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthConfigOut"];
+                };
+            };
+        };
+    };
+    login_api_v1_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_api_v1_auth_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokensOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_api_v1_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    me_api_v1_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeOut"];
+                };
+            };
+        };
+    };
+    subjects_api_v1_access_subjects_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectsOut"];
+                };
+            };
+        };
+    };
+    get_grants_api_v1_access_grants_get: {
+        parameters: {
+            query?: {
+                subject_type?: ("role" | "user") | null;
+                subject?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantsOut"] | components["schemas"]["GrantSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_grants_api_v1_access_grants_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_audit_api_v1_audit_get: {
+        parameters: {
+            query?: {
+                username?: string | null;
+                /** @description Prefix, e.g. 'auth' or 'live.open' */
+                action?: string | null;
+                camera_id?: number | null;
+                status?: string | null;
+                start?: string | null;
+                end?: string | null;
+                /** @description Rows per page */
+                limit?: number;
+                /** @description Rows to skip */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AuditOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_cameras_api_v1_cameras_get: {
         parameters: {
             query?: {

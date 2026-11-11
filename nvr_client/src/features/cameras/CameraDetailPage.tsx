@@ -1,3 +1,5 @@
+import { Perm } from "@/lib/auth/permissions"
+import { useAuth } from "@/lib/auth/useAuth"
 import { ArrowLeft, ArrowLeftRight, Copy, History, Pencil } from "lucide-react"
 import { useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router"
@@ -25,6 +27,7 @@ import { BackfillTab } from "./BackfillTab"
 import { Pager } from "@/components/Pager"
 
 export function CameraDetailPage() {
+  const { can } = useAuth()
   const id = Number(useParams().id)
   const camera = useCamera(id)
   const [editing, setEditing] = useState(false)
@@ -45,25 +48,29 @@ export function CameraDetailPage() {
         actions={
           <>
             {!c.enabled && <StatusBadge status="DISABLED" />}
-            <Button variant="outline" className="flex-1 sm:flex-none" asChild>
-              <Link to={`/playback?camera=${c.id}`}>
-                <History className="size-4" /> Recordings
-              </Link>
-            </Button>
-            <Button className="flex-1 sm:flex-none" onClick={() => setEditing(true)}>
-              <Pencil className="size-4" /> Edit
-            </Button>
+            {can(Perm.PLAYBACK) && (
+              <Button variant="outline" className="flex-1 sm:flex-none" asChild>
+                <Link to={`/playback?camera=${c.id}`}>
+                  <History className="size-4" /> Recordings
+                </Link>
+              </Button>
+            )}
+            {can(Perm.CAMERAS_MANAGE) && (
+              <Button className="flex-1 sm:flex-none" onClick={() => setEditing(true)}>
+                <Pencil className="size-4" /> Edit
+              </Button>
+            )}
           </>
         }
       />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="recordings">Recordings</TabsTrigger>
-          <TabsTrigger value="assignment">Assignment</TabsTrigger>
-          <TabsTrigger value="device">Device</TabsTrigger>
-          <TabsTrigger value="video">Video</TabsTrigger>
-          <TabsTrigger value="backfill">Edge storage</TabsTrigger>
+          {can(Perm.PLAYBACK) && <TabsTrigger value="recordings">Recordings</TabsTrigger>}
+          {can(Perm.ASSIGNMENTS, Perm.CAMERAS_MANAGE) && <TabsTrigger value="assignment">Assignment</TabsTrigger>}
+          {can(Perm.CAMERAS_MANAGE) && <TabsTrigger value="device">Device</TabsTrigger>}
+          {can(Perm.ENCODER) && <TabsTrigger value="video">Video</TabsTrigger>}
+          {can(Perm.BACKFILL) && <TabsTrigger value="backfill">Edge storage</TabsTrigger>}
         </TabsList>
         <TabsContent value="overview">
           <Overview camera={c} />

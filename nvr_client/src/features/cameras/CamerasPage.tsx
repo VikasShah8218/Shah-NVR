@@ -1,3 +1,5 @@
+import { Perm } from "@/lib/auth/permissions"
+import { useAuth } from "@/lib/auth/useAuth"
 import { Camera as CameraIcon, History, MonitorPlay, MoreHorizontal, Pencil, Plus, Radar, Search, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { Link, useNavigate } from "react-router"
@@ -35,6 +37,7 @@ const FILTERS: Record<string, { label: string; query: Partial<CameraQuery> }> = 
 }
 
 export function CamerasPage() {
+  const manage = useAuth().can(Perm.CAMERAS_MANAGE)
   const paged = usePaged({ sizeKey: "cameras" })
   const [filter, setFilter] = useState("all")
   // camera group filter: the group and all its sub-groups
@@ -65,14 +68,18 @@ export function CamerasPage() {
             </Select>
             <GroupPicker className="w-full sm:w-48" value={filter === "ungrouped" ? null : groupId} noneLabel="Any group"
               onChange={(id) => { setGroupId(id); if (id != null && filter === "ungrouped") setFilter("all"); paged.setPage(1) }} />
-            <Button variant="outline" asChild>
-              <Link to="/discover">
-                <Radar className="size-4" /> Discover
-              </Link>
-            </Button>
-            <Button onClick={() => setEditing("new")}>
-              <Plus className="size-4" /> Add camera
-            </Button>
+            {manage && (
+              <>
+                <Button variant="outline" asChild>
+                  <Link to="/discover">
+                    <Radar className="size-4" /> Discover
+                  </Link>
+                </Button>
+                <Button onClick={() => setEditing("new")}>
+                  <Plus className="size-4" /> Add camera
+                </Button>
+              </>
+            )}
           </>
         }
       />
@@ -127,6 +134,7 @@ export function CamerasPage() {
 }
 
 function MobileCameraCard({ camera: c, onEdit }: { camera: Camera; onEdit: () => void }) {
+  const manage = useAuth().can(Perm.CAMERAS_MANAGE)
   const navigate = useNavigate()
   const update = useUpdateCamera()
   const del = useDeleteCamera()
@@ -138,12 +146,12 @@ function MobileCameraCard({ camera: c, onEdit }: { camera: Camera; onEdit: () =>
         <div className="flex items-center gap-2"><span className="truncate font-medium">{c.name}</span><span className="text-xs text-muted-foreground">#{c.id}</span></div>
         {c.description && <div className="mt-0.5 truncate text-xs text-muted-foreground">{c.description}</div>}
       </div>
-      <div onClick={(e) => e.stopPropagation()}><Switch checked={c.enabled} disabled={update.isPending} onCheckedChange={(v) => update.mutate({ id: c.id, body: { enabled: v } })} /></div>
+      <div onClick={(e) => e.stopPropagation()}><Switch checked={c.enabled} disabled={update.isPending || !manage} onCheckedChange={(v) => update.mutate({ id: c.id, body: { enabled: v } })} /></div>
       <div onClick={(e) => e.stopPropagation()}><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="size-10"><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={onEdit}><Pencil className="size-4" /> Edit</DropdownMenuItem>
+        {manage && <DropdownMenuItem onClick={onEdit}><Pencil className="size-4" /> Edit</DropdownMenuItem>}
         <DropdownMenuItem onClick={() => navigate(`/cameras/${c.id}`)}><MonitorPlay className="size-4" /> Details & live</DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate(`/playback?camera=${c.id}`)}><History className="size-4" /> Recordings</DropdownMenuItem>
-        <DropdownMenuSeparator /><DropdownMenuItem className="text-danger focus:text-danger" onClick={() => setConfirmDelete(true)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>
+        {manage && <><DropdownMenuSeparator /><DropdownMenuItem className="text-danger focus:text-danger" onClick={() => setConfirmDelete(true)}><Trash2 className="size-4" /> Delete</DropdownMenuItem></>}
       </DropdownMenuContent></DropdownMenu></div>
     </div>
     <div className="flex flex-wrap gap-1.5">{c.streams.map((s) => <span key={s.profile} className="flex items-center gap-1 text-xs"><span className="text-muted-foreground">{s.profile}</span><StatusBadge status={s.status} /></span>)}</div>
@@ -158,6 +166,7 @@ function MobileCameraCard({ camera: c, onEdit }: { camera: Camera; onEdit: () =>
 }
 
 function CameraRow({ camera: c, onEdit }: { camera: Camera; onEdit: () => void }) {
+  const manage = useAuth().can(Perm.CAMERAS_MANAGE)
   const navigate = useNavigate()
   const update = useUpdateCamera()
   const del = useDeleteCamera()
@@ -206,7 +215,7 @@ function CameraRow({ camera: c, onEdit }: { camera: Camera; onEdit: () => void }
       <TableCell className="tabular-nums">{retentionLabel(c.retention_days)}</TableCell>
       <TableCell className="text-xs text-muted-foreground">{lastSegment ? timeAgo(lastSegment) : "—"}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
-        <Switch checked={c.enabled} disabled={update.isPending} onCheckedChange={(v) => update.mutate({ id: c.id, body: { enabled: v } })} />
+        <Switch checked={c.enabled} disabled={update.isPending || !manage} onCheckedChange={(v) => update.mutate({ id: c.id, body: { enabled: v } })} />
       </TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
@@ -216,19 +225,23 @@ function CameraRow({ camera: c, onEdit }: { camera: Camera; onEdit: () => void }
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onEdit}>
-              <Pencil className="size-4" /> Edit
-            </DropdownMenuItem>
+            {manage && (
+              <DropdownMenuItem onClick={onEdit}>
+                <Pencil className="size-4" /> Edit
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => navigate(`/cameras/${c.id}`)}>
               <MonitorPlay className="size-4" /> Live preview
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate(`/playback?camera=${c.id}`)}>
               <History className="size-4" /> Recordings
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-danger focus:text-danger" onClick={() => setConfirmDelete(true)}>
-              <Trash2 className="size-4" /> Delete
-            </DropdownMenuItem>
+            {manage && <DropdownMenuSeparator />}
+            {manage && (
+              <DropdownMenuItem className="text-danger focus:text-danger" onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="size-4" /> Delete
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
         <ConfirmDialog

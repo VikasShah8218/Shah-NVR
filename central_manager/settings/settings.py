@@ -53,6 +53,22 @@ class Settings(BaseSettings):
     EXPORT_MAX_HOURS: int = 4
     EXPORT_FILE_TTL_HOURS: int = 24
 
+    # ---------------- Authentication (docs/AUTH_INTEGRATION_PLAN.md)
+    # Off = open API like before (every request runs as a built-in local admin). On = a valid Auth Server
+    # access token for app AUTH_APP_KEY is required on every API call.
+    AUTH_ENABLED: bool = False
+    AUTH_SERVER: str = "http://localhost:5082"
+    AUTH_APP_KEY: str = "SNVR"
+    AUTH_CLIENT_ID: str = "SNVR"
+    AUTH_CLIENT_SECRET: str = ""  # downstream service secret (never commit it)
+    AUTH_KEY: str = ""  # Auth Server user-token signing secret (HS256); never logged
+    AUTH_STATE_BACKEND: str = "memory"  # memory (one central process) | redis (later)
+    AUTH_FAIL_MODE: str = "closed"  # closed: unknown token version = rejected | open: allowed (documented risk)
+    AUTH_USERS_REFRESH_SECONDS: int = 600
+    AUTH_LEEWAY_SECONDS: int = 30
+    AUTH_HTTP_TIMEOUT_SECONDS: float = 10.0
+    AUDIT_RETENTION_DAYS: int = 365
+
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

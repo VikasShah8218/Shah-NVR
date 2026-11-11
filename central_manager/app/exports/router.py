@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 
+from app.auth import scope
 from app.cameras.models import Camera, CameraStream
 from app.exports.schemas import ClaimIn, ClaimedExportOut, CompleteIn, ExportCreate, ExportOut, FailIn, ProgressIn, ProgressOut
 from app.nodes.models import MediaNode, NodeState
@@ -75,6 +76,8 @@ async def create_export(body: ExportCreate):
 async def list_exports(camera_id: int | None = None, page: PageParams = Depends()):
     await _expire()
     query = ExportJob.all().order_by("-created_at", "-id")
+    if (visible := await scope.camera_ids_subquery()) is not None:
+        query = query.filter(camera_id__in=visible)
     if camera_id is not None:
         query = query.filter(camera_id=camera_id)
     return await paginate(query, page, lambda rows: [_out(job) for job in rows])
@@ -84,7 +87,7 @@ async def list_exports(camera_id: int | None = None, page: PageParams = Depends(
 async def get_export(job_id: UUID):
     await _expire()
     job = await ExportJob.get_or_none(id=job_id)
-    if job is None:
+    if job is None or not await scope.camera_visible(job.camera_id):
         raise HTTPException(404, "Export not found")
     return _out(job)
 
@@ -92,7 +95,7 @@ async def get_export(job_id: UUID):
 @router.post("/{job_id}/cancel", response_model=ExportOut)
 async def cancel_export(job_id: UUID):
     job = await ExportJob.get_or_none(id=job_id)
-    if job is None:
+    if job is None or not await scope.camera_visible(job.camera_id):
         raise HTTPException(404, "Export not found")
     if job.state in ACTIVE:
         job.state, job.finished_at, job.lease_expires_at = ExportState.CANCELLED, utcnow(), None
@@ -104,7 +107,7 @@ async def cancel_export(job_id: UUID):
 async def download_export(job_id: UUID, access: str = Query("lan", pattern="^(lan|public)$")):
     await _expire()
     job = await ExportJob.get_or_none(id=job_id).prefetch_related("node")
-    if job is None:
+    if job is None or not await scope.camera_visible(job.camera_id):
         raise HTTPException(404, "Export not found")
     if job.state != ExportState.READY or job.node is None:
         raise HTTPException(409, "Export is not ready for download")

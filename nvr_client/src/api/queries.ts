@@ -1,5 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { accessToken } from "@/lib/auth/session"
 import { onvifErrorText } from "@/lib/onvif"
 import { type NodeAccess, selectedNodeAccess, useNodeAccessMap } from "@/lib/nodeAccess"
 import type { Paged } from "@/lib/pager"
@@ -23,6 +24,11 @@ import type {
   CameraUpdate,
   CameraGroup,
   ClusterHealth,
+  AccessGrants,
+  AccessGrantsIn,
+  AccessSubjects,
+  AccessSummary,
+  AuditEvent,
   GroupCreate,
   GroupDetail,
   GroupUpdate,
@@ -546,6 +552,59 @@ export const useDeleteCamera = () =>
     { success: "Camera deleted" },
   )
 
+// ---------------------------------------------------------------- access grants + audit (auth)
+
+export function useAccessSubjects() {
+  const { url, api } = useCentral()
+  return useQuery({
+    queryKey: [url, "access", "subjects"],
+    queryFn: () => unwrap<AccessSubjects>(api.GET("/api/v1/access/subjects")),
+  })
+}
+
+export function useAccessSummary() {
+  const { url, api } = useCentral()
+  return useQuery({
+    queryKey: [url, "access", "summary"],
+    queryFn: () => unwrap<AccessSummary[]>(api.GET("/api/v1/access/grants") as never),
+  })
+}
+
+export function useAccessGrants(subject: { type: "role" | "user"; name: string } | null) {
+  const { url, api } = useCentral()
+  return useQuery({
+    queryKey: [url, "access", "grants", subject?.type, subject?.name],
+    enabled: subject != null,
+    queryFn: () => unwrap<AccessGrants>(api.GET("/api/v1/access/grants", {
+      params: { query: { subject_type: subject!.type, subject: subject!.name } },
+    }) as never),
+  })
+}
+
+export const usePutGrants = () =>
+  useCentralMutation((api, body: AccessGrantsIn) => unwrap<AccessGrants>(api.PUT("/api/v1/access/grants", { body })), {
+    invalidate: ["access", "cameras", "groups"], success: (g) => `Access saved for ${g.subject_type} ${g.subject}`,
+  })
+
+export interface AuditQuery {
+  username?: string
+  action?: string
+  status?: "ok" | "denied" | "failed"
+  limit: number
+  offset: number
+}
+
+export function useAudit(params: AuditQuery) {
+  const { url, api, poll } = useCentral()
+  const query = { ...params, username: params.username || undefined, action: params.action || undefined }
+  return useQuery({
+    queryKey: [url, "audit", query],
+    placeholderData: keepPreviousData,
+    queryFn: () => unwrap<Paged<AuditEvent>>(api.GET("/api/v1/audit", { params: { query } })),
+    refetchInterval: poll * 2,
+  })
+}
+
 const GROUP_KEYS = ["groups", "cameras"]
 
 export const useCreateGroup = () =>
@@ -762,10 +821,11 @@ export function useOnvifSnapshotCall() {
   const { url } = useCentral()
   return async (body: OnvifDeviceIn & { uri: string }): Promise<string> => {
     let res: Response
+    const token = await accessToken(url)
     try {
       res = await fetch(`${url}/api/v1/onvif/snapshot`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify(body),
       })
     } catch {

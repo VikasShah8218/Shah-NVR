@@ -1,4 +1,5 @@
 import createClient from "openapi-fetch"
+import { accessToken, accessTokenNow, handleUnauthorized } from "@/lib/auth/session"
 import type { Paged } from "@/lib/pager"
 import type { paths as CentralPaths } from "./central"
 import type { paths as NodePaths } from "./node"
@@ -55,9 +56,28 @@ export function centralClient(baseUrl: string) {
   let c = centralClients.get(baseUrl)
   if (!c) {
     c = createClient<CentralPaths>({ baseUrl })
+    // Sign-in (docs/AUTH_INTEGRATION_PLAN.md): the access token on every call; a 401 ends or renews the session.
+    c.use({
+      async onRequest({ request }) {
+        const token = await accessToken(baseUrl)
+        if (token) request.headers.set("Authorization", `Bearer ${token}`)
+        return request
+      },
+      onResponse({ response }) {
+        if (response.status === 401) handleUnauthorized(response.headers.get("x-auth-error"))
+        return response
+      },
+    })
     centralClients.set(baseUrl, c)
   }
   return c
+}
+
+/** `?access_token=` for URLs a player or the browser opens itself (they cannot send the header). */
+function withToken(centralUrl: string, query: URLSearchParams): URLSearchParams {
+  const token = accessTokenNow(centralUrl)
+  if (token) query.set("access_token", token)
+  return query
 }
 
 /** Direct, read-only access to a media node's own API (status, paths, chunks, logs). */
@@ -91,23 +111,27 @@ export const mediaFileUrl = (apiUrl: string, segmentId: string) =>
 export function playbackUrl(centralUrl: string, cameraId: number, profile: string, start: Date, end: Date, access: "lan" | "public", videoOnly = false) {
   const q = new URLSearchParams({ profile, start: start.toISOString(), end: end.toISOString(), access })
   if (videoOnly) q.set("video_only", "true")
-  return `${centralUrl}/api/v1/playback/${cameraId}/index.m3u8?${q}`
+  return `${centralUrl}/api/v1/playback/${cameraId}/index.m3u8?${withToken(centralUrl, q)}`
 }
 
 export function playbackAudioUrl(centralUrl: string, cameraId: number, profile: string, start: Date, end: Date, access: "lan" | "public") {
   const q = new URLSearchParams({ profile, start: start.toISOString(), end: end.toISOString(), access })
-  return `${centralUrl}/api/v1/playback/${cameraId}/audio.m3u8?${q}`
+  return `${centralUrl}/api/v1/playback/${cameraId}/audio.m3u8?${withToken(centralUrl, q)}`
 }
 
 async function exportFetch<T>(centralUrl: string, path: string, init?: RequestInit): Promise<T> {
   let response: Response
+  const token = await accessToken(centralUrl)
   try {
     response = await fetch(centralUrl.replace(/\/+$/, "") + path, {
-      ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      ...init, headers: {
+        "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init?.headers ?? {}),
+      },
     })
   } catch {
     throw new ApiError(0, "Server unreachable")
   }
+  if (response.status === 401) handleUnauthorized(response.headers.get("x-auth-error"))
   if (!response.ok) {
     let error: unknown
     try { error = await response.json() } catch { error = undefined }
@@ -125,4 +149,4 @@ export const createExport = (centralUrl: string, body: ExportCreate) =>
 export const cancelExport = (centralUrl: string, id: string) =>
   exportFetch<ExportJob>(centralUrl, `/api/v1/exports/${id}/cancel`, { method: "POST" })
 export const exportDownloadUrl = (centralUrl: string, id: string, access: "lan" | "public") =>
-  `${centralUrl.replace(/\/+$/, "")}/api/v1/exports/${id}/download?access=${access}`
+  `${centralUrl.replace(/\/+$/, "")}/api/v1/exports/${id}/download?${withToken(centralUrl, new URLSearchParams({ access }))}`
