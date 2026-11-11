@@ -8,7 +8,8 @@ Startup order matters:
 3. QGuiApplication, fonts, the "C" numeric locale libmpv requires;
    then the render mode (GPU/OpenGL or CPU/software, app/video/render_mode.py) - before any window;
 4. the stores (Python state for every page), registered as QML singletons under `import App`;
-5. ui/Main.qml.
+5. ui/Main.qml, then the sign-in session starts (`Auth`: asks central whether sign-in is needed; the shell is
+   shown once the user is signed in, or right away when auth is off; docs/DESKTOP_AUTH_PLAN.md).
 """
 
 import locale
@@ -38,6 +39,7 @@ from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterSingletonInstance  #
 from PySide6.QtQuick import QQuickWindow, QSGRendererInterface  # noqa: E402
 from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
 
+from app.core.auth.permissions import PAGE_PERMS  # noqa: E402
 from app.core.branding import PRODUCT_LOGO_PATH, PRODUCT_NAME  # noqa: E402
 
 UI_DIR = BASE_DIR / "ui"
@@ -75,6 +77,7 @@ def build_app():
     load_fonts()
 
     # Imported after QGuiApplication exists (QML types / image provider need it).
+    from app.core.auth.session import AuthSession
     from app.core.context import AppContext
     from app.core.format import Formatter
     from app.core.icons import IconProvider
@@ -83,7 +86,9 @@ def build_app():
     from app.core.status import StatusHelper
     from app.core.toasts import ToastBus
     from app.core.utils import Utils
+    from app.features.access.store import AccessStore
     from app.features.assignments.store import AssignmentsStore
+    from app.features.audit.store import AuditStore
     from app.features.cameras.detail_store import CameraDetailStore
     from app.features.cameras.backfill_store import BackfillStore
     from app.features.cameras.options_store import EncoderCamerasStore, LiveCamerasStore, PlaybackCamerasStore
@@ -103,13 +108,18 @@ def build_app():
     from app.features.playback.store import PlaybackStore
     from app.features.settings.store import SettingsStore
     from app.video import register_video_types
+    from app.video.player import set_source_signer
 
     prefs = Preferences()
     mode, gpu_name = choose_render_mode(settings.RENDER_MODE or prefs.renderMode)
     prefs.set_active_render_mode(mode, gpu_name)
     register_video_types(mode)  # import Nvr.Video: MpvPlayer + MpvSurface (GPU or CPU)
     toasts = ToastBus()
-    ctx = AppContext(prefs, toasts)
+    auth = AuthSession(prefs.centralUrl)
+    set_source_signer(auth.sign_url)  # playback playlists get a fresh token on every load
+    ctx = AppContext(prefs, toasts, auth)
+    router = Router()
+    auth.sessionStarted.connect(lambda: _open_start_page(auth, router))
     cluster = ClusterStore(ctx)
     cameras = CamerasStore(ctx)
     nodes = NodesStore(ctx)
@@ -119,7 +129,8 @@ def build_app():
     singletons = {
         "Prefs": prefs,
         "Toasts": toasts,
-        "Router": Router(),
+        "Auth": auth,
+        "Router": router,
         "Fmt": Formatter(),
         "Status": StatusHelper(),
         "Utils": Utils(toasts),
@@ -146,6 +157,8 @@ def build_app():
         "Playback": playback,
         "Bookmarks": BookmarksStore(ctx, playback),
         "SettingsPage": SettingsStore(ctx),
+        "Access": AccessStore(ctx),
+        "AuditLog": AuditStore(ctx),
     }
     for name, instance in singletons.items():
         qmlRegisterSingletonInstance(type(instance), "App", 1, 0, name, instance)
@@ -156,6 +169,12 @@ def build_app():
     engine.addImageProvider("icon", IconProvider())
     engine.load(UI_DIR / "Main.qml")
     return qt_app, engine, singletons
+
+
+def _open_start_page(auth, router) -> None:
+    """After sign-in: another user starts on their start page; the same user keeps their page if still allowed."""
+    if auth.user_switched() or not auth.can(*PAGE_PERMS.get(router.page, ())):
+        router.reset(auth.start_page())
 
 
 def restore_window(window: QQuickWindow, prefs) -> None:
@@ -176,15 +195,24 @@ def save_window(window: QQuickWindow, prefs) -> None:
 
 
 def main() -> int:
+    from app.core.single_instance import SingleInstance  # docs/DESKTOP_AUTH_PLAN.md DD2
+    if SingleInstance.notify_running():
+        logger.info("Shah-NVR is already running: showing that window")
+        return 0
     qt_app, engine, singletons = build_app()
     if not engine.rootObjects():
         logger.error("Failed to load ui/Main.qml")
         return 1
+    instance = SingleInstance(qt_app)
+    instance.listen()
     window = engine.rootObjects()[0]
+    instance.activated.connect(lambda: (window.showNormal() if window.visibility() == QWindow.Visibility.Minimized
+                                        else None, window.raise_(), window.requestActivate()))
     from app.core.window_chrome import apply_window_chrome
     apply_window_chrome(window)
     restore_window(window, singletons["Prefs"])
     qt_app.aboutToQuit.connect(lambda: save_window(window, singletons["Prefs"]))
+    singletons["Auth"].start()
     code = qt_app.exec()
     # Orderly shutdown: destroy QML (and with it every video player) while Python is fully alive,
     # then let running background requests finish.

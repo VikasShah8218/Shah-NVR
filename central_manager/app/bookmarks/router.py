@@ -9,6 +9,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query, status
 from tortoise.expressions import Q
 
+from app.auth import scope
 from app.bookmarks.models import Bookmark
 from app.bookmarks.schemas import BookmarkCreate, BookmarkOut, BookmarkUpdate, _utc
 from app.cameras.models import Camera
@@ -27,7 +28,7 @@ def _out(b: Bookmark) -> BookmarkOut:
 
 async def _get(bookmark_id: int) -> Bookmark:
     b = await Bookmark.get_or_none(id=bookmark_id).prefetch_related("camera")
-    if b is None:
+    if b is None or not await scope.camera_visible(b.camera_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Bookmark not found")
     return b
 
@@ -52,6 +53,8 @@ async def list_bookmarks(
     offset: int = Query(default=0, ge=0),
 ):
     qs = Bookmark.all()
+    if (visible := await scope.camera_ids_subquery()) is not None:
+        qs = qs.filter(camera_id__in=visible)
     if camera_id is not None:
         qs = qs.filter(camera_id=camera_id)
     if profile:

@@ -9,10 +9,11 @@ import logging
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import RegisterTortoise
 
+from app.access.router import router as access_router
 from app.assignments.router import router as assignments_router
 from app.assignments.services import scheduler_tick
 from app.backfill.router import internal_router as backfill_internal_router
@@ -21,6 +22,12 @@ from app.backfill.services import backfill_scheduler_tick
 from app.bookmarks.router import router as bookmarks_router
 from app.cameras.router import router as cameras_router
 from app.cluster.router import router as cluster_router
+from app.audit.router import router as audit_router
+from app.audit.services import prune_audit
+from app.auth.deps import AuditMiddleware, guard
+from app.auth.integration import create_runtime, set_runtime
+from app.auth.router import router as auth_router
+from app.auth.verify import check_signing_key
 from app.groups.router import router as groups_router
 from app.nodes.router import internal_router as nodes_internal_router
 from app.nodes.router import router as nodes_router
@@ -54,25 +61,43 @@ async def lifespan(app: FastAPI):
             asyncio.create_task(run_periodic("retention", settings.RETENTION_INTERVAL_SECONDS, retention_tick)),
             asyncio.create_task(run_periodic("backfill", settings.BACKFILL_SCHEDULER_INTERVAL_SECONDS,
                                              backfill_scheduler_tick)),
+            asyncio.create_task(run_periodic("audit-retention", 86400, prune_audit)),
         ]
-        logger.info("%s started", settings.APP_NAME)
+        auth_runtime = None
+        if settings.AUTH_ENABLED:  # docs/AUTH_INTEGRATION_PLAN.md: service token, users snapshot, revocations
+            check_signing_key()
+            auth_runtime = create_runtime()
+            set_runtime(auth_runtime)
+            auth_runtime.start()
+        logger.info("%s started (auth %s)", settings.APP_NAME,
+                    f"ON, app {settings.AUTH_APP_KEY}, {settings.AUTH_STATE_BACKEND} state" if settings.AUTH_ENABLED
+                    else "OFF: open API")
         try:
             yield
         finally:
             for t in tasks:
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            if auth_runtime is not None:
+                await auth_runtime.stop()
+                set_runtime(None)
 
 
-app = FastAPI(title=settings.APP_NAME, version="0.1.0", lifespan=lifespan)
+# Every API route goes through the guard (app/auth/deps.py): permission rule, caller, camera scope, audit mark.
+app = FastAPI(title=settings.APP_NAME, version="0.1.0", lifespan=lifespan, dependencies=[Depends(guard)])
+app.add_middleware(AuditMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Auth-Error"],
 )
 
 for r in (
+    auth_router,
+    access_router,
+    audit_router,
     cameras_router,
     groups_router,
     recordings_router,

@@ -7,6 +7,8 @@ import "layout"
 import "components"
 
 // App shell (port of AppLayout.tsx): sidebar + top bar + the current page, toasts on top.
+// Sign-in (docs/DESKTOP_AUTH_PLAN.md): until Auth.isReady (signed in, or auth off) only AuthGate is shown and no
+// page is loaded; a page the user's role does not allow shows NoAccessPage.
 ApplicationWindow {
     id: window
 
@@ -21,8 +23,11 @@ ApplicationWindow {
         nodes: "pages/nodes/NodesPage.qml",
         node: "pages/nodes/NodeDetailPage.qml",
         assignments: "pages/assignments/AssignmentsPage.qml",
+        access: "pages/access/AccessPage.qml",
+        audit: "pages/audit/AuditPage.qml",
         settings: "pages/settings/SettingsPage.qml"
     })
+    readonly property bool pageAllowed: Auth.isReady && Auth.pages[Router.page] === true
 
     // Live View is kept loaded (hidden, its tiles paused) for LIVE_KEEP_ALIVE_MS after leaving it, so switching
     // pages is instant both ways: destroying 16 players costs ~1.6 s on the UI thread (GL render contexts and
@@ -55,6 +60,7 @@ ApplicationWindow {
     RowLayout {
         anchors.fill: parent
         spacing: 0
+        visible: Auth.isReady
 
         Sidebar { visible: !window.immersive; Layout.fillHeight: true }
 
@@ -72,14 +78,15 @@ ApplicationWindow {
                 Loader {
                     id: page
                     anchors.fill: parent
-                    source: Router.page === "live" ? "" : window.pages[Router.page]
+                    source: !Auth.isReady || Router.page === "live" && window.pageAllowed ? ""
+                        : window.pageAllowed ? window.pages[Router.page] : "pages/auth/NoAccessPage.qml"
                     asynchronous: false
                 }
                 Loader {
                     id: livePage
                     anchors.fill: parent
-                    active: Router.page === "live" || window.liveKept
-                    visible: Router.page === "live"
+                    active: Auth.isReady && Auth.pages.live === true && (Router.page === "live" || window.liveKept)
+                    visible: Router.page === "live" && window.pageAllowed
                     source: window.pages.live
                     asynchronous: false
                     onLoaded: window.liveKept = true  // set before leaving, so `active` stays true then
@@ -96,6 +103,21 @@ ApplicationWindow {
                     function onPlayersReleased() { window.liveKept = false }
                 }
             }
+        }
+    }
+
+    // nobody signed in: sign-in screens instead of the app
+    Loader {
+        anchors.fill: parent
+        active: !Auth.isReady
+        source: "pages/auth/AuthGate.qml"
+    }
+    Connections {
+        target: Auth
+        function onSessionEnded() {  // sign-out / session ended: no kept-alive Live page, no fullscreen
+            liveKeepAlive.stop()
+            window.liveKept = false
+            window.immersive = false
         }
     }
 

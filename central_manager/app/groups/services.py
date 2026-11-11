@@ -159,17 +159,21 @@ async def _labels_for_paths(paths: dict[int, str]) -> dict[int, str]:
 
 
 # ------------------------------------------------------------------ output with roll-up counts
-async def groups_out(groups: Sequence[CameraGroup]) -> list[GroupOut]:
+async def groups_out(groups: Sequence[CameraGroup], scope_groups: Q | None = None,
+                     scope_cameras: Q | None = None) -> list[GroupOut]:
     """A page of groups with labels and counts, in a fixed number of queries (not per group):
-    descendants of the page, cameras per group, online cameras per group, ancestor names."""
+    descendants of the page, cameras per group, online cameras per group, ancestor names.
+    `scope_groups` / `scope_cameras` (app/auth/scope.py) limit the counts to what the caller may see."""
     if not groups:
         return []
     cond = Q(*[Q(path__startswith=g.path) for g in groups], join_type="OR")
-    subtree = dict(await CameraGroup.filter(cond).values_list("id", "path"))
+    subtree = dict(await (CameraGroup.filter(cond).filter(scope_groups) if scope_groups is not None
+                           else CameraGroup.filter(cond)).values_list("id", "path"))
     sub_ids = list(subtree)
-    cams = dict(await Camera.filter(group_id__in=sub_ids).annotate(n=Count("id")).group_by("group_id")
+    visible = Camera.filter(scope_cameras) if scope_cameras is not None else Camera.all()
+    cams = dict(await visible.filter(group_id__in=sub_ids).annotate(n=Count("id")).group_by("group_id")
                 .values_list("group_id", "n"))
-    online = dict(await Camera.filter(
+    online = dict(await visible.filter(
         group_id__in=sub_ids, enabled=True,
         id__in=Subquery(CameraStream.filter(status__in=ONLINE).values("camera_id")),
     ).annotate(n=Count("id")).group_by("group_id").values_list("group_id", "n"))
@@ -189,8 +193,9 @@ async def groups_out(groups: Sequence[CameraGroup]) -> list[GroupOut]:
     return out
 
 
-async def group_detail(group: CameraGroup) -> GroupDetail:
-    (out,) = await groups_out([group])
+async def group_detail(group: CameraGroup, scope_groups: Q | None = None,
+                       scope_cameras: Q | None = None) -> GroupDetail:
+    (out,) = await groups_out([group], scope_groups, scope_cameras)
     ancestors = group.ancestor_ids()
     names = dict(await CameraGroup.filter(id__in=ancestors).values_list("id", "name")) if ancestors else {}
     return GroupDetail(**out.model_dump(), breadcrumb=[GroupRef(id=i, name=names.get(i, "?")) for i in ancestors])

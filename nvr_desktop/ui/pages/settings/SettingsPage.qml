@@ -10,6 +10,55 @@ PageScroll {
 
     PageHeader { title: "Settings"; description: "Stored on this computer only." }
 
+    // signed-in user (docs/DESKTOP_AUTH_PLAN.md §8): who, roles, what they may do, which cameras
+    Card {
+        id: account
+        objectName: "accountCard"
+        visible: Auth.enabled && Auth.state === "signed_in"
+        Layout.fillWidth: true
+        Layout.maximumWidth: 820
+        padding: 24
+        spacing: 12
+
+        RowLayout {
+            Layout.fillWidth: true
+            AppText { text: "Account"; font.pixelSize: Theme.textLg; font.weight: Font.Medium; Layout.fillWidth: true }
+            AppButton { text: "Sign out (all devices)"; iconName: "log-out"; variant: "outline"; onClicked: Auth.signOut() }
+        }
+        SettingRow {
+            title: Auth.user.display_name || ""
+            hint: (Auth.user.username || "") + " · signed in to " + Auth.serverUrl
+            Flow {
+                spacing: 6
+                Repeater {
+                    model: Auth.user.roles || []
+                    delegate: StatusBadge { required property var modelData; status: modelData }
+                }
+            }
+        }
+        SettingRow {
+            title: "Cameras"
+            hint: "Set on the Access page by an administrator."
+            AppText { text: Auth.scopeText }
+        }
+        AppText { text: "Permissions"; font.weight: Font.Medium }
+        Flow {
+            Layout.fillWidth: true
+            spacing: 6
+            Repeater {
+                model: Auth.permissionLabels
+                delegate: Rectangle {
+                    required property var modelData
+                    implicitWidth: label.implicitWidth + 16
+                    implicitHeight: 24
+                    radius: 12
+                    color: Theme.muted
+                    AppText { id: label; anchors.centerIn: parent; text: modelData; font.pixelSize: Theme.textXs }
+                }
+            }
+        }
+    }
+
     Card {
         Layout.fillWidth: true
         Layout.maximumWidth: 820
@@ -46,6 +95,12 @@ PageScroll {
                 enabled: urlField.text.replace(/\/+$/, "") !== Prefs.centralUrl
                 onClicked: SettingsPage.saveCentralUrl(urlField.text)
             }
+        }
+        AppText {
+            visible: Auth.enabled && urlField.text.replace(/\/+$/, "") !== Prefs.centralUrl
+            text: "Saving another server signs you out of this one."
+            color: Theme.warning
+            variant: "small"
         }
         RowLayout {
             visible: SettingsPage.testState !== "idle"

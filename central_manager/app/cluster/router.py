@@ -5,6 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
+from app.auth import scope
 from app.cameras.models import Camera, CameraStream
 from app.cluster.alerts import AlertCounts, AlertOut, camera_alerts, count_levels
 from app.nodes.models import MediaNode
@@ -59,6 +60,9 @@ async def cluster_alerts(
     """Enabled cameras that are unassigned, not recording, not answering ONVIF or whose clock drifts.
     Node alerts (unreachable, disk, storage) are built by the clients from `GET /api/v1/nodes`."""
     alerts = await camera_alerts()
+    if (visible := await scope.camera_q()) is not None:  # only the caller's cameras
+        ids = set(await Camera.filter(visible).values_list("id", flat=True))
+        alerts = [a for a in alerts if a.camera_id in ids]
     shown = [a for a in alerts if level is None or a.level == level]
     paged = page_of(shown, page)
     return AlertPage(**paged.model_dump(), counts=count_levels(alerts))

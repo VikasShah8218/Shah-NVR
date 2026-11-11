@@ -13,6 +13,7 @@ from __future__ import annotations
 from PySide6.QtCore import Property, Signal, Slot
 
 from app.core.context import AppContext
+from app.core.auth.permissions import CAMERA_READ
 from app.core.paged_store import PagedStore
 from app.features.cameras import forms
 
@@ -56,6 +57,7 @@ def _decorate(camera: dict) -> dict:
 
 
 class CamerasStore(PagedStore):
+    PERMS = CAMERA_READ
     camerasChanged = Signal()  # the cache behind byId() changed
     filterChanged = Signal()
     saved = Signal(int)  # camera id, after a successful create/update (closes the form sheet)

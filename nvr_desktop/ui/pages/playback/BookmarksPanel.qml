@@ -107,10 +107,12 @@ Card {
                     AppText { text: row.modelData.note; wrapMode: Text.WordWrap; elide: Text.ElideNone; Layout.fillWidth: true }
                 }
                 AppButton {
+                    visible: Auth.allowed["4"] === true
                     variant: "ghost"; size: "icon"; iconName: "pencil"; tip: "Edit bookmark"
                     onClicked: panel.dialog.openEdit(row.modelData)
                 }
                 AppButton {
+                    visible: Auth.allowed["4"] === true
                     variant: "ghost"; size: "icon"; iconName: "trash-2"; tip: "Delete bookmark"
                     onClicked: { panel.pendingDelete = row.modelData; confirmDelete.open() }
                 }

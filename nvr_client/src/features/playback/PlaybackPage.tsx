@@ -1,3 +1,5 @@
+import { Perm } from "@/lib/auth/permissions"
+import { useAuth } from "@/lib/auth/useAuth"
 import { BookmarkPlus, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Copy, Crosshair, Download, FileVideo, Film, X } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router"
@@ -41,6 +43,7 @@ const ZOOMS = [
 ]
 
 export function PlaybackPage() {
+  const { can } = useAuth()
   const [params, setParams] = useSearchParams()
   const { settings } = useSettings()
   // First page of the camera picker list: only used to pick a default camera and to detect "no cameras".
@@ -248,13 +251,17 @@ export function PlaybackPage() {
           </Button>
         </div>
         <div className="col-span-2 flex items-center gap-2 sm:col-span-1 sm:ml-auto">
-          <Button variant="outline" className="w-full sm:w-auto" onClick={() => setBookmarkOpen(true)} disabled={cameraId == null}
-            title="Bookmark the moment at the playhead">
-            <BookmarkPlus className="size-4" /> Bookmark
-          </Button>
-          <Button className="w-full sm:w-auto" onClick={() => setExportOpen(true)} disabled={cameraId == null || segments.length === 0}>
-            <FileVideo className="size-4" /> Export
-          </Button>
+          {can(Perm.BOOKMARKS_EDIT) && (
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setBookmarkOpen(true)} disabled={cameraId == null}
+              title="Bookmark the moment at the playhead">
+              <BookmarkPlus className="size-4" /> Bookmark
+            </Button>
+          )}
+          {can(Perm.EXPORT) && (
+            <Button className="w-full sm:w-auto" onClick={() => setExportOpen(true)} disabled={cameraId == null || segments.length === 0}>
+              <FileVideo className="size-4" /> Export
+            </Button>
+          )}
           <Button variant="outline" className="w-full sm:w-auto" onClick={copyVlc} disabled={!src}>
             <Copy className="size-4" /> VLC URL
           </Button>

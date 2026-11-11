@@ -18,10 +18,16 @@ from typing import Any
 from PySide6.QtCore import Property, QObject, Signal
 
 from app.core.api.central import CentralApi
+from app.core.api.errors import ApiError
 from app.core.context import AppContext
 from app.core.tasks import run_task
 
 logger = logging.getLogger(__name__)
+
+
+def _session_ended(exc: Exception) -> bool:
+    """A 401 that ends the session: no toast or error state, the login screen appears instead."""
+    return isinstance(exc, ApiError) and exc.status == 401
 
 
 class BaseStore(QObject):
@@ -65,8 +71,9 @@ class BaseStore(QObject):
         """Background read. A fetch with the same `name` is skipped while one is still running.
 
         track_error=True: the result drives the store's `loading` / `error` (the page's main data).
-        on_err: extra handler for failures (e.g. a per-item error message)."""
-        if name in self._in_flight:
+        on_err: extra handler for failures (e.g. a per-item error message).
+        Nothing is fetched while nobody is signed in (pollers keep ticking; they resume by themselves)."""
+        if name in self._in_flight or not getattr(self.ctx, "ready", True):  # no session at all = not gated
             return
         self._in_flight.add(name)
 
@@ -82,11 +89,16 @@ class BaseStore(QObject):
             logger.debug("%s.%s failed: %s", type(self).__name__, name, exc)
             if on_err:
                 on_err(exc)
-            if track_error:
+            if track_error and not _session_ended(exc):  # the login screen explains it
                 self._set_error(str(exc))
                 self._set_loading(False)
 
         run_task(fn, ok, err)
+
+    def allowed(self, *perms: int) -> bool:
+        """Does the signed-in user have any of these permissions? (always true when auth is off)"""
+        can = getattr(self.ctx, "can", None)  # contexts without a sign-in session allow everything
+        return can(*perms) if can else True
 
     def act(
         self,
@@ -104,7 +116,8 @@ class BaseStore(QObject):
                 after(result)
 
         def err(exc: Exception):
-            self.ctx.toasts.error(str(exc))
+            if not _session_ended(exc):
+                self.ctx.toasts.error(str(exc))
             if on_error:
                 on_error(exc)
 

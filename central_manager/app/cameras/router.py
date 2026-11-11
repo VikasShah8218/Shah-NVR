@@ -18,6 +18,7 @@ from app.cameras.schemas import (
 )
 from app.cameras.services import create_camera_with_streams
 from app.cameras.utils import camera_options_out, camera_to_out, cameras_to_out
+from app.auth import scope as access
 from app.groups.services import camera_scope, check_group_id
 from app.recordings.models import RecordingSegment
 from settings.settings import settings
@@ -99,6 +100,8 @@ async def list_cameras(
 ):
     scope = await camera_scope(group_id, ungrouped, recursive)
     qs = _camera_query(q, enabled, node_id, stream_status, _parse_ids(ids), sort, scope)
+    if (visible := await access.camera_q()) is not None:
+        qs = qs.filter(visible)
     return await paginate(qs, page, cameras_to_out)
 
 
@@ -116,6 +119,8 @@ async def camera_options(
     """`id`, `name` and what a picker or a live tile needs, without the full camera (streams, ONVIF details)."""
     scope = await camera_scope(group_id, ungrouped, recursive)
     qs = _camera_query(q, enabled, node_id, None, _parse_ids(ids), "name", scope)
+    if (visible := await access.camera_q()) is not None:
+        qs = qs.filter(visible)
     return await paginate(qs, page, camera_options_out)
 
 

@@ -97,6 +97,8 @@ class CameraDetailStore(BaseStore):
 
     def _refresh_history(self) -> None:
         cid, page = self._camera_id, self._history_page
+        if not self.allowed(24, 20):  # ASSIGNMENTS or CAMERAS_MANAGE (central's rule for the history)
+            return
 
         def load():
             rows, total = self.api.assignment_history(cid, limit=HISTORY_PER_PAGE, offset=(page - 1) * HISTORY_PER_PAGE)
@@ -115,6 +117,10 @@ class CameraDetailStore(BaseStore):
         cid = self._camera_id
         if not cid:
             return
+        if not self.allowed(1):  # Perm.LIVE: no live URLs (and no audited "live.open") without it
+            self.loadRecordings(self._recordings_profile)
+            return
+
         def load_live():
             node_id = (self._camera.get("assignment") or {}).get("node_id")
             access = self._nodes.access(node_id) if self._nodes is not None and node_id else "lan"
@@ -154,6 +160,8 @@ class CameraDetailStore(BaseStore):
         if not cid or not profile:
             return
         self._recordings_profile = profile
+        if not self.allowed(2):  # Perm.PLAYBACK
+            return
         end_ms = int(time.time() // 60 * 60 * 1000)
         start_ms = end_ms - DAY
         start = datetime.fromtimestamp(start_ms / 1000, timezone.utc)

@@ -6,6 +6,7 @@ from __future__ import annotations
 from PySide6.QtCore import Property, Signal, Slot
 
 from app.core.context import AppContext
+from app.core.auth.permissions import Perm
 from app.core.paged_store import PagedStore
 
 ASSIGNMENT_ROLES = ["camera_id", "camera_name", "node_id", "node_name", "generation", "lease_expires_at",
@@ -16,6 +17,7 @@ HISTORY_LIMIT = 50
 
 
 class AssignmentsStore(PagedStore):
+    PERMS = (Perm.ASSIGNMENTS,)
     historyChanged = Signal()
 
     def __init__(self, ctx: AppContext, parent=None):

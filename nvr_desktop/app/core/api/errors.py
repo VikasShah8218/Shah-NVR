@@ -43,4 +43,5 @@ def raise_for_response(response: httpx.Response) -> None:
         except (ValueError, AttributeError):
             detail = None
         code = detail.get("code") if isinstance(detail, dict) else None
+        code = code or response.headers.get("X-Auth-Error")  # auth codes come in a header (central app/auth/deps.py)
         raise ApiError(response.status_code, error_message(response), code=code, detail=detail)

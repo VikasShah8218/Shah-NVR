@@ -17,6 +17,7 @@ from PySide6.QtTest import QTest
 from unittest.mock import patch
 
 from app.core.api.models import Camera, OnvifDiscovered
+from app.core.auth.session import LOCAL_ADMIN
 from app.core.poller import Poller
 from app.core.preferences import Preferences
 from app.core.store import BaseStore
@@ -89,6 +90,29 @@ def main():
             def texts():
                 return [o.property("text") for o in walk(window) if o.metaObject().indexOfProperty("text") >= 0]
 
+            def visible(name):  # walk(): Repeater delegates are not QObject children
+                item = next((o for o in walk(window) if o.objectName() == name), None)
+                return item is not None and bool(item.property("visible"))
+
+            # Sign-in (docs/DESKTOP_AUTH_PLAN.md): with auth on and nobody signed in only the login form shows;
+            # no page is loaded. The rest of the smoke runs with auth off (the built-in local admin).
+            auth = stores["Auth"]
+            auth._enabled = True
+            auth._ended_reason = "Your session ended. Please sign in again."
+            auth._set_state("signed_out")
+            settle()
+            assert visible("loginUser") and visible("loginPassword") and visible("signInButton"), texts()
+            assert "Your session ended. Please sign in again." in texts()
+            assert not visible("nav-dashboard")
+            assert window.grabWindow().save(str(output / "login.png"))
+            auth._set_state("unreachable")
+            settle()
+            assert visible("retryButton"), texts()
+            auth._enabled, auth._user, auth._ended_reason = False, dict(LOCAL_ADMIN), ""
+            auth._set_state("disabled")
+            settle()
+            assert visible("nav-access") and visible("nav-audit") and not visible("userMenuButton")
+
             # Exercise the exact delegate contract that the old `model` role broke.
             engine.rootContext().setContextProperty("CameraRows", cameras.model)
             component = QQmlComponent(engine)
@@ -115,8 +139,19 @@ Item {
             assert second.property("cameraEnabled") is False
 
             stores["Prefs"].liveSidebarTab = "all"  # the flat camera list (the group tree is checked below)
+            access = stores["Access"]
+            access._apply_subjects({"roles": ["Admin", "Viewer"], "users": [
+                {"id": 1, "username": "shah", "display_name": "Mr Shah", "roles": ["Admin"], "is_active": True}]})
+            access._apply_summary([{"subject_type": "role", "subject": "Viewer", "all_cameras": False, "groups": 2,
+                                    "cameras": 1}])
+            access._set_loading(False)
+            stores["AuditLog"]._apply([{"id": 1, "at": "2026-11-11T10:00:00Z", "user_id": 1, "username": "shah",
+                                        "action": "auth.login", "method": "POST", "path": "/api/v1/auth/login",
+                                        "camera_id": None, "status": "ok", "detail": None, "ip": "127.0.0.1",
+                                        "detailText": ""}], 1)
+            stores["AuditLog"]._set_loading(False)
             for page in ("cameras", "live", "playback", "dashboard", "discover", "nodes", "assignments", "groups",
-                         "settings"):
+                         "access", "audit", "settings"):
                 router.go(page)
                 settle()
                 if page in ("cameras", "live", "playback"):
@@ -131,6 +166,17 @@ Item {
                     assert pager is not None and pager.property("visible") and "Page 1 / 3" in texts(), texts()
                     assert window.grabWindow().save(str(output / "cameras-paged.png"))
                     cameras._apply([camera, manual], 2)
+                if page == "access":
+                    assert "Viewer" in texts() and "2 groups · 1 camera" in texts(), texts()
+                    access.select("role", "Viewer", "Viewer")
+                    access._set_grants({"subject_type": "role", "subject": "Viewer", "all_cameras": False,
+                                        "groups": [{"id": 7, "name": "Anantnag"}], "cameras": [{"id": 1, "name": "Gate"}]})
+                    settle()
+                    assert visible("grantEditor") and "Anantnag" in texts(), texts()
+                    assert window.grabWindow().save(str(output / "access.png"))
+                if page == "audit":
+                    assert "auth.login" in texts(), texts()
+                    assert window.grabWindow().save(str(output / "audit.png"))
                 if page == "live":
                     stores["Live"]._set_grid_total(40)  # 4 per page -> 10 grid pages
                     settle()
@@ -305,6 +351,31 @@ Item {
             router.go("cameras")
             settle()
             assert "Gate renamed" in texts()
+
+            # A signed-in operator (live + playback only): the sidebar hides other pages, a forbidden page shows
+            # "No access", the user menu appears and actions without permission are hidden.
+            auth._enabled = True
+            auth._user = {"id": 5, "username": "op", "display_name": "Operator One", "roles": ["Operator"],
+                          "permissions": [1, 2], "is_admin": False, "local": False,
+                          "scope": {"all_cameras": False, "groups": 1, "cameras": 0}}
+            auth._set_state("signed_in")
+            settle()
+            assert visible("nav-live") and visible("nav-playback") and visible("nav-cameras")
+            assert not visible("nav-nodes") and not visible("nav-access") and not visible("nav-audit")
+            assert visible("userMenuButton") and "Operator One" in texts(), texts()
+            router.go("nodes")
+            settle()
+            assert visible("noAccess"), texts()
+            router.go("playback")
+            settle()
+            assert not visible("addBookmarkButton"), "bookmark button needs permission 4"
+            router.go("settings")
+            settle()
+            assert visible("accountCard") and "Live view" in texts() and "Playback" in texts(), texts()
+            assert window.grabWindow().save(str(output / "settings-account.png"))
+            auth._end("")
+            settle()
+            assert visible("loginUser"), texts()
 
             # No page should generate a QML warning, binding error or layout loop.
             bad = [m for m in messages if any(s in m for s in

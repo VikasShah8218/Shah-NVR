@@ -1,3 +1,5 @@
+import { Perm } from "@/lib/auth/permissions"
+import { useAuth } from "@/lib/auth/useAuth"
 import {
   Camera as CameraIcon,
   ChevronLeft,
@@ -100,6 +102,7 @@ function useGridPages(scope?: GridScope) {
 }
 
 export function LivePage() {
+  const { can } = useAuth()
   const { settings } = useSettings()
   const isMobile = useMediaQuery("(max-width: 767px)")
   const [desktopState, setDesktopState] = useState<LiveState>(() => readStored(STORAGE_KEY, { layout: 4, tiles: Array(16).fill(null) }))
@@ -228,7 +231,7 @@ export function LivePage() {
         <>
           <Button variant="ghost" size="icon-sm" title={`Play ${g.name} on the grid`} aria-label={`Play ${g.name}`}
             disabled={g.cameras_total === 0} onClick={() => playGroup(g)}><Play /></Button>
-          {!big && (
+          {!big && can(Perm.GROUPS_MANAGE) && (
             <Button variant="ghost" size="icon-sm" title="Manage group" aria-label={`Manage ${g.name}`}
               onClick={() => navigate(`/groups?group=${g.id}`)}><Settings2 /></Button>
           )}
@@ -405,7 +408,7 @@ export function LivePage() {
           {fullscreenCam != null && (
             <div className="relative flex min-h-0 flex-1 overflow-hidden">
               <DigitalZoomPlayer key={fullscreenCam} cameraId={fullscreenCam} protocol={protocol} />
-              {byId.get(fullscreenCam)?.has_ptz && <PtzOverlay key={`ptz-${fullscreenCam}`} cameraId={fullscreenCam} />}
+              {byId.get(fullscreenCam)?.has_ptz && can(Perm.PTZ) && <PtzOverlay key={`ptz-${fullscreenCam}`} cameraId={fullscreenCam} />}
             </div>
           )}
         </DialogContent>

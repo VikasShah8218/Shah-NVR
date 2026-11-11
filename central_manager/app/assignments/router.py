@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.auth import scope
 from app.assignments.models import AssignmentHistory, CameraAssignment
 from app.assignments.schemas import AssignmentHistoryOut, AssignmentOut, ManualAssignIn
 from app.assignments.services import assign_camera, scheduler_tick
@@ -30,6 +31,8 @@ async def list_assignments(
     q: str | None = Query(default=None, max_length=128, description="Camera name contains"),
 ):
     qs = CameraAssignment.all().prefetch_related("camera", "node").order_by("camera_id")
+    if (visible := await scope.camera_ids_subquery()) is not None:
+        qs = qs.filter(camera_id__in=visible)
     if node_id is not None:
         qs = qs.filter(node_id=node_id)
     if q and q.strip():

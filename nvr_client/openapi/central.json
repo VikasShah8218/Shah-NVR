@@ -5,6 +5,448 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/v1/auth/config": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Is sign-in required? (no token needed)",
+        "operationId": "auth_config_api_v1_auth_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfigOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Sign in (proxied to the Auth Server, app SNVR)",
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "New access + refresh tokens (refresh tokens rotate)",
+        "operationId": "refresh_api_v1_auth_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokensOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Sign out (everywhere: the user's token version is bumped)",
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "The signed-in user, permissions and camera scope",
+        "operationId": "me_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access/subjects": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "summary": "Roles and users that grants can be given to",
+        "operationId": "subjects_api_v1_access_subjects_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectsOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access/grants": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "summary": "Grants of one role / user (with subject_type + subject), or a summary of all",
+        "operationId": "get_grants_api_v1_access_grants_get",
+        "parameters": [
+          {
+            "name": "subject_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "role",
+                    "user"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subject Type"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subject"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/GrantsOut"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GrantSummary"
+                      }
+                    }
+                  ],
+                  "title": "Response Get Grants Api V1 Access Grants Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Access"
+        ],
+        "summary": "Replace the grants of one role / user",
+        "operationId": "put_grants_api_v1_access_grants_put",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantsIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audit": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Audit events, newest first (paged)",
+        "operationId": "list_audit_api_v1_audit_get",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Prefix, e.g. 'auth' or 'live.open'",
+              "title": "Action"
+            },
+            "description": "Prefix, e.g. 'auth' or 'live.open'"
+          },
+          {
+            "name": "camera_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Camera Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(ok|denied|failed)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Rows per page",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Rows per page"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Rows to skip",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Rows to skip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AuditOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/cameras": {
       "post": {
         "tags": [
@@ -5391,6 +5833,124 @@
         ],
         "title": "AudioTrackIn"
       },
+      "AuditOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "camera_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "at",
+          "user_id",
+          "username",
+          "action",
+          "method",
+          "path",
+          "camera_id",
+          "status",
+          "detail",
+          "ip"
+        ],
+        "title": "AuditOut"
+      },
+      "AuthConfigOut": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "app_key": {
+            "type": "string",
+            "title": "App Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "app_key"
+        ],
+        "title": "AuthConfigOut"
+      },
       "BackfillConfigOut": {
         "properties": {
           "camera_id": {
@@ -8419,6 +8979,149 @@
         ],
         "title": "GpuInfo"
       },
+      "GrantRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "GrantRef"
+      },
+      "GrantSummary": {
+        "properties": {
+          "subject_type": {
+            "type": "string",
+            "enum": [
+              "role",
+              "user"
+            ],
+            "title": "Subject Type"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "all_cameras": {
+            "type": "boolean",
+            "title": "All Cameras"
+          },
+          "groups": {
+            "type": "integer",
+            "title": "Groups"
+          },
+          "cameras": {
+            "type": "integer",
+            "title": "Cameras"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject_type",
+          "subject",
+          "all_cameras",
+          "groups",
+          "cameras"
+        ],
+        "title": "GrantSummary"
+      },
+      "GrantsIn": {
+        "properties": {
+          "subject_type": {
+            "type": "string",
+            "enum": [
+              "role",
+              "user"
+            ],
+            "title": "Subject Type"
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Subject"
+          },
+          "all_cameras": {
+            "type": "boolean",
+            "title": "All Cameras",
+            "default": false
+          },
+          "group_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Group Ids"
+          },
+          "camera_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Camera Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject_type",
+          "subject"
+        ],
+        "title": "GrantsIn"
+      },
+      "GrantsOut": {
+        "properties": {
+          "subject_type": {
+            "type": "string",
+            "enum": [
+              "role",
+              "user"
+            ],
+            "title": "Subject Type"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "all_cameras": {
+            "type": "boolean",
+            "title": "All Cameras"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/GrantRef"
+            },
+            "type": "array",
+            "title": "Groups"
+          },
+          "cameras": {
+            "items": {
+              "$ref": "#/components/schemas/GrantRef"
+            },
+            "type": "array",
+            "title": "Cameras"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject_type",
+          "subject",
+          "all_cameras",
+          "groups",
+          "cameras"
+        ],
+        "title": "GrantsOut"
+      },
       "GroupCreate": {
         "properties": {
           "name": {
@@ -9204,6 +9907,72 @@
         ],
         "title": "LiveStreamUrls"
       },
+      "LoginIn": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password"
+          },
+          "totp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Totp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginIn"
+      },
+      "LoginOut": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "refresh_token",
+          "expires_in",
+          "user"
+        ],
+        "title": "LoginOut"
+      },
       "ManualAssignIn": {
         "properties": {
           "node_id": {
@@ -9231,6 +10000,61 @@
           "profile_token"
         ],
         "title": "MappingIn"
+      },
+      "MeOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "permissions": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Permissions"
+          },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin"
+          },
+          "local": {
+            "type": "boolean",
+            "title": "Local",
+            "default": false
+          },
+          "scope": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Scope"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "display_name",
+          "roles",
+          "permissions",
+          "is_admin",
+          "scope"
+        ],
+        "title": "MeOut"
       },
       "MessageOut": {
         "properties": {
@@ -10100,6 +10924,37 @@
           "offset"
         ],
         "title": "Page[AssignmentOut]"
+      },
+      "Page_AuditOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[AuditOut]"
       },
       "Page_BackfillJobOut_": {
         "properties": {
@@ -11001,6 +11856,20 @@
         ],
         "title": "RecoveryOut"
       },
+      "RefreshIn": {
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Refresh Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "title": "RefreshIn"
+      },
       "SegmentBatchIn": {
         "properties": {
           "node_id": {
@@ -11787,6 +12656,66 @@
         "type": "object",
         "title": "StreamUpdate"
       },
+      "SubjectUser": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "display_name",
+          "roles",
+          "is_active"
+        ],
+        "title": "SubjectUser"
+      },
+      "SubjectsOut": {
+        "properties": {
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/SubjectUser"
+            },
+            "type": "array",
+            "title": "Users"
+          }
+        },
+        "type": "object",
+        "required": [
+          "roles",
+          "users"
+        ],
+        "title": "SubjectsOut"
+      },
       "SuggestedOut": {
         "properties": {
           "main": {
@@ -11879,6 +12808,83 @@
           "gaps"
         ],
         "title": "TimelineOut"
+      },
+      "TokensOut": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "refresh_token",
+          "expires_in"
+        ],
+        "title": "TokensOut"
+      },
+      "UserOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "permissions": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Permissions"
+          },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin"
+          },
+          "local": {
+            "type": "boolean",
+            "title": "Local",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "display_name",
+          "roles",
+          "permissions",
+          "is_admin"
+        ],
+        "title": "UserOut"
       },
       "ValidationError": {
         "properties": {

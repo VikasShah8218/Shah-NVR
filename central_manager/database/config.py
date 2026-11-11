@@ -7,6 +7,8 @@ APP_MODELS = [
     "app.assignments.models",
     "app.recordings.models",
     "app.bookmarks.models",
+    "app.access.models",
+    "app.audit.models",
 ]
 
 # Used by both the application and Aerich (`aerich init -t database.config.TORTOISE_ORM`).

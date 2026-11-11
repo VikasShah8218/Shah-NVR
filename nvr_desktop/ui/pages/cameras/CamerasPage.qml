@@ -43,8 +43,8 @@ PageScroll {
             noneLabel: "Any group"
             onPicked: (id, label) => { root.groupFilterLabel = label; Cameras.setGroupFilter(id) }
         }
-        AppButton { text: "Discover"; iconName: "search"; variant: "outline"; onClicked: Router.go("discover") }
-        AppButton { text: "Add camera"; iconName: "plus"; onClicked: form.openFor(null) }
+        AppButton { visible: Auth.allowed["20"] === true; text: "Discover"; iconName: "search"; variant: "outline"; onClicked: Router.go("discover") }
+        AppButton { visible: Auth.allowed["20"] === true; text: "Add camera"; iconName: "plus"; onClicked: form.openFor(null) }
     }
 
     LoadingState { visible: Cameras.loading && Cameras.error === "" && Cameras.listModel.count === 0 }
@@ -146,6 +146,7 @@ PageScroll {
                         AppSwitch {
                             id: enabledSwitch
                             checked: row.model.enabled
+                            enabled: Auth.allowed["20"] === true
                             onToggled: Cameras.setEnabled(row.model.id, checked)
                         }
                     }
@@ -184,15 +185,16 @@ PageScroll {
             camera = cam
             popup(button, button.width - width, button.height + 4)
         }
-        AppMenuItem { text: "Edit"; iconName: "pencil"; onTriggered: form.openFor(Cameras.byId(rowMenu.camera.id)) }
+        AppMenuItem { visible: Auth.allowed["20"] === true; text: "Edit"; iconName: "pencil"; onTriggered: form.openFor(Cameras.byId(rowMenu.camera.id)) }
         AppMenuItem { text: "Live preview"; iconName: "monitor-play"; onTriggered: Router.go("camera", rowMenu.camera.id) }
         AppMenuItem {
+            visible: Auth.allowed["2"] === true
             text: "Recordings"
             iconName: "history"
             onTriggered: Router.go("playback", 0, { camera: rowMenu.camera.id })
         }
-        MenuSeparator {}
-        AppMenuItem { text: "Delete"; iconName: "trash-2"; danger: true; onTriggered: deleteConfirm.open() }
+        MenuSeparator { visible: Auth.allowed["20"] === true; height: visible ? implicitHeight : 0 }
+        AppMenuItem { visible: Auth.allowed["20"] === true; text: "Delete"; iconName: "trash-2"; danger: true; onTriggered: deleteConfirm.open() }
     }
 
     ConfirmDialog {

@@ -61,15 +61,23 @@ PageScroll {
         description: root.c.description || ("Camera #" + (root.c.id ?? ""))
         StatusBadge { visible: root.ready && !root.c.enabled; status: "DISABLED"; anchors.verticalCenter: parent.verticalCenter }
         AppButton {
+            visible: Auth.allowed["2"] === true
             text: "Recordings"; iconName: "history"; variant: "outline"
             onClicked: Router.go("playback", 0, { camera: root.c.id })
         }
-        AppButton { text: "Edit"; iconName: "pencil"; onClicked: form.openFor(root.c) }
+        AppButton { visible: Auth.allowed["20"] === true; text: "Edit"; iconName: "pencil"; onClicked: form.openFor(root.c) }
     }
 
     AppTabs {
         visible: root.ready
-        options: [{ value: "overview", label: "Overview" }, { value: "device", label: "Device" }, { value: "video", label: "Video" }, { value: "recordings", label: "Recordings" }, { value: "backfill", label: "Backfill" }, { value: "assignment", label: "Assignment" }]
+        // each tab needs a permission (device 20, video/encoder 21, recordings 2, backfill 25, assignment 24 or 20)
+        options: [{ value: "overview", label: "Overview", ok: true },
+                  { value: "device", label: "Device", ok: Auth.allowed["20"] === true },
+                  { value: "video", label: "Video", ok: Auth.allowed["21"] === true },
+                  { value: "recordings", label: "Recordings", ok: Auth.allowed["2"] === true },
+                  { value: "backfill", label: "Backfill", ok: Auth.allowed["25"] === true },
+                  { value: "assignment", label: "Assignment", ok: Auth.allowed["24"] === true || Auth.allowed["20"] === true }]
+                 .filter(t => t.ok)
         current: root.tab
         onPicked: v => {
             root.tab = v
