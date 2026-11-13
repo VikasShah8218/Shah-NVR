@@ -67,6 +67,21 @@ class Settings(BaseSettings):
     AUTH_USERS_REFRESH_SECONDS: int = 600
     AUTH_LEEWAY_SECONDS: int = 30
     AUTH_HTTP_TIMEOUT_SECONDS: float = 10.0
+    # Which Auth Server (docs/AUTH_V2_PLAN.md). Switch with this line and a restart; both stay supported until
+    # every site runs on oidc.
+    #   legacy: the old Authentication-Server (AUTH_SERVER, AUTH_KEY HS256, login proxied by central)
+    #   oidc:   the new Auth Server through auth_sdk (ES256 + JWKS, events; clients sign in on its login page)
+    AUTH_PROVIDER: str = "legacy"
+    AUTH_ISSUER: str = "http://localhost:5181"  # exactly the new Auth Server's ISSUER
+    AUTH_API_URL: str = ""  # where central reaches it when that differs from the issuer (empty = issuer)
+    AUTH_OIDC_CLIENT_ID: str = "snvr-a"  # confidential server client: events.read permissions.read users.read
+    AUTH_OIDC_CLIENT_SECRET: str = ""  # never commit it
+    AUTH_WEB_CLIENT_ID: str = "snvr-web"  # public clients, handed to the apps by GET /auth/config
+    AUTH_DESKTOP_CLIENT_ID: str = "snvr-desktop"
+    AUTH_CLIENT_SCOPES: str = "openid profile email"
+    AUTH_STATE_PATH: str = "./data/auth-state.json"  # SDK keys + revocations, so a restart works during an outage
+    AUTH_INSTANCE_ID: str = ""  # name on the Auth Server's Downstream Sync page (empty = saved / random)
+    AUTH_MAX_STALENESS_SECONDS: int = 0  # 0 = keep serving through an outage (token lifetime is the limit)
     AUDIT_RETENTION_DAYS: int = 365
 
     @property

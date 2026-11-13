@@ -44,7 +44,7 @@ SESSION_ENDED = {"token_revoked", "inactive", "no_access", "invalid_token", "wro
 REFRESH_BEFORE_S = 60  # refresh this long before the access token expires
 RETRY_BACKOFF_S = (5, 10, 20, 40, 60)
 
-LOCAL_ADMIN = {"id": 0, "username": "local", "display_name": "Local administrator", "roles": [], "is_admin": True,
+LOCAL_ADMIN = {"id": "0", "username": "local", "display_name": "Local administrator", "roles": [], "is_admin": True,
                "permissions": list(ALL_PERMS), "local": True, "scope": {"all_cameras": True, "groups": 0, "cameras": 0}}
 
 
@@ -99,7 +99,7 @@ class AuthSession(QObject):
         self._login_error = ""
         self._busy = False
         self._reconnecting = False
-        self._last_user_id: int | None = None
+        self._last_user_id: str | None = None
         # token state, shared with worker threads
         self._lock = threading.Lock()
         self._refresh_lock = threading.Lock()

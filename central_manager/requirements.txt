@@ -6,4 +6,5 @@ pydantic>=2.7
 pydantic-settings>=2.3
 httpx>=0.27
 tzdata>=2024.1
-PyJWT>=2.9,<3
+PyJWT>=2.9,<3  # AUTH_PROVIDER=legacy
+# AUTH_PROVIDER=oidc also needs auth-sdk 0.3.0+, not on PyPI: pip install -e <Auth-Server>/sdk

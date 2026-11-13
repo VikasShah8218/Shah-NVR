@@ -12,13 +12,18 @@ ADMIN_ROLE = "Admin"
 
 @dataclass
 class Principal:
-    user_id: int
+    # Text, because the two Auth Servers differ: the old one numbers users ("12"), the new one uses UUIDs.
+    user_id: str
     username: str
-    roles: tuple[str, ...] = ()
+    roles: tuple[str, ...] = ()  # role names (display, Admin check)
     perms: frozenset[int] = frozenset()
     is_admin: bool = False  # "*" in the token (or the Admin role): every permission, every camera
     display_name: str = ""
     local: bool = False  # auth is off: built-in local admin
+    source: str = ""  # which Auth Server verified it: "legacy" | "oidc" ("" = local / anonymous)
+    sid: str = ""  # sign-in session (oidc only)
+    # what role grants are stored under: role names (legacy) or role ids that survive renames (oidc)
+    role_keys: tuple[str, ...] = ()
     # per-request cache of the camera scope (app/auth/scope.py)
     scope_cache: dict = field(default_factory=dict, repr=False, compare=False)
 
@@ -30,7 +35,7 @@ class Principal:
 
 
 def local_admin() -> Principal:
-    return Principal(user_id=0, username="local", roles=(ADMIN_ROLE,), is_admin=True, display_name="Local admin",
+    return Principal(user_id="0", username="local", roles=(ADMIN_ROLE,), is_admin=True, display_name="Local admin",
                      local=True)
 
 

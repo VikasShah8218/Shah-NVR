@@ -42,8 +42,8 @@ PageScroll {
                     iconName: "shield-check"
                     title: modelData.name
                     hint: modelData.summary
-                    active: Access.selected.type === "role" && Access.selected.name === modelData.name
-                    onClicked: Access.select("role", modelData.name, modelData.name)
+                    active: Access.selected.type === "role" && Access.selected.name === modelData.key
+                    onClicked: Access.select("role", modelData.key, modelData.name)
                 }
             }
             SectionTitle { iconName: "user"; label: "Users" }
@@ -64,8 +64,8 @@ PageScroll {
                     title: modelData.display_name
                     sub: modelData.sub
                     hint: modelData.summary
-                    active: Access.selected.type === "user" && Access.selected.name === String(modelData.id)
-                    onClicked: Access.select("user", String(modelData.id), modelData.display_name + " (" + modelData.username + ")")
+                    active: Access.selected.type === "user" && Access.selected.name === modelData.key
+                    onClicked: Access.select("user", modelData.key, modelData.display_name + " (" + modelData.username + ")")
                 }
             }
         }

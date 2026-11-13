@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Is sign-in required? (no token needed) */
+        /** Is sign-in required, and how? (no token needed) */
         get: operations["auth_config_api_v1_auth_config_get"];
         put?: never;
         post?: never;
@@ -81,6 +81,23 @@ export interface paths {
         };
         /** The signed-in user, permissions and camera scope */
         get: operations["me_api_v1_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which Auth Server, and its sync health */
+        get: operations["auth_status_api_v1_auth_status_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1533,7 +1550,9 @@ export interface components {
              */
             at: string;
             /** User Id */
-            user_id: number | null;
+            user_id: string | null;
+            /** Auth Source */
+            auth_source: string | null;
             /** Username */
             username: string;
             /** Action */
@@ -1559,6 +1578,30 @@ export interface components {
             enabled: boolean;
             /** App Key */
             app_key: string;
+            /**
+             * Mode
+             * @default legacy
+             */
+            mode: string;
+            /** Issuer */
+            issuer?: string | null;
+            /** Web Client Id */
+            web_client_id?: string | null;
+            /** Desktop Client Id */
+            desktop_client_id?: string | null;
+            /** Scopes */
+            scopes?: string | null;
+        };
+        /** AuthStatusOut */
+        AuthStatusOut: {
+            /** Enabled */
+            enabled: boolean;
+            /** Mode */
+            mode: string;
+            /** Health */
+            health: {
+                [key: string]: unknown;
+            };
         };
         /** BackfillConfigOut */
         BackfillConfigOut: {
@@ -2543,6 +2586,8 @@ export interface components {
             subject_type: "role" | "user";
             /** Subject */
             subject: string;
+            /** Label */
+            label: string;
             /** All Cameras */
             all_cameras: boolean;
             /** Groups */
@@ -2578,6 +2623,8 @@ export interface components {
             subject_type: "role" | "user";
             /** Subject */
             subject: string;
+            /** Label */
+            label: string;
             /** All Cameras */
             all_cameras: boolean;
             /** Groups */
@@ -2921,7 +2968,7 @@ export interface components {
         /** MeOut */
         MeOut: {
             /** Id */
-            id: number;
+            id: string;
             /** Username */
             username: string;
             /** Display Name */
@@ -3822,10 +3869,24 @@ export interface components {
             /** Rtsp Transport */
             rtsp_transport?: string | null;
         };
+        /** SubjectRole */
+        SubjectRole: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Removed
+             * @default false
+             */
+            removed: boolean;
+        };
         /** SubjectUser */
         SubjectUser: {
-            /** Id */
-            id: number;
+            /** Key */
+            key: string;
             /** Username */
             username: string;
             /** Display Name */
@@ -3838,7 +3899,7 @@ export interface components {
         /** SubjectsOut */
         SubjectsOut: {
             /** Roles */
-            roles: string[];
+            roles: components["schemas"]["SubjectRole"][];
             /** Users */
             users: components["schemas"]["SubjectUser"][];
         };
@@ -3893,7 +3954,7 @@ export interface components {
         /** UserOut */
         UserOut: {
             /** Id */
-            id: number;
+            id: string;
             /** Username */
             username: string;
             /** Display Name */
@@ -4163,6 +4224,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeOut"];
+                };
+            };
+        };
+    };
+    auth_status_api_v1_auth_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthStatusOut"];
                 };
             };
         };

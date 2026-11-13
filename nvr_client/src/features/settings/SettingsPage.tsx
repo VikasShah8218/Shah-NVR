@@ -15,7 +15,7 @@ import { type LiveProtocol, type NodeAccessPreference, useSettings } from "@/lib
 
 /** Who is signed in, their roles, camera scope and permissions (same as the desktop Settings → Account). */
 function AccountCard() {
-  const { enabled, user, logout } = useAuth()
+  const { enabled, mode, user, logout } = useAuth()
   const { settings } = useSettings()
   if (!enabled) return null
   const perms = user.is_admin ? Object.values(Perm) : [...user.permissions].sort((a, b) => a - b)
@@ -24,7 +24,7 @@ function AccountCard() {
       <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
         <CardTitle className="text-base">Account</CardTitle>
         <Button variant="outline" size="sm" onClick={() => void logout()}>
-          <LogOut className="size-4" /> Sign out (all devices)
+          <LogOut className="size-4" /> {mode === "oidc" ? "Sign out" : "Sign out (all devices)"}
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">

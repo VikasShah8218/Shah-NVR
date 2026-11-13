@@ -12,7 +12,10 @@ class AccessGrant(Model):
 
     id = fields.IntField(primary_key=True)
     subject_type = fields.CharField(max_length=8)  # "role" | "user"
-    subject = fields.CharField(max_length=128)  # role name, or the Auth Server user id as text
+    subject = fields.CharField(max_length=128)  # legacy: role name / user id; oidc: role id / user sub (UUIDs)
+    # which Auth Server the subject belongs to (legacy | oidc): ids of the two never match, so a grant only
+    # counts while its server is the active AUTH_PROVIDER (docs/AUTH_V2_PLAN.md)
+    auth_source = fields.CharField(max_length=8, default="legacy")
     all_cameras = fields.BooleanField(default=False)
     group = fields.ForeignKeyField("models.CameraGroup", related_name="grants", null=True, on_delete=fields.CASCADE)
     camera = fields.ForeignKeyField("models.Camera", related_name="grants", null=True, on_delete=fields.CASCADE)
@@ -20,5 +23,5 @@ class AccessGrant(Model):
 
     class Meta:
         table = "access_grants"
-        indexes = (("subject_type", "subject"),)
+        indexes = (("auth_source", "subject_type", "subject"),)
         ordering = ["id"]

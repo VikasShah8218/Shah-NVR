@@ -10,7 +10,7 @@
         "tags": [
           "Auth"
         ],
-        "summary": "Is sign-in required? (no token needed)",
+        "summary": "Is sign-in required, and how? (no token needed)",
         "operationId": "auth_config_api_v1_auth_config_get",
         "responses": {
           "200": {
@@ -136,6 +136,27 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/status": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Which Auth Server, and its sync health",
+        "operationId": "auth_status_api_v1_auth_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthStatusOut"
                 }
               }
             }
@@ -5847,13 +5868,24 @@
           "user_id": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "title": "User Id"
+          },
+          "auth_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auth Source"
           },
           "username": {
             "type": "string",
@@ -5922,6 +5954,7 @@
           "id",
           "at",
           "user_id",
+          "auth_source",
           "username",
           "action",
           "method",
@@ -5942,6 +5975,55 @@
           "app_key": {
             "type": "string",
             "title": "App Key"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "default": "legacy"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "web_client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web Client Id"
+          },
+          "desktop_client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desktop Client Id"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
           }
         },
         "type": "object",
@@ -5950,6 +6032,30 @@
           "app_key"
         ],
         "title": "AuthConfigOut"
+      },
+      "AuthStatusOut": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "health": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Health"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "mode",
+          "health"
+        ],
+        "title": "AuthStatusOut"
       },
       "BackfillConfigOut": {
         "properties": {
@@ -9011,6 +9117,10 @@
             "type": "string",
             "title": "Subject"
           },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
           "all_cameras": {
             "type": "boolean",
             "title": "All Cameras"
@@ -9028,6 +9138,7 @@
         "required": [
           "subject_type",
           "subject",
+          "label",
           "all_cameras",
           "groups",
           "cameras"
@@ -9093,6 +9204,10 @@
             "type": "string",
             "title": "Subject"
           },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
           "all_cameras": {
             "type": "boolean",
             "title": "All Cameras"
@@ -9116,6 +9231,7 @@
         "required": [
           "subject_type",
           "subject",
+          "label",
           "all_cameras",
           "groups",
           "cameras"
@@ -10004,7 +10120,7 @@
       "MeOut": {
         "properties": {
           "id": {
-            "type": "integer",
+            "type": "string",
             "title": "Id"
           },
           "username": {
@@ -12656,11 +12772,45 @@
         "type": "object",
         "title": "StreamUpdate"
       },
+      "SubjectRole": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "removed": {
+            "type": "boolean",
+            "title": "Removed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name"
+        ],
+        "title": "SubjectRole"
+      },
       "SubjectUser": {
         "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
+          "key": {
+            "type": "string",
+            "title": "Key"
           },
           "username": {
             "type": "string",
@@ -12684,7 +12834,7 @@
         },
         "type": "object",
         "required": [
-          "id",
+          "key",
           "username",
           "display_name",
           "roles",
@@ -12696,7 +12846,7 @@
         "properties": {
           "roles": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/SubjectRole"
             },
             "type": "array",
             "title": "Roles"
@@ -12840,7 +12990,7 @@
       "UserOut": {
         "properties": {
           "id": {
-            "type": "integer",
+            "type": "string",
             "title": "Id"
           },
           "username": {

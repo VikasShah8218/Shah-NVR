@@ -26,7 +26,7 @@ from app.core.store import BaseStore
 app = QCoreApplication.instance() or QCoreApplication([])
 BASE = "http://central.test"
 ROOT = Path(__file__).resolve().parents[2]
-ME = {"id": 7, "username": "op", "display_name": "Operator", "roles": ["Operator"], "permissions": [1, 2],
+ME = {"id": "7", "username": "op", "display_name": "Operator", "roles": ["Operator"], "permissions": [1, 2],
       "is_admin": False, "local": False, "scope": {"all_cameras": False, "groups": 1, "cameras": 0}}
 
 
@@ -326,7 +326,7 @@ def test_api_retries_while_central_loads_the_users(monkeypatch):
     route = respx.get(f"{BASE}/api/v1/auth/me").mock(side_effect=[
         httpx.Response(503, json={"detail": "syncing"}, headers={"X-Auth-Error": "auth_syncing"}),
         httpx.Response(200, json=ME)])
-    assert CentralApi(BASE, Tokens()).me()["id"] == 7 and route.call_count == 2
+    assert CentralApi(BASE, Tokens()).me()["id"] == "7" and route.call_count == 2
 
 
 @respx.mock

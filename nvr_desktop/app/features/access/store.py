@@ -49,7 +49,9 @@ class AccessStore(BaseStore):
         self.fetch("summary", self.api.access_summary, self._apply_summary, track_error=False)
 
     def _apply_subjects(self, data: dict) -> None:
-        self._roles = [{"name": r, "summary": ""} for r in data.get("roles") or []]
+        # key = what grants store: role name / user id (old Auth Server) or role id / user sub (new one)
+        self._roles = [{"key": r["key"], "name": r["name"], "removed": bool(r.get("removed")), "summary": ""}
+                       for r in data.get("roles") or []]
         self._users = list(data.get("users") or [])
         self._decorate()
 
@@ -59,11 +61,14 @@ class AccessStore(BaseStore):
 
     def _decorate(self) -> None:
         for role in self._roles:
-            role["summary"] = summary_text(self._summary.get(f"role:{role['name']}"), role["name"] == ADMIN_ROLE)
+            role["summary"] = summary_text(self._summary.get(f"role:{role['key']}"), role["name"] == ADMIN_ROLE)
+            if role["removed"]:
+                role["summary"] = "Removed on the Auth Server · " + role["summary"]
         for user in self._users:
-            user["summary"] = summary_text(self._summary.get(f"user:{user['id']}"))
+            user["summary"] = summary_text(self._summary.get(f"user:{user['key']}"))
+            user["display_name"] = user.get("display_name") or user.get("username", "")
             roles = ", ".join(user.get("roles") or []) or "no role"
-            user["sub"] = f"{user.get('username', '')} · {roles}" + ("" if user.get("is_active", True) else " · inactive")
+            user["sub"] = f"{user.get('username', '')} · {roles}" + ("" if user.get("is_active", True) else " · disabled")
         self.subjectsChanged.emit()
 
     # ------------------------------------------------------------------ one subject
@@ -71,9 +76,9 @@ class AccessStore(BaseStore):
     def select(self, subject_type: str, subject: str, label: str) -> None:
         roles = []
         if subject_type == "user":
-            roles = next((u.get("roles") or [] for u in self._users if str(u.get("id")) == subject), [])
+            roles = next((u.get("roles") or [] for u in self._users if u.get("key") == subject), [])
         self._selected = {"type": subject_type, "name": subject, "label": label, "roles": roles,
-                          "isAdminRole": subject_type == "role" and subject == ADMIN_ROLE}
+                          "isAdminRole": subject_type == "role" and label == ADMIN_ROLE}
         self._grants, self._grants_error, self._grants_loading = None, "", True
         self.grantsChanged.emit()
 

@@ -1,10 +1,12 @@
-"""Shah-NVR permission numbers (docs/AUTH_INTEGRATION_PLAN.md §5).
+"""Shah-NVR permission numbers (docs/AUTH_INTEGRATION_PLAN.md §5, docs/AUTH_V2_PLAN.md).
 
-The Auth Server puts permission *codes* in the access token's `perms` claim. For app SNVR the codes are these
-numbers as text ("1", "20"...) plus "*" = everything. Numbers keep the token small; the meaning lives here.
-The web and desktop clients mirror this table to hide what a user cannot do (the server enforces it).
+Inside Shah-NVR a permission is always one of these numbers: the route rules (policy.py), /auth/me and the web
+and desktop clients use them. Only the token format differs between the two Auth Servers:
+* legacy: the `perms` claim lists the numbers as text ("1", "20"...) plus "*" = everything;
+* oidc:   the token carries a bit mask of named codes; CODES below maps each code to its number.
 """
 
+from collections.abc import Callable
 from enum import IntEnum
 
 ALL = "*"
@@ -44,3 +46,29 @@ def parse_perms(raw: object) -> tuple[bool, frozenset[int]]:
         if value in known:
             numbers.add(value)
     return is_all, frozenset(numbers)
+
+
+# New Auth Server (AUTH_PROVIDER=oidc): the permission codes of app SNVR. Create exactly these in its console.
+CODES: dict[str, Perm] = {
+    "live.view": Perm.LIVE,
+    "playback.view": Perm.PLAYBACK,
+    "export.create": Perm.EXPORT,
+    "bookmark.edit": Perm.BOOKMARKS_EDIT,
+    "ptz.control": Perm.PTZ,
+    "ptz.admin": Perm.PTZ_ADMIN,
+    "audio.listen": Perm.AUDIO,
+    "camera.manage": Perm.CAMERAS_MANAGE,
+    "encoder.manage": Perm.ENCODER,
+    "group.manage": Perm.GROUPS_MANAGE,
+    "node.manage": Perm.NODES_MANAGE,
+    "assignment.manage": Perm.ASSIGNMENTS,
+    "backfill.manage": Perm.BACKFILL,
+    "access.manage": Perm.ACCESS_MANAGE,
+    "audit.view": Perm.AUDIT_VIEW,
+    "dashboard.view": Perm.DASHBOARD,
+}
+
+
+def perms_from_codes(has_perm: Callable[[str], bool]) -> frozenset[int]:
+    """The numbers whose code the token grants (`has_perm` = auth_sdk Principal.has_perm)."""
+    return frozenset(perm.value for code, perm in CODES.items() if has_perm(code))

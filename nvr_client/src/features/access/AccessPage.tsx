@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils"
 /** Which cameras each role / user may see (docs/AUTH_INTEGRATION_PLAN.md §6). What they may *do* comes from their
  *  role's permission numbers on the Auth Server; this page only decides *which cameras*. */
 
+/** name = the key grants are stored under (role name / user id on the old Auth Server, role id / user sub on the
+ *  new one); label = what to show. */
 type Subject = { type: "role" | "user"; name: string; label: string }
 type Item = { id: number; name: string }
 
@@ -43,24 +45,25 @@ export function AccessPage() {
             <SectionTitle icon={Users} label="Roles" />
             {roles.length === 0 && <p className="px-4 pb-2 text-sm text-muted-foreground">No roles yet.</p>}
             {roles.map((role) => (
-              <SubjectRow key={`r-${role}`} active={selected?.type === "role" && selected.name === role}
-                icon={ShieldCheck} title={role} hint={summaryText(summaryOf("role", role), role === ADMIN_ROLE)}
-                onClick={() => setSelected({ type: "role", name: role, label: role })} />
+              <SubjectRow key={`r-${role.key}`} active={selected?.type === "role" && selected.name === role.key}
+                icon={ShieldCheck} title={role.name} sub={role.removed ? "removed on the Auth Server" : role.description ?? undefined}
+                hint={summaryText(summaryOf("role", role.key), role.name === ADMIN_ROLE)}
+                onClick={() => setSelected({ type: "role", name: role.key, label: role.name })} />
             ))}
             <SectionTitle icon={User} label="Users" />
             {users.length === 0 && <p className="px-4 pb-2 text-sm text-muted-foreground">No users have access to this application yet.</p>}
             {users.map((u) => (
-              <SubjectRow key={`u-${u.id}`} active={selected?.type === "user" && selected.name === String(u.id)}
-                icon={User} title={u.display_name} sub={`${u.username} · ${u.roles.join(", ") || "no role"}${u.is_active ? "" : " · inactive"}`}
-                hint={summaryText(summaryOf("user", String(u.id)), false)}
-                onClick={() => setSelected({ type: "user", name: String(u.id), label: `${u.display_name} (${u.username})` })} />
+              <SubjectRow key={`u-${u.key}`} active={selected?.type === "user" && selected.name === u.key}
+                icon={User} title={u.display_name || u.username} sub={`${u.username} · ${u.roles.join(", ") || "no role"}${u.is_active ? "" : " · disabled"}`}
+                hint={summaryText(summaryOf("user", u.key), false)} muted={!u.is_active}
+                onClick={() => setSelected({ type: "user", name: u.key, label: `${u.display_name || u.username} (${u.username})` })} />
             ))}
           </Card>
           <div className="min-w-0">
             {selected ? (
               <GrantEditor key={`${selected.type}:${selected.name}`} subject={selected}
-                isAdminRole={selected.type === "role" && selected.name === ADMIN_ROLE}
-                userRoles={selected.type === "user" ? users.find((u) => String(u.id) === selected.name)?.roles ?? [] : []} />
+                isAdminRole={selected.type === "role" && selected.label === ADMIN_ROLE}
+                userRoles={selected.type === "user" ? users.find((u) => u.key === selected.name)?.roles ?? [] : []} />
             ) : (
               <EmptyState icon={KeyRound} title="Choose a role or a user">
                 A user sees the cameras of their own grants plus those of each of their roles. Admins see everything.
@@ -81,8 +84,9 @@ function SectionTitle({ icon: Icon, label }: { icon: typeof Users; label: string
   )
 }
 
-function SubjectRow({ active, icon: Icon, title, sub, hint, onClick }: {
+function SubjectRow({ active, icon: Icon, title, sub, hint, muted, onClick }: {
   active: boolean
+  muted?: boolean
   icon: typeof Users
   title: string
   sub?: string
@@ -91,7 +95,7 @@ function SubjectRow({ active, icon: Icon, title, sub, hint, onClick }: {
 }) {
   return (
     <button type="button" onClick={onClick}
-      className={cn("mx-2 flex w-[calc(100%-1rem)] items-start gap-2.5 rounded-md px-2.5 py-2 text-left hover:bg-accent", active && "bg-accent")}>
+      className={cn("mx-2 flex w-[calc(100%-1rem)] items-start gap-2.5 rounded-md px-2.5 py-2 text-left hover:bg-accent", active && "bg-accent", muted && "opacity-60")}>
       <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{title}</span>

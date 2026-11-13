@@ -78,8 +78,9 @@ async def verify_access_token(token: str, runtime: AuthRuntime) -> Principal:
 
     is_all, perms = parse_perms(claims.get("perms"))
     roles = tuple(str(r) for r in claims.get("roles") or [])
-    return Principal(user_id=user_id, username=str(claims.get("sub") or user.username), roles=roles, perms=perms,
-                     is_admin=is_all or ADMIN_ROLE in roles, display_name=user.display_name)
+    return Principal(user_id=str(user_id), username=str(claims.get("sub") or user.username), roles=roles, perms=perms,
+                     is_admin=is_all or ADMIN_ROLE in roles, display_name=user.display_name, source="legacy",
+                     role_keys=roles)
 
 
 def check_signing_key() -> None:

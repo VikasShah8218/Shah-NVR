@@ -11,6 +11,7 @@ from tortoise.expressions import Q, Subquery
 
 from app.access.models import AccessGrant
 from app.auth.principal import Principal, current
+from app.auth.provider import active_source
 from app.cameras.models import Camera
 from app.groups.models import CameraGroup, path_ids
 
@@ -26,10 +27,10 @@ async def _load(p: Principal) -> dict:
     cache["group_paths"], cache["camera_ids"] = [], []
     if p.is_admin:
         return cache
-    who = Q(subject_type="user", subject=str(p.user_id))
-    if p.roles:
-        who |= Q(subject_type="role", subject__in=list(p.roles))
-    grants = await AccessGrant.filter(who).prefetch_related("group")
+    who = Q(subject_type="user", subject=p.user_id)
+    if p.role_keys:  # role names (legacy) or role ids (oidc)
+        who |= Q(subject_type="role", subject__in=list(p.role_keys))
+    grants = await AccessGrant.filter(who, auth_source=p.source or active_source()).prefetch_related("group")
     if any(g.all_cameras for g in grants):
         cache["all"] = True
         return cache

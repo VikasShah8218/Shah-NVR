@@ -8,7 +8,9 @@ class AuditEvent(Model):
 
     id = fields.BigIntField(primary_key=True)
     at = fields.DatetimeField(auto_now_add=True, db_index=True)
-    user_id = fields.IntField(null=True)
+    # text: "12" from the old Auth Server, a UUID from the new one; auth_source says which (legacy | oidc)
+    user_id = fields.CharField(max_length=64, null=True)
+    auth_source = fields.CharField(max_length=8, null=True)
     username = fields.CharField(max_length=128)
     action = fields.CharField(max_length=64, db_index=True)  # e.g. live.open, camera.update, auth.login
     method = fields.CharField(max_length=8, null=True)

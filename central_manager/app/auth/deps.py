@@ -15,16 +15,16 @@ from fastapi import HTTPException, Request
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.audit.services import record
-from app.auth.integration import get_runtime
 from app.auth.policy import allows, change_action, rule_for
 from app.auth.principal import Principal, local_admin, set_current
+from app.auth.provider import get_provider
 from app.auth.scope import camera_visible
-from app.auth.verify import AuthError, verify_access_token
+from app.auth.verify import AuthError
 from settings.settings import settings
 
 logger = logging.getLogger("central.auth")
 
-ANONYMOUS = Principal(user_id=-1, username="anonymous")
+ANONYMOUS = Principal(user_id="", username="anonymous")
 
 
 def bearer_token(request: Request, allow_query: bool) -> str | None:
@@ -47,16 +47,20 @@ async def authenticate(request: Request, allow_query: bool = False) -> Principal
     token = bearer_token(request, allow_query)
     if not token:
         raise HTTPException(401, "Sign in required", headers={"WWW-Authenticate": "Bearer", "X-Auth-Error": "missing"})
-    runtime = get_runtime()
-    if runtime is None:
+    provider = get_provider()
+    if provider is None:
         raise HTTPException(503, "Authentication is not running")
     try:
-        return await verify_access_token(token, runtime)
+        principal = await provider.verify(token)
     except AuthError as exc:
         headers = {"X-Auth-Error": exc.code}
         if exc.status == 401:
             headers["WWW-Authenticate"] = "Bearer"
         raise HTTPException(exc.status, exc.detail, headers=headers) from exc
+    if provider.new_session(principal):  # oidc: sign-in happened on the Auth Server; note its first use here
+        await record(principal, "auth.session", method=request.method, path=request.url.path,
+                     detail={"sid": principal.sid}, ip=client_ip(request))
+    return principal
 
 
 async def guard(request: Request) -> None:

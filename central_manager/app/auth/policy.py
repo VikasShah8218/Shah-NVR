@@ -47,6 +47,7 @@ POLICY: dict[tuple[str, str], Rule] = {
     ("POST", "/api/v1/auth/refresh"): PUBLIC,
     ("POST", "/api/v1/auth/logout"): Rule(audit_changes=False),  # the router writes "auth.logout"
     ("GET", "/api/v1/auth/me"): SIGNED_IN,
+    ("GET", "/api/v1/auth/status"): any_of(P.DASHBOARD),
     ("GET", "/api/v1/access/subjects"): any_of(P.ACCESS_MANAGE),
     ("GET", "/api/v1/access/grants"): any_of(P.ACCESS_MANAGE),
     ("PUT", "/api/v1/access/grants"): any_of(P.ACCESS_MANAGE),

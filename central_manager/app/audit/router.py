@@ -16,7 +16,8 @@ router = APIRouter(prefix="/api/v1/audit", tags=["Audit"])
 class AuditOut(BaseModel):
     id: int
     at: datetime
-    user_id: int | None
+    user_id: str | None
+    auth_source: str | None
     username: str
     action: str
     method: str | None

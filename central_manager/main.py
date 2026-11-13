@@ -25,9 +25,8 @@ from app.cluster.router import router as cluster_router
 from app.audit.router import router as audit_router
 from app.audit.services import prune_audit
 from app.auth.deps import AuditMiddleware, guard
-from app.auth.integration import create_runtime, set_runtime
+from app.auth.provider import check_provider_setting, create_provider, set_provider
 from app.auth.router import router as auth_router
-from app.auth.verify import check_signing_key
 from app.groups.router import router as groups_router
 from app.nodes.router import internal_router as nodes_internal_router
 from app.nodes.router import router as nodes_router
@@ -63,14 +62,14 @@ async def lifespan(app: FastAPI):
                                              backfill_scheduler_tick)),
             asyncio.create_task(run_periodic("audit-retention", 86400, prune_audit)),
         ]
-        auth_runtime = None
-        if settings.AUTH_ENABLED:  # docs/AUTH_INTEGRATION_PLAN.md: service token, users snapshot, revocations
-            check_signing_key()
-            auth_runtime = create_runtime()
-            set_runtime(auth_runtime)
-            auth_runtime.start()
+        check_provider_setting()
+        auth_provider = None
+        if settings.AUTH_ENABLED:  # docs/AUTH_V2_PLAN.md: legacy (old server) or oidc (new server, auth_sdk)
+            auth_provider = create_provider()
+            await auth_provider.start()
+            set_provider(auth_provider)
         logger.info("%s started (auth %s)", settings.APP_NAME,
-                    f"ON, app {settings.AUTH_APP_KEY}, {settings.AUTH_STATE_BACKEND} state" if settings.AUTH_ENABLED
+                    f"ON, {settings.AUTH_PROVIDER} provider, app {settings.AUTH_APP_KEY}" if settings.AUTH_ENABLED
                     else "OFF: open API")
         try:
             yield
@@ -78,9 +77,9 @@ async def lifespan(app: FastAPI):
             for t in tasks:
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
-            if auth_runtime is not None:
-                await auth_runtime.stop()
-                set_runtime(None)
+            if auth_provider is not None:
+                set_provider(None)
+                await auth_provider.stop()
 
 
 # Every API route goes through the guard (app/auth/deps.py): permission rule, caller, camera scope, audit mark.

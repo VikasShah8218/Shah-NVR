@@ -140,8 +140,9 @@ Item {
 
             stores["Prefs"].liveSidebarTab = "all"  # the flat camera list (the group tree is checked below)
             access = stores["Access"]
-            access._apply_subjects({"roles": ["Admin", "Viewer"], "users": [
-                {"id": 1, "username": "shah", "display_name": "Mr Shah", "roles": ["Admin"], "is_active": True}]})
+            access._apply_subjects({"roles": [{"key": "Admin", "name": "Admin"}, {"key": "Viewer", "name": "Viewer"}],
+                                    "users": [{"key": "1", "username": "shah", "display_name": "Mr Shah",
+                                               "roles": ["Admin"], "is_active": True}]})
             access._apply_summary([{"subject_type": "role", "subject": "Viewer", "all_cameras": False, "groups": 2,
                                     "cameras": 1}])
             access._set_loading(False)
@@ -355,7 +356,7 @@ Item {
             # A signed-in operator (live + playback only): the sidebar hides other pages, a forbidden page shows
             # "No access", the user menu appears and actions without permission are hidden.
             auth._enabled = True
-            auth._user = {"id": 5, "username": "op", "display_name": "Operator One", "roles": ["Operator"],
+            auth._user = {"id": "5", "username": "op", "display_name": "Operator One", "roles": ["Operator"],
                           "permissions": [1, 2], "is_admin": False, "local": False,
                           "scope": {"all_cameras": False, "groups": 1, "cameras": 0}}
             auth._set_state("signed_in")

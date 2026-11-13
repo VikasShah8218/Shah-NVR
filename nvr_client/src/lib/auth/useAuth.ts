@@ -4,6 +4,8 @@ import type { AuthUser } from "./session"
 export interface AuthContextValue {
   /** sign-in required by central */
   enabled: boolean
+  /** which Auth Server: legacy (password form via central) | oidc (the Auth Server's login page) */
+  mode: "legacy" | "oidc"
   user: AuthUser
   /** any one of `perms` (none = any signed-in user) */
   can: (...perms: number[]) => boolean

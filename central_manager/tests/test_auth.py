@@ -10,7 +10,7 @@ import jwt
 import pytest
 from fastapi.testclient import TestClient
 
-from app.auth import integration
+from app.auth import provider as provider_module
 from app.auth.integration import AuthRuntime, AuthServer, parse_events, parse_user
 from app.auth.policy import rule_for
 from app.auth.state import AuthUser, MemoryAuthStateStore
@@ -86,7 +86,7 @@ def auth_on(monkeypatch):
     monkeypatch.setattr(settings, "AUTH_ENABLED", True)
     monkeypatch.setattr(settings, "AUTH_KEY", KEY)
     monkeypatch.setattr(settings, "AUTH_CLIENT_SECRET", "secret")
-    monkeypatch.setattr(main, "create_runtime", lambda: runtime)
+    monkeypatch.setattr(provider_module, "create_runtime", lambda: runtime)
     server = runtime.server
 
     async def refresh_now(wait: float = 3.0):  # no background loop in tests: fetch at once
@@ -111,7 +111,8 @@ def test_auth_off_is_open_as_before():
     import main
 
     with TestClient(main.app) as c:
-        assert c.get("/api/v1/auth/config").json() == {"enabled": False, "app_key": "SNVR"}
+        cfg = c.get("/api/v1/auth/config").json()
+        assert (cfg["enabled"], cfg["app_key"], cfg["mode"], cfg["issuer"]) == (False, "SNVR", "legacy", None)
         me = c.get("/api/v1/auth/me").json()
         assert me["local"] and me["is_admin"] and me["scope"]["all_cameras"]
         assert c.post("/api/v1/cameras", json={"name": "Gate", "streams": STREAM}).status_code == 201
@@ -211,7 +212,9 @@ def test_camera_scope_through_groups(auth_on):
     assert {(s["subject_type"], s["subject"], s["groups"], s["cameras"]) for s in summary} == \
         {("role", "Viewer", 1, 0), ("user", "2", 0, 1)}
     subjects = c.get("/api/v1/access/subjects", headers=admin).json()
-    assert "Viewer" in subjects["roles"] and {u["username"] for u in subjects["users"]} == {"shah", "guard", "gone"}
+    assert "Viewer" in [r["key"] for r in subjects["roles"]]
+    assert {(u["key"], u["username"]) for u in subjects["users"]} == {("1", "shah"), ("2", "guard"), ("3", "gone")}
+    assert {(s["subject"], s["label"]) for s in summary} == {("Viewer", "Viewer"), ("2", "guard")}
     # all cameras grant
     c.put("/api/v1/access/grants", json={"subject_type": "role", "subject": "Viewer", "all_cameras": True}, headers=admin)
     assert c.get("/api/v1/cameras/options", headers=viewer).json()["total"] == 3
@@ -281,4 +284,4 @@ def anyio_backend():
 
 
 def test_runtime_is_not_left_behind():
-    assert integration.get_runtime() is None
+    assert provider_module.get_provider() is None

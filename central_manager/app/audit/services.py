@@ -19,7 +19,8 @@ async def record(principal: Principal | None, action: str, *, method: str | None
     """Never let an audit failure break the request it describes."""
     try:
         await AuditEvent.create(
-            user_id=principal.user_id if principal and not principal.local else None,
+            user_id=(principal.user_id or None) if principal and not principal.local else None,
+            auth_source=(principal.source or None) if principal else None,
             username=(principal.username if principal else "anonymous")[:128], action=action[:64], method=method,
             path=path[:512], camera_id=camera_id, status=status, detail=detail, ip=(ip or "")[:64] or None,
         )

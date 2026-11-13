@@ -1,10 +1,14 @@
-"""Auth endpoints for the clients (docs/AUTH_INTEGRATION_PLAN.md §7.1, decision D5: login goes through central).
+"""Auth endpoints for the clients (docs/AUTH_INTEGRATION_PLAN.md §7.1, docs/AUTH_V2_PLAN.md).
 
-GET  /api/v1/auth/config   -> {enabled, app_key}: does the client need a login screen?
-POST /api/v1/auth/login    -> proxied to the Auth Server with app_key forced to SNVR
-POST /api/v1/auth/refresh  -> proxied (refresh tokens rotate; reusing an old one logs the user out)
-POST /api/v1/auth/logout   -> proxied (bumps the user's token version: signed out everywhere, decision D6)
+GET  /api/v1/auth/config   -> {enabled, app_key, mode, ...}: does the client need a login, and which kind?
+                              mode "legacy": central's /login form; mode "oidc": the Auth Server's login page
+                              (issuer + public client ids for Authorization Code + PKCE)
+POST /api/v1/auth/login    -> legacy only: proxied to the Auth Server with app_key forced to SNVR
+POST /api/v1/auth/refresh  -> legacy only: proxied (refresh tokens rotate; reusing an old one logs the user out)
+POST /api/v1/auth/logout   -> legacy: proxied (signed out everywhere, decision D6). oidc: audit only; the client
+                              ends its own session at the Auth Server (/oauth/revoke, /oauth/logout)
 GET  /api/v1/auth/me       -> the caller, permission numbers and camera scope summary
+GET  /api/v1/auth/status   -> which Auth Server, and its sync health
 """
 
 from __future__ import annotations
@@ -15,9 +19,10 @@ from pydantic import BaseModel, Field
 from app.audit.services import record
 from app.auth import scope
 from app.auth.deps import bearer_token, client_ip
-from app.auth.integration import AuthServerError, get_runtime
+from app.auth.integration import AuthServerError
 from app.auth.permissions import Perm, parse_perms
 from app.auth.principal import ADMIN_ROLE, Principal, current
+from app.auth.provider import LEGACY, LegacyProvider, get_provider
 from settings.settings import settings
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
@@ -26,6 +31,11 @@ router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 class AuthConfigOut(BaseModel):
     enabled: bool
     app_key: str
+    mode: str = LEGACY  # legacy | oidc
+    issuer: str | None = None  # oidc: the Auth Server (login page, /oauth/token, /oauth/revoke, /oauth/logout)
+    web_client_id: str | None = None
+    desktop_client_id: str | None = None
+    scopes: str | None = None
 
 
 class LoginIn(BaseModel):
@@ -39,7 +49,7 @@ class RefreshIn(BaseModel):
 
 
 class UserOut(BaseModel):
-    id: int
+    id: str  # "12" (legacy) or the user's UUID (oidc)
     username: str
     display_name: str
     roles: list[str]
@@ -69,7 +79,7 @@ def _user_from_login(data: dict) -> UserOut:
     is_all, perms = parse_perms(data.get("permissions"))
     is_admin = is_all or ADMIN_ROLE in roles
     name = " ".join(p for p in (raw_user.get("first_name"), raw_user.get("last_name")) if p)
-    return UserOut(id=int(raw_user.get("id", 0)), username=str(raw_user.get("username", "")),
+    return UserOut(id=str(raw_user.get("id", 0)), username=str(raw_user.get("username", "")),
                    display_name=name or str(raw_user.get("username", "")), roles=roles,
                    permissions=sorted(p.value for p in Perm) if is_admin else sorted(perms), is_admin=is_admin)
 
@@ -85,15 +95,20 @@ def _tokens(data: dict) -> dict:
 def _server():
     if not settings.AUTH_ENABLED:
         raise HTTPException(status.HTTP_409_CONFLICT, "Authentication is disabled on this server")
-    runtime = get_runtime()
-    if runtime is None:
+    provider = get_provider()
+    if provider is None:
         raise HTTPException(503, "Authentication is not running")
-    return runtime.server
+    if not isinstance(provider, LegacyProvider):
+        raise HTTPException(status.HTTP_409_CONFLICT, "This server signs in on the Auth Server's login page")
+    return provider.runtime.server
 
 
-@router.get("/config", response_model=AuthConfigOut, summary="Is sign-in required? (no token needed)")
+@router.get("/config", response_model=AuthConfigOut, summary="Is sign-in required, and how? (no token needed)")
 async def auth_config():
-    return AuthConfigOut(enabled=settings.AUTH_ENABLED, app_key=settings.AUTH_APP_KEY)
+    provider = get_provider()
+    extra = provider.client_config() if settings.AUTH_ENABLED and provider else {}
+    return AuthConfigOut(enabled=settings.AUTH_ENABLED, app_key=settings.AUTH_APP_KEY, mode=settings.AUTH_PROVIDER,
+                         **extra)
 
 
 @router.post("/login", response_model=LoginOut, summary="Sign in (proxied to the Auth Server, app SNVR)")
@@ -102,13 +117,13 @@ async def login(body: LoginIn, request: Request):
     try:
         data = await server.login(body.username, body.password, body.totp)
     except AuthServerError as exc:
-        await record(Principal(user_id=-1, username=body.username), "auth.login", method="POST",
+        await record(Principal(user_id="", username=body.username, source=LEGACY), "auth.login", method="POST",
                      path=request.url.path, status="denied", detail={"reason": exc.detail}, ip=client_ip(request))
         if exc.status == 404:  # the Auth Server answers a wrong password with 404
             raise HTTPException(401, "Invalid username or password") from exc
         raise HTTPException(exc.status, exc.detail) from exc
     user = _user_from_login(data)
-    await record(Principal(user_id=user.id, username=user.username), "auth.login", method="POST",
+    await record(Principal(user_id=user.id, username=user.username, source=LEGACY), "auth.login", method="POST",
                  path=request.url.path, ip=client_ip(request))
     return LoginOut(**_tokens(data), user=user)
 
@@ -129,12 +144,13 @@ async def logout(request: Request):
     principal = current()
     if principal.local:
         return
-    token = bearer_token(request, allow_query=False)
-    try:
-        await _server().logout(token or "")
-    except AuthServerError as exc:
-        if exc.status != 401:  # an already-ended session is fine
-            raise HTTPException(exc.status, exc.detail) from exc
+    if principal.source == LEGACY:
+        token = bearer_token(request, allow_query=False)
+        try:
+            await _server().logout(token or "")
+        except AuthServerError as exc:
+            if exc.status != 401:  # an already-ended session is fine
+                raise HTTPException(exc.status, exc.detail) from exc
     await record(principal, "auth.logout", method="POST", path=request.url.path, ip=client_ip(request))
 
 
@@ -143,3 +159,16 @@ async def me():
     p = current()
     return MeOut(id=p.user_id, username=p.username, display_name=p.display_name or p.username, roles=list(p.roles),
                  permissions=p.permission_list(), is_admin=p.is_admin, local=p.local, scope=await scope.summary(p))
+
+
+class AuthStatusOut(BaseModel):
+    enabled: bool
+    mode: str
+    health: dict
+
+
+@router.get("/status", response_model=AuthStatusOut, summary="Which Auth Server, and its sync health")
+async def auth_status():
+    provider = get_provider()
+    return AuthStatusOut(enabled=settings.AUTH_ENABLED, mode=settings.AUTH_PROVIDER,
+                         health=provider.health() if provider else {})
