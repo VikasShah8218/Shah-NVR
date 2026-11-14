@@ -23,7 +23,7 @@ PageScroll {
         RowLayout {
             Layout.fillWidth: true
             AppText { text: "Account"; font.pixelSize: Theme.textLg; font.weight: Font.Medium; Layout.fillWidth: true }
-            AppButton { text: "Sign out (all devices)"; iconName: "log-out"; variant: "outline"; onClicked: Auth.signOut() }
+            AppButton { text: Auth.mode === "oidc" ? "Sign out" : "Sign out (all devices)"; iconName: "log-out"; variant: "outline"; onClicked: Auth.signOut() }
         }
         SettingRow {
             title: Auth.user.display_name || ""

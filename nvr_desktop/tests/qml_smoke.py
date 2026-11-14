@@ -105,6 +105,22 @@ def main():
             assert "Your session ended. Please sign in again." in texts()
             assert not visible("nav-dashboard")
             assert window.grabWindow().save(str(output / "login.png"))
+            # new Auth Server (docs/DESKTOP_AUTH_V2_PLAN.md): the browser button instead of the password form,
+            # then the waiting screen while the browser is open
+            from app.core.auth.oauth import OidcConfig
+            auth._mode, auth._oidc = "oidc", OidcConfig("http://auth.example:5181", "snvr-desktop")
+            auth._set_state("signed_out")
+            settle()
+            assert visible("browserSignInButton") and not visible("loginPassword"), texts()
+            assert "auth.example:5181" in texts()
+            assert window.grabWindow().save(str(output / "login-oidc.png"))
+            auth._sign_in_link = "http://auth.example:5181/oauth/authorize?x=1"
+            auth._set_state("waiting_browser")
+            settle()
+            assert visible("cancelBrowserButton") and visible("copyLinkButton") and visible("openAgainButton"), texts()
+            assert not visible("browserSignInButton")
+            assert window.grabWindow().save(str(output / "login-waiting.png"))
+            auth._mode, auth._oidc, auth._sign_in_link = "legacy", None, ""
             auth._set_state("unreachable")
             settle()
             assert visible("retryButton"), texts()

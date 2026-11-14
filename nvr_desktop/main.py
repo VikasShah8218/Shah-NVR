@@ -206,8 +206,14 @@ def main() -> int:
     instance = SingleInstance(qt_app)
     instance.listen()
     window = engine.rootObjects()[0]
-    instance.activated.connect(lambda: (window.showNormal() if window.visibility() == QWindow.Visibility.Minimized
-                                        else None, window.raise_(), window.requestActivate()))
+    def bring_to_front():
+        if window.visibility() == QWindow.Visibility.Minimized:
+            window.showNormal()
+        window.raise_()
+        window.requestActivate()
+
+    instance.activated.connect(bring_to_front)
+    singletons["Auth"].bringToFront.connect(bring_to_front)  # browser sign-in finished (DESKTOP_AUTH_V2_PLAN)
     from app.core.window_chrome import apply_window_chrome
     apply_window_chrome(window)
     restore_window(window, singletons["Prefs"])
