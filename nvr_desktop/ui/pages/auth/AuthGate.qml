@@ -5,7 +5,9 @@ import "../../theme"
 import "../../components"
 
 // Shown instead of the app while nobody is signed in (port of nvr_client LoginPage.tsx + ServerUnreachable).
-// Auth.state: checking | unreachable | signed_out (docs/DESKTOP_AUTH_PLAN.md §4, §8).
+// Auth.state: checking | unreachable | signed_out | waiting_browser (docs/DESKTOP_AUTH_PLAN.md §4, §8).
+// Auth.mode: legacy = the password form below | oidc = "Sign in with Auth Server" in the system browser
+// (docs/DESKTOP_AUTH_V2_PLAN.md).
 Rectangle {
     id: gate
     color: Theme.background
@@ -93,10 +95,148 @@ Rectangle {
             }
         }
 
-        // login form
+        // new Auth Server: sign in on its own page in the system browser
+        Card {
+            id: browserCard
+            objectName: "browserSignInCard"
+            visible: Auth.state === "signed_out" && Auth.mode === "oidc"
+            Layout.fillWidth: true
+            padding: 24
+            spacing: 12
+
+            function start() {
+                if (Auth.busy)
+                    return
+                const server = browserServer.text.trim().replace(/\/+$/, "")
+                if (server !== Prefs.centralUrl) {  // a new server: ask it first
+                    gate.saveServer(server)
+                    return
+                }
+                Auth.signInWithBrowser(browserRemember.checked)
+            }
+
+            AppText { text: "Sign in"; variant: "heading" }
+            AppText {
+                text: "You'll sign in on your organisation's Auth Server in your browser, then come back here."
+                variant: "muted"
+                wrapMode: Text.WordWrap
+                elide: Text.ElideNone
+                Layout.fillWidth: true
+            }
+            AppText {
+                visible: Auth.endedReason !== ""
+                text: Auth.endedReason
+                color: Theme.warning
+                wrapMode: Text.WordWrap
+                elide: Text.ElideNone
+                Layout.fillWidth: true
+            }
+            AppCheckBox {
+                id: browserRemember
+                objectName: "browserRememberBox"
+                text: Auth.secureStoreSupported ? "Keep me signed in" : "Keep me signed in (not available on this system)"
+                enabled: Auth.secureStoreSupported && !Auth.busy
+                checked: Auth.secureStoreSupported
+            }
+            AppText {
+                visible: Auth.loginError !== ""
+                objectName: "browserLoginError"
+                text: Auth.loginError
+                color: Theme.danger
+                wrapMode: Text.WordWrap
+                elide: Text.ElideNone
+                Layout.fillWidth: true
+            }
+            AppButton {
+                objectName: "browserSignInButton"
+                text: Auth.busy ? "Signing in…" : "Sign in with Auth Server"
+                iconName: "external-link"
+                Layout.fillWidth: true
+                enabled: !Auth.busy
+                onClicked: browserCard.start()
+            }
+            AppText {
+                visible: Auth.issuerHost !== ""
+                text: Auth.issuerHost
+                variant: "small"
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            Separator { Layout.fillWidth: true }
+            AppText { text: "Server"; variant: "small" }
+            AppInput {
+                id: browserServer
+                objectName: "browserServer"
+                text: Prefs.centralUrl
+                placeholderText: "http://192.168.1.3:8000"
+                Layout.fillWidth: true
+                enabled: !Auth.busy
+                onAccepted: browserCard.start()
+            }
+        }
+
+        // waiting for the browser
+        Card {
+            objectName: "waitingBrowserCard"
+            visible: Auth.state === "waiting_browser"
+            Layout.fillWidth: true
+            padding: 24
+            spacing: 12
+            RowLayout {
+                spacing: 10
+                Spinner {}
+                AppText { text: "Finish signing in in your browser…"; variant: "heading" }
+            }
+            AppText {
+                text: "Nothing happened? Check that a browser window opened (it may be behind this one), or copy the link "
+                      + "and open it yourself."
+                variant: "muted"
+                wrapMode: Text.WordWrap
+                elide: Text.ElideNone
+                Layout.fillWidth: true
+            }
+            AppText {
+                visible: Auth.loginError !== ""
+                text: Auth.loginError
+                color: Theme.danger
+                wrapMode: Text.WordWrap
+                elide: Text.ElideNone
+                Layout.fillWidth: true
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                AppButton {
+                    objectName: "openAgainButton"
+                    text: "Open again"
+                    iconName: "external-link"
+                    variant: "outline"
+                    Layout.fillWidth: true
+                    onClicked: Auth.openSignInLinkAgain()
+                }
+                AppButton {
+                    objectName: "copyLinkButton"
+                    text: "Copy link"
+                    iconName: "copy"
+                    variant: "outline"
+                    Layout.fillWidth: true
+                    onClicked: Auth.copySignInLink()
+                }
+            }
+            AppButton {
+                objectName: "cancelBrowserButton"
+                text: "Cancel"
+                iconName: "x"
+                variant: "ghost"
+                Layout.fillWidth: true
+                onClicked: Auth.cancelBrowserSignIn()
+            }
+        }
+
+        // login form (old Auth Server)
         Card {
             id: loginCard
-            visible: Auth.state === "signed_out"
+            visible: Auth.state === "signed_out" && Auth.mode !== "oidc"
             Layout.fillWidth: true
             padding: 24
             spacing: 12
@@ -203,7 +343,7 @@ Rectangle {
     Connections {
         target: Auth
         function onChanged() {
-            if (Auth.state === "signed_out" && !Auth.busy) {
+            if (Auth.state === "signed_out" && Auth.mode !== "oidc" && !Auth.busy) {
                 if (userField.text === "")
                     userField.text = Auth.lastUsername
                 Qt.callLater(() => (userField.text === "" ? userField : passField).forceActiveFocus())
@@ -212,7 +352,7 @@ Rectangle {
     }
     Component.onCompleted: {
         userField.text = Auth.lastUsername
-        if (Auth.state === "signed_out")
+        if (Auth.state === "signed_out" && Auth.mode !== "oidc")
             (userField.text === "" ? userField : passField).forceActiveFocus()
     }
 }

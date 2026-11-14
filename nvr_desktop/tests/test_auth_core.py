@@ -176,7 +176,8 @@ def test_stored_session_signs_in_silently_and_rotates_the_stored_token(store):
     auth.start()
     assert auth.state == "signed_in" and auth.user["username"] == "op"
     assert ("/api/v1/auth/refresh", {"refresh_token": "refresh-old"}) in server.calls
-    assert store.load(BASE) == "refresh-2"  # the rotated token replaced the used one
+    entry = store.load_entry(BASE)  # an old bare token still loaded; it is saved back as a v2 entry
+    assert (entry["mode"], entry["refresh"]) == ("legacy", "refresh-2")  # the rotated token replaced the used one
 
 
 def test_sign_in_and_permissions(store):

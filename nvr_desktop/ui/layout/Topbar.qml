@@ -127,7 +127,7 @@ Rectangle {
         AppMenuItem { text: "Account"; iconName: "user"; onTriggered: Router.go("settings") }
         AppMenuItem {
             objectName: "signOutItem"
-            text: "Sign out (all devices)"
+            text: Auth.mode === "oidc" ? "Sign out" : "Sign out (all devices)"
             iconName: "log-out"
             danger: true
             onTriggered: Auth.signOut()

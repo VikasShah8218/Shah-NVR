@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import ctypes
 import hashlib
+import json
 import logging
 import sys
 
@@ -74,7 +75,12 @@ def server_key(url: str) -> str:
 
 
 class TokenStore:
-    """Encrypted refresh tokens per server, and the last username (not secret) for the login form."""
+    """Encrypted refresh tokens per server, and the last username (not secret) for the login form.
+
+    Since auth v2 (docs/DESKTOP_AUTH_V2_PLAN.md DV7) the encrypted value is an entry
+    `{"v": 2, "mode", "issuer", "client_id", "refresh"}`, so a token saved under one Auth Server is never sent to
+    the other. A bare token saved by an older version reads as a legacy entry.
+    """
 
     def __init__(self, settings: QSettings | None = None):
         self._settings = settings or QSettings("ShahNVR", "Desktop")
@@ -100,6 +106,37 @@ class TokenStore:
         self._settings.setValue(f"auth/{server_key(url)}/refresh", base64.b64encode(blob).decode())
         self._settings.sync()
         return True
+
+    def load_entry(self, url: str) -> dict | None:
+        raw = self.load(url)
+        if raw is None:
+            return None
+        if raw.startswith("{"):
+            try:
+                entry = json.loads(raw)
+            except ValueError:
+                entry = None
+            if isinstance(entry, dict) and entry.get("v") == 2 and entry.get("refresh"):
+                return entry
+            self.clear(url)
+            return None
+        return {"v": 2, "mode": "legacy", "issuer": None, "client_id": None, "refresh": raw}
+
+    def save_entry(self, url: str, mode: str, refresh_token: str, issuer: str | None = None,
+                   client_id: str | None = None) -> bool:
+        entry = {"v": 2, "mode": mode, "issuer": issuer, "client_id": client_id, "refresh": refresh_token}
+        return self.save(url, json.dumps(entry, separators=(",", ":")))
+
+    def signed_out(self, url: str) -> bool:
+        """Set by a sign-out on the new Auth Server: the next browser sign-in asks for the password (DV8)."""
+        return str(self._settings.value(f"auth/{server_key(url)}/signed_out", "") or "") == "1"
+
+    def set_signed_out(self, url: str, value: bool) -> None:
+        if value:
+            self._settings.setValue(f"auth/{server_key(url)}/signed_out", "1")
+        else:
+            self._settings.remove(f"auth/{server_key(url)}/signed_out")
+        self._settings.sync()
 
     def clear(self, url: str) -> None:
         self._settings.remove(f"auth/{server_key(url)}/refresh")
