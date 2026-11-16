@@ -19,6 +19,8 @@ class NodeRuntime:
     node_id: int | None = None
     # camera_id -> assignment dict from central: {camera_id, camera_name, generation, streams: [...]}
     assignments: dict[int, dict] = field(default_factory=dict)
+    # Wall clock of the recording schedules (IANA name or "+05:30"), sent by central with the assignments
+    site_timezone: str = "UTC"
     central_online: bool = False
     last_central_contact: datetime | None = None
     mediamtx_running: bool = False
@@ -27,6 +29,8 @@ class NodeRuntime:
     last_segment_end: dict[tuple[int, str], datetime] = field(default_factory=dict)
     # path name -> time we first saw it "ready" in MediaMTX
     ready_since: dict[str, datetime] = field(default_factory=dict)
+    # path name -> last time its recording schedule was seen off: the "no chunks yet" grace restarts from here
+    schedule_off_at: dict[str, datetime] = field(default_factory=dict)
     # Desired H5 state supplied by central. Credentials are intentionally absent.
     onvif_server_config: dict = field(default_factory=lambda: {
         "enabled": False, "discovery_name": "Shah-NVR", "location": None,

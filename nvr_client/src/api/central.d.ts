@@ -341,6 +341,94 @@ export interface paths {
         patch: operations["update_group_api_v1_groups__group_id__patch"];
         trace?: never;
     };
+    "/api/v1/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All recording schedules (a site has a handful) */
+        get: operations["list_schedules_api_v1_schedules_get"];
+        put?: never;
+        /** Create Schedule */
+        post: operations["create_schedule_api_v1_schedules_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/schedules/site-time": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The site clock schedules run on */
+        get: operations["site_time_api_v1_schedules_site_time_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/schedules/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set the recording mode of cameras and/or a group (with sub-groups); only visible cameras */
+        post: operations["apply_schedule_api_v1_schedules_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/schedules/{schedule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Schedule */
+        get: operations["get_schedule_api_v1_schedules__schedule_id__get"];
+        /** Update Schedule */
+        put: operations["update_schedule_api_v1_schedules__schedule_id__put"];
+        post?: never;
+        /** Delete a schedule (409 while cameras use it) */
+        delete: operations["delete_schedule_api_v1_schedules__schedule_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/schedules/{schedule_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** On/off spans, site wall clock */
+        get: operations["preview_schedule_api_v1_schedules__schedule_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cameras/{camera_id}/recordings": {
         parameters: {
             query?: never;
@@ -1456,6 +1544,33 @@ export interface components {
             offset: number;
             counts: components["schemas"]["AlertCounts"];
         };
+        /**
+         * ApplyIn
+         * @description Set the recording mode of many cameras: listed ones, a group (optionally with its sub-groups), or both.
+         */
+        ApplyIn: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "always" | "schedule" | "never";
+            /** Schedule Id */
+            schedule_id?: number | null;
+            /** Camera Ids */
+            camera_ids?: number[];
+            /** Group Id */
+            group_id?: number | null;
+            /**
+             * Include Subgroups
+             * @default true
+             */
+            include_subgroups: boolean;
+        };
+        /** ApplyOut */
+        ApplyOut: {
+            /** Updated */
+            updated: number;
+        };
         /** AssignIn */
         AssignIn: {
             /** Camera Ids */
@@ -1526,6 +1641,11 @@ export interface components {
             state: components["schemas"]["NodeState"];
             /** Cameras */
             cameras: components["schemas"]["CameraAssignmentOut"][];
+            /**
+             * Site Timezone
+             * @default UTC
+             */
+            site_timezone: string;
         };
         /** AudioTrackIn */
         AudioTrackIn: {
@@ -1840,6 +1960,10 @@ export interface components {
              * @default true
              */
             expose_via_onvif: boolean;
+            /** Recording */
+            recording?: {
+                [key: string]: unknown;
+            };
         };
         /** CameraCreate */
         CameraCreate: {
@@ -1865,6 +1989,14 @@ export interface components {
             has_ptz: boolean;
             /** Group Id */
             group_id?: number | null;
+            /**
+             * Recording Mode
+             * @default always
+             * @enum {string}
+             */
+            recording_mode: "always" | "schedule" | "never";
+            /** Recording Schedule Id */
+            recording_schedule_id?: number | null;
             /** Streams */
             streams: components["schemas"]["StreamIn"][];
         };
@@ -1911,6 +2043,22 @@ export interface components {
             has_ptz: boolean;
             /** Retention Days */
             retention_days: number | null;
+            /**
+             * Recording Mode
+             * @default always
+             */
+            recording_mode: string;
+            /** Recording Schedule Id */
+            recording_schedule_id?: number | null;
+            /** Recording Schedule Name */
+            recording_schedule_name?: string | null;
+            /**
+             * Recording Now
+             * @default true
+             */
+            recording_now: boolean;
+            /** Recording Next Change */
+            recording_next_change?: string | null;
             /** Onvif Host */
             onvif_host?: string | null;
             /** Onvif Port */
@@ -1971,6 +2119,10 @@ export interface components {
             group_id?: number | null;
             /** Retention Days */
             retention_days?: number | null;
+            /** Recording Mode */
+            recording_mode?: ("always" | "schedule" | "never") | null;
+            /** Recording Schedule Id */
+            recording_schedule_id?: number | null;
         };
         /** ChangeOut */
         ChangeOut: {
@@ -3345,6 +3497,31 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** PreviewOut */
+        PreviewOut: {
+            /** Timezone */
+            timezone: string;
+            /** Spans */
+            spans: components["schemas"]["PreviewSpan"][];
+        };
+        /** PreviewSpan */
+        PreviewSpan: {
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "continuous" | "event" | "off";
+        };
         /** ProbeOut */
         ProbeOut: {
             /** Node Id */
@@ -3593,6 +3770,78 @@ export interface components {
             /** Refresh Token */
             refresh_token: string;
         };
+        /**
+         * ScheduleBlock
+         * @description One weekly block. `end <= start` runs past midnight; "24:00" = end of the day; start == end = 24 h.
+         */
+        ScheduleBlock: {
+            /**
+             * Days
+             * @description 0 = Monday ... 6 = Sunday
+             */
+            days: number[];
+            /**
+             * Start
+             * @example 08:00
+             */
+            start: string;
+            /**
+             * End
+             * @example 18:00
+             */
+            end: string;
+            /**
+             * Mode
+             * @default continuous
+             * @enum {string}
+             */
+            mode: "continuous" | "off";
+        };
+        /** ScheduleIn */
+        ScheduleIn: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Blocks */
+            blocks?: components["schemas"]["ScheduleBlock"][];
+        };
+        /** ScheduleOut */
+        ScheduleOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Blocks */
+            blocks: components["schemas"]["ScheduleBlock"][];
+            /** Camera Count */
+            camera_count: number;
+            /** Recording Now */
+            recording_now: boolean;
+            /** Next Change */
+            next_change: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ScheduleUpdate */
+        ScheduleUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Blocks */
+            blocks?: components["schemas"]["ScheduleBlock"][] | null;
+        };
         /** SegmentBatchIn */
         SegmentBatchIn: {
             /** Node Id */
@@ -3711,6 +3960,16 @@ export interface components {
          * @enum {string}
          */
         SegmentStatus: "AVAILABLE" | "DELETING";
+        /** SiteTimeOut */
+        SiteTimeOut: {
+            /** Timezone */
+            timezone: string;
+            /**
+             * Now
+             * Format: date-time
+             */
+            now: string;
+        };
         /** SnapshotIn */
         SnapshotIn: {
             /** Node Id */
@@ -3838,7 +4097,7 @@ export interface components {
          * StreamStatus
          * @enum {string}
          */
-        StreamStatus: "UNKNOWN" | "UNASSIGNED" | "ASSIGNED" | "CONNECTING" | "IDLE" | "STREAMING" | "RECORDING" | "NOT_RECORDING" | "DISABLED";
+        StreamStatus: "UNKNOWN" | "UNASSIGNED" | "ASSIGNED" | "CONNECTING" | "IDLE" | "STREAMING" | "RECORDING" | "NOT_RECORDING" | "DISABLED" | "SCHEDULED_OFF";
         /** StreamStatusBatchIn */
         StreamStatusBatchIn: {
             /** Items */
@@ -4952,6 +5211,241 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GroupDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_schedules_api_v1_schedules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleOut"][];
+                };
+            };
+        };
+    };
+    create_schedule_api_v1_schedules_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    site_time_api_v1_schedules_site_time_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteTimeOut"];
+                };
+            };
+        };
+    };
+    apply_schedule_api_v1_schedules_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_schedule_api_v1_schedules__schedule_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_schedule_api_v1_schedules__schedule_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_schedule_api_v1_schedules__schedule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_schedule_api_v1_schedules__schedule_id__preview_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                days?: number;
+            };
+            header?: never;
+            path: {
+                schedule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewOut"];
                 };
             };
             /** @description Validation Error */

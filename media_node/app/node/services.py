@@ -6,6 +6,7 @@ from datetime import timedelta
 from app.node import metrics
 from app.node.models import KeyValue
 from app.node.utils import CentralError, central, runtime
+from app.schedules.services import format_change, next_change, recording_on
 from settings.settings import settings
 from utilities.common import utcnow
 
@@ -13,6 +14,7 @@ logger = logging.getLogger("node.agent")
 
 KV_NODE_ID = "node_id"
 KV_ASSIGNMENTS = "assignments"
+KV_SITE_TIMEZONE = "site_timezone"
 VERSION = "0.1.0"
 
 
@@ -27,6 +29,7 @@ async def load_local_state() -> None:
     runtime.node_id = await KeyValue.get_value(KV_NODE_ID)
     cached = await KeyValue.get_value(KV_ASSIGNMENTS, {}) or {}
     runtime.assignments = {int(k): v for k, v in cached.items()}
+    runtime.site_timezone = await KeyValue.get_value(KV_SITE_TIMEZONE, "UTC") or "UTC"
     logger.info("Local state: node_id=%s, cached cameras=%s", runtime.node_id, len(runtime.assignments))
 
 
@@ -139,6 +142,11 @@ async def refresh_assignments() -> None:
         logger.debug("Assignments fetch failed, using cached set: %s", exc)
         return
     new = {c["camera_id"]: c for c in data["cameras"]}
+    site_tz = data.get("site_timezone") or "UTC"
+    if site_tz != runtime.site_timezone:
+        logger.info("Site timezone for recording schedules: %s", site_tz)
+        runtime.site_timezone = site_tz
+        await KeyValue.set_value(KV_SITE_TIMEZONE, site_tz)
     if new != runtime.assignments:
         added = new.keys() - runtime.assignments.keys()
         removed = runtime.assignments.keys() - new.keys()
@@ -183,9 +191,18 @@ async def stream_status_tick() -> None:
                 status, detail = "CONNECTING", "waiting for camera"
             elif not s["record"]:
                 status = "STREAMING"
+            elif not recording_on(cam, now):
+                status = "SCHEDULED_OFF"
+                nxt = next_change(cam, now)
+                mode = (cam.get("recording") or {}).get("mode")
+                detail = ("recording mode: never" if mode == "never"
+                          else f"off by schedule until {format_change(nxt, now)}" if nxt else "off by schedule")
+                runtime.last_segment_end.pop((cam["camera_id"], s["profile"]), None)
+                runtime.schedule_off_at[name] = now
             else:
                 last_end = runtime.last_segment_end.get((cam["camera_id"], s["profile"]))
-                ready_for = now - runtime.ready_since[name]
+                # grace for the first chunk: from when the stream came up, or when its schedule switched on
+                ready_for = now - max(runtime.ready_since[name], runtime.schedule_off_at.get(name, runtime.ready_since[name]))
                 if (last_end and now - last_end < 2 * seg + slack) or ready_for < seg * 1.5 + slack:
                     status = "RECORDING"
                 else:

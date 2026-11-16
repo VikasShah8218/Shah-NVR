@@ -49,6 +49,11 @@ import type {
   OnvifProbe,
   OnvifServer,
   OnvifServerUpdate,
+  RecordingSchedule,
+  ScheduleApply,
+  ScheduleIn,
+  ScheduleUpdate,
+  SiteTime,
   StreamIn,
   StorageVolume,
   StreamUpdate,
@@ -870,4 +875,53 @@ export const useCameraReboot = () =>
     (api, cameraId: number) =>
       unwrap<{ message: string }>(api.POST("/api/v1/onvif/cameras/{camera_id}/reboot", { params: { path: { camera_id: cameraId } } })),
     { success: (r) => `Camera: ${r.message}`, invalidate: DEVICE_KEYS, errorText: onvifErrorText },
+  )
+
+// ---------------------------------------------------------------- recording schedules
+
+export function useSchedules(enabled = true) {
+  const { url, api, poll } = useCentral()
+  return useQuery({
+    queryKey: [url, "schedules"],
+    enabled,
+    queryFn: () => unwrap<RecordingSchedule[]>(api.GET("/api/v1/schedules")),
+    refetchInterval: poll * 3,
+  })
+}
+
+/** The site clock (SITE_TIMEZONE) that schedules run on. */
+export function useSiteTime() {
+  const { url, api } = useCentral()
+  return useQuery({
+    queryKey: [url, "schedules", "site-time"],
+    queryFn: () => unwrap<SiteTime>(api.GET("/api/v1/schedules/site-time")),
+    refetchInterval: 60_000,
+  })
+}
+
+const SCHEDULE_KEYS = ["schedules", "cameras"]
+
+export const useCreateSchedule = () =>
+  useCentralMutation((api, body: ScheduleIn) => unwrap<RecordingSchedule>(api.POST("/api/v1/schedules", { body })), {
+    invalidate: SCHEDULE_KEYS, success: (s) => `Schedule "${s.name}" created`,
+  })
+
+export const useUpdateSchedule = () =>
+  useCentralMutation(
+    (api, { id, body }: { id: number; body: ScheduleUpdate }) =>
+      unwrap<RecordingSchedule>(api.PUT("/api/v1/schedules/{schedule_id}", { params: { path: { schedule_id: id } }, body })),
+    { invalidate: SCHEDULE_KEYS, success: (s) => `Schedule "${s.name}" saved` },
+  )
+
+export const useDeleteSchedule = () =>
+  useCentralMutation(
+    (api, id: number) => unwrap(api.DELETE("/api/v1/schedules/{schedule_id}", { params: { path: { schedule_id: id } } })),
+    { invalidate: SCHEDULE_KEYS, success: "Schedule deleted" },
+  )
+
+/** Set the recording mode of listed cameras and/or a whole group. */
+export const useApplySchedule = () =>
+  useCentralMutation(
+    (api, body: ScheduleApply) => unwrap<{ updated: number }>(api.POST("/api/v1/schedules/apply", { body })),
+    { invalidate: SCHEDULE_KEYS, success: (r) => `Recording updated for ${r.updated} camera${r.updated === 1 ? "" : "s"}` },
   )

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -59,6 +60,9 @@ class CameraCreate(BaseModel):
     retention_days: int | None = Field(default=None, ge=1, le=3650)
     has_ptz: bool = False  # PTZ-capable; auto-set from ONVIF detection when added through discovery
     group_id: int | None = None  # camera group (docs/GROUPING_PLAN.md); None = no group
+    # When recorded streams record (docs/RECORDING_SCHEDULES_PLAN.md); schedule id needed with "schedule"
+    recording_mode: Literal["always", "schedule", "never"] = "always"
+    recording_schedule_id: int | None = None
     streams: list[StreamIn] = Field(min_length=1)
 
     @field_validator("streams")
@@ -82,6 +86,9 @@ class CameraUpdate(BaseModel):
     # Days to keep, counted back from the camera's latest recording. Leave out for the default (create) /
     # unchanged (update); send null to keep recordings until storage is full.
     retention_days: int | None = Field(default=None, ge=1, le=3650)
+    # Leave out = unchanged. "schedule" needs recording_schedule_id (in this request or already set).
+    recording_mode: Literal["always", "schedule", "never"] | None = None
+    recording_schedule_id: int | None = None
 
 
 class AssignmentInfo(BaseModel):
@@ -101,6 +108,11 @@ class CameraOut(BaseModel):
     expose_via_onvif: bool
     has_ptz: bool
     retention_days: int | None  # None = keep until storage is full
+    recording_mode: str = "always"  # always | schedule | never
+    recording_schedule_id: int | None = None
+    recording_schedule_name: str | None = None
+    recording_now: bool = True  # what the mode/schedule says right now (not whether a file is being written)
+    recording_next_change: datetime | None = None  # site wall clock, with offset
     # ONVIF device (null for cameras never seen over ONVIF)
     onvif_host: str | None = None
     onvif_port: int | None = None

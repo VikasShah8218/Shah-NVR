@@ -71,7 +71,9 @@ export function DashboardPage() {
   const alertCount = nodeAlerts.length + camPage.counts.danger + camPage.counts.warning
   const dangerCount = nodeAlerts.filter((a) => a.level === "danger").length + camPage.counts.danger
   const recording = h.streams_by_status.RECORDING ?? 0
-  const recordStreams = h.record_streams
+  // streams off by their recording schedule are not expected to record now
+  const scheduledOff = h.streams_by_status.SCHEDULED_OFF ?? 0
+  const recordStreams = Math.max(h.record_streams - scheduledOff, 0)
   const healthy = nodeList.filter(isNodeHealthy).length
   const rs = nodeList.map(nodeResources)
   const storage = rs.reduce((a, r) => a + (r.recordings ?? 0), 0)
@@ -87,7 +89,7 @@ export function DashboardPage() {
           icon={CheckCircle2}
           label="Recording"
           value={`${recording} / ${recordStreams}`}
-          hint="recorded streams healthy"
+          hint={scheduledOff ? `recorded streams healthy · ${scheduledOff} off by schedule` : "recorded streams healthy"}
           tone={recording < recordStreams ? "warning" : "success"}
         />
         <KpiCard icon={Server} label="Nodes healthy" value={`${healthy} / ${nodeList.length}`} tone={healthy < nodeList.length ? "danger" : "success"} />

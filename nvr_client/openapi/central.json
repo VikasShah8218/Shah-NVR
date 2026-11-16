@@ -1604,6 +1604,328 @@
         }
       }
     },
+    "/api/v1/schedules": {
+      "get": {
+        "tags": [
+          "Recording schedules"
+        ],
+        "summary": "All recording schedules (a site has a handful)",
+        "operationId": "list_schedules_api_v1_schedules_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScheduleOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Schedules Api V1 Schedules Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Recording schedules"
+        ],
+        "summary": "Create Schedule",
+        "operationId": "create_schedule_api_v1_schedules_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schedules/site-time": {
+      "get": {
+        "tags": [
+          "Recording schedules"
+        ],
+        "summary": "The site clock schedules run on",
+        "operationId": "site_time_api_v1_schedules_site_time_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteTimeOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schedules/apply": {
+      "post": {
+        "tags": [
+          "Recording schedules"
+        ],
+        "summary": "Set the recording mode of cameras and/or a group (with sub-groups); only visible cameras",
+        "operationId": "apply_schedule_api_v1_schedules_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schedules/{schedule_id}": {
+      "get": {
+        "tags": [
+          "Recording schedules"
+        ],
+        "summary": "Get Schedule",
+        "operationId": "get_schedule_api_v1_schedules__schedule_id__get",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Recording schedules"
+        ],
+        "summary": "Update Schedule",
+        "operationId": "update_schedule_api_v1_schedules__schedule_id__put",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Recording schedules"
+        ],
+        "summary": "Delete a schedule (409 while cameras use it)",
+        "operationId": "delete_schedule_api_v1_schedules__schedule_id__delete",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schedules/{schedule_id}/preview": {
+      "get": {
+        "tags": [
+          "Recording schedules"
+        ],
+        "summary": "On/off spans, site wall clock",
+        "operationId": "preview_schedule_api_v1_schedules__schedule_id__preview_get",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Schedule Id"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 31,
+              "minimum": 1,
+              "default": 7,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/cameras/{camera_id}/recordings": {
       "get": {
         "tags": [
@@ -5541,6 +5863,73 @@
         ],
         "title": "AlertPage"
       },
+      "ApplyIn": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "always",
+              "schedule",
+              "never"
+            ],
+            "title": "Mode"
+          },
+          "schedule_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule Id"
+          },
+          "camera_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Camera Ids"
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
+          "include_subgroups": {
+            "type": "boolean",
+            "title": "Include Subgroups",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "title": "ApplyIn",
+        "description": "Set the recording mode of many cameras: listed ones, a group (optionally with its sub-groups), or both."
+      },
+      "ApplyOut": {
+        "properties": {
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "updated"
+        ],
+        "title": "ApplyOut"
+      },
       "AssignIn": {
         "properties": {
           "camera_ids": {
@@ -5781,6 +6170,11 @@
             },
             "type": "array",
             "title": "Cameras"
+          },
+          "site_timezone": {
+            "type": "string",
+            "title": "Site Timezone",
+            "default": "UTC"
           }
         },
         "type": "object",
@@ -6837,6 +7231,11 @@
             "type": "boolean",
             "title": "Expose Via Onvif",
             "default": true
+          },
+          "recording": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Recording"
           }
         },
         "type": "object",
@@ -6922,6 +7321,27 @@
               }
             ],
             "title": "Group Id"
+          },
+          "recording_mode": {
+            "type": "string",
+            "enum": [
+              "always",
+              "schedule",
+              "never"
+            ],
+            "title": "Recording Mode",
+            "default": "always"
+          },
+          "recording_schedule_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Schedule Id"
           },
           "streams": {
             "items": {
@@ -7072,6 +7492,50 @@
               }
             ],
             "title": "Retention Days"
+          },
+          "recording_mode": {
+            "type": "string",
+            "title": "Recording Mode",
+            "default": "always"
+          },
+          "recording_schedule_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Schedule Id"
+          },
+          "recording_schedule_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Schedule Name"
+          },
+          "recording_now": {
+            "type": "boolean",
+            "title": "Recording Now",
+            "default": true
+          },
+          "recording_next_change": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Next Change"
           },
           "onvif_host": {
             "anyOf": [
@@ -7370,6 +7834,33 @@
               }
             ],
             "title": "Retention Days"
+          },
+          "recording_mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "always",
+                  "schedule",
+                  "never"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Mode"
+          },
+          "recording_schedule_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Schedule Id"
           }
         },
         "type": "object",
@@ -11258,6 +11749,57 @@
         ],
         "title": "Page[GroupOut]"
       },
+      "PreviewOut": {
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "spans": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewSpan"
+            },
+            "type": "array",
+            "title": "Spans"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timezone",
+          "spans"
+        ],
+        "title": "PreviewOut"
+      },
+      "PreviewSpan": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "continuous",
+              "event",
+              "off"
+            ],
+            "title": "Mode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "mode"
+        ],
+        "title": "PreviewSpan"
+      },
       "ProbeOut": {
         "properties": {
           "node_id": {
@@ -11986,6 +12528,205 @@
         ],
         "title": "RefreshIn"
       },
+      "ScheduleBlock": {
+        "properties": {
+          "days": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 7,
+            "minItems": 1,
+            "title": "Days",
+            "description": "0 = Monday ... 6 = Sunday"
+          },
+          "start": {
+            "type": "string",
+            "title": "Start",
+            "examples": [
+              "08:00"
+            ]
+          },
+          "end": {
+            "type": "string",
+            "title": "End",
+            "examples": [
+              "18:00"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "continuous",
+              "off"
+            ],
+            "title": "Mode",
+            "default": "continuous"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "start",
+          "end"
+        ],
+        "title": "ScheduleBlock",
+        "description": "One weekly block. `end <= start` runs past midnight; \"24:00\" = end of the day; start == end = 24 h."
+      },
+      "ScheduleIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleBlock"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Blocks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ScheduleIn"
+      },
+      "ScheduleOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleBlock"
+            },
+            "type": "array",
+            "title": "Blocks"
+          },
+          "camera_count": {
+            "type": "integer",
+            "title": "Camera Count"
+          },
+          "recording_now": {
+            "type": "boolean",
+            "title": "Recording Now"
+          },
+          "next_change": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Change"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "blocks",
+          "camera_count",
+          "recording_now",
+          "next_change",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ScheduleOut"
+      },
+      "ScheduleUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "blocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ScheduleBlock"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocks"
+          }
+        },
+        "type": "object",
+        "title": "ScheduleUpdate"
+      },
       "SegmentBatchIn": {
         "properties": {
           "node_id": {
@@ -12312,6 +13053,25 @@
           "DELETING"
         ],
         "title": "SegmentStatus"
+      },
+      "SiteTimeOut": {
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "now": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Now"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timezone",
+          "now"
+        ],
+        "title": "SiteTimeOut"
       },
       "SnapshotIn": {
         "properties": {
@@ -12664,7 +13424,8 @@
           "STREAMING",
           "RECORDING",
           "NOT_RECORDING",
-          "DISABLED"
+          "DISABLED",
+          "SCHEDULED_OFF"
         ],
         "title": "StreamStatus"
       },

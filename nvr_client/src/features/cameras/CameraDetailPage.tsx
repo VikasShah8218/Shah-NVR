@@ -17,6 +17,7 @@ import { formatBytes, retentionLabel, timeAgo } from "@/lib/format"
 import { deviceLabel } from "@/lib/onvif"
 import { useSettings } from "@/lib/settings"
 import { DAY, fmtDateTime } from "@/lib/time"
+import { nowText } from "@/lib/schedule"
 import { MoveCameraDialog } from "../assignments/MoveCameraDialog"
 import { LivePlayer } from "../live/LivePlayer"
 import { Timeline } from "../playback/Timeline"
@@ -143,6 +144,16 @@ function Overview({ camera: c }: { camera: Camera }) {
             </Field>
             <Field label="Username">{c.username ?? "—"}</Field>
             <Field label="Password">{c.has_password ? "Set" : "Not set"}</Field>
+            <Field label="Recording">
+              <span title={nowText(c.recording_now, c.recording_next_change)}>
+                {c.recording_mode === "schedule" ? (
+                  <Link to="/schedules" className="hover:text-primary">{c.recording_schedule_name ?? "Schedule"}</Link>
+                ) : c.recording_mode === "never" ? "Never" : "Always"}
+                <span className={c.recording_now ? "text-success" : "text-muted-foreground"}>
+                  {" · "}{c.recording_mode === "always" ? "on" : nowText(c.recording_now, c.recording_next_change).replace(/^./, (x) => x.toLowerCase())}
+                </span>
+              </span>
+            </Field>
             <Field label="Keep recordings">{retentionLabel(c.retention_days)}</Field>
             {c.model && <Field label="Device">{deviceLabel(c.manufacturer, c.model)}</Field>}
             <Field label="Added">{fmtDateTime(new Date(c.created_at))}</Field>

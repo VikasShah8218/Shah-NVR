@@ -29,6 +29,7 @@ from app.nodes.schemas import (
 from app.nodes.utils import gb_to_bytes, total_quota
 from app.onvif.services import apply_onvif_health
 from app.recordings.models import RecordingSegment
+from app.schedules.services import recording_setting, schedules_by_id, site_timezone
 from settings.settings import settings
 from utilities.common import utcnow
 
@@ -314,6 +315,7 @@ async def node_assignments(node_id: int):
     assignments = await CameraAssignment.filter(node_id=node.id, camera__enabled=True).prefetch_related(
         "camera", "camera__streams"
     )
+    schedules = await schedules_by_id(a.camera.recording_schedule_id for a in assignments)
     cameras = []
     for a in assignments:
         cam = a.camera
@@ -335,9 +337,10 @@ async def node_assignments(node_id: int):
                 onvif_host=cam.onvif_host,
                 onvif_port=cam.onvif_port,
                 expose_via_onvif=cam.expose_via_onvif,
+                recording=recording_setting(cam, schedules.get(cam.recording_schedule_id)),
             )
         )
-    return AssignmentsOut(node_id=node.id, state=node.state, cameras=cameras)
+    return AssignmentsOut(node_id=node.id, state=node.state, cameras=cameras, site_timezone=site_timezone())
 
 
 @internal_router.post("/{node_id}/stream-status", status_code=status.HTTP_204_NO_CONTENT)
