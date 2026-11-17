@@ -408,6 +408,17 @@ Item {
             editor.close()
             QTest.qWait(250)
             settle()
+            # Edit an existing schedule from its row (user bug 2026-11-17: Edit did not open the editor)
+            row = next(o for o in walk(window) if o.objectName() == "scheduleRow-3")
+            QMetaObject.invokeMethod(row, "clicked")  # the same signal a mouse click on the row emits
+            QTest.qWait(250)
+            settle()
+            assert editor.property("opened"), "Edit did not open the editor"
+            assert schedules.editorState.scheduleId == 3 and schedules.editorState.name == "Office hours"
+            assert window.grabWindow().save(str(output / "schedule-edit.png"))
+            editor.close()
+            QTest.qWait(250)
+            settle()
 
             router.go("cameras")
             settle()

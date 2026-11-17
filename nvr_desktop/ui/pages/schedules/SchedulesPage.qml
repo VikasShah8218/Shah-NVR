@@ -17,7 +17,13 @@ PageScroll {
         { title: "Cameras", width: 70 }, { title: "", width: 40 }
     ]
 
-    function openEditor(row) { editor.openFor(row, !root.canEdit) }
+    // Rows are passed by id: a delegate's `model` is a QML object, not the plain dict the Python editor needs
+    // (bug 2026-11-17: Edit did not open the editor).
+    function openEditor(id) {
+        const s = Schedules.byId(id)
+        if (s)
+            editor.openFor(s, !root.canEdit)
+    }
 
     Component.onCompleted: Schedules.setActive(true)
     Component.onDestruction: Schedules.setActive(false)
@@ -63,8 +69,9 @@ PageScroll {
                 delegate: TableRow {
                     id: row
                     required property var model
+                    objectName: "scheduleRow-" + row.model.id
                     clickable: true
-                    onClicked: root.openEditor(row.model)
+                    onClicked: root.openEditor(row.model.id)
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.preferredWidth: 1
@@ -92,7 +99,7 @@ PageScroll {
                     AppButton {
                         Layout.preferredWidth: 40
                         variant: "ghost"; size: "icon"; iconName: "ellipsis"
-                        onClicked: rowMenu.openFor(row.model, this)
+                        onClicked: rowMenu.openFor(Schedules.byId(row.model.id), this)
                     }
                 }
             }
@@ -106,8 +113,8 @@ PageScroll {
             schedule = s
             popup(button, button.width - width, button.height + 4)
         }
-        AppMenuItem { visible: root.canEdit; height: visible ? implicitHeight : 0; text: "Edit"; iconName: "pencil"; onTriggered: root.openEditor(rowMenu.schedule) }
-        AppMenuItem { visible: !root.canEdit; height: visible ? implicitHeight : 0; text: "View"; iconName: "eye"; onTriggered: root.openEditor(rowMenu.schedule) }
+        AppMenuItem { visible: root.canEdit; height: visible ? implicitHeight : 0; text: "Edit"; iconName: "pencil"; onTriggered: root.openEditor(rowMenu.schedule.id) }
+        AppMenuItem { visible: !root.canEdit; height: visible ? implicitHeight : 0; text: "View"; iconName: "eye"; onTriggered: root.openEditor(rowMenu.schedule.id) }
         AppMenuItem {
             visible: root.canEdit; height: visible ? implicitHeight : 0
             text: "Delete"; iconName: "trash-2"; danger: true
