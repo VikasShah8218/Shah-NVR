@@ -1,6 +1,6 @@
 """Router: which page is shown (QML singleton `Router`). The desktop equivalent of React Router.
 
-Pages: dashboard, live, playback, cameras, camera (id), groups (id = selected group), discover, nodes, node (id),
+Pages: dashboard, live, playback, cameras, camera (id), groups (id = selected group), schedules, discover, nodes, node (id),
 assignments, access, audit, settings. Which pages a user may open: app/core/auth/permissions.py (PAGE_PERMS);
 Main.qml shows "No access" for the others.
 `go(page, id)` navigates; `back()` returns to the previous page; `params` holds extra values
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
-PAGES = ("dashboard", "live", "playback", "cameras", "camera", "groups", "discover", "nodes", "node", "assignments",
+PAGES = ("dashboard", "live", "playback", "cameras", "camera", "groups", "schedules", "discover", "nodes", "node", "assignments",
          "access", "audit", "settings")
 
 

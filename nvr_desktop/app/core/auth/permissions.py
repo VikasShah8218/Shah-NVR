@@ -47,6 +47,7 @@ PAGE_PERMS: dict[str, tuple[int, ...]] = {
     "cameras": CAMERA_READ,
     "camera": CAMERA_READ,
     "groups": (Perm.GROUPS_MANAGE,),
+    "schedules": (Perm.CAMERAS_MANAGE, Perm.DASHBOARD),  # editing needs CAMERAS_MANAGE
     "discover": (Perm.CAMERAS_MANAGE,),
     "nodes": (Perm.NODES_MANAGE,),
     "node": (Perm.NODES_MANAGE,),
@@ -57,7 +58,7 @@ PAGE_PERMS: dict[str, tuple[int, ...]] = {
 }
 
 # Sidebar order: the start page is the first of these the user may open.
-NAV_ORDER = ("dashboard", "live", "playback", "cameras", "groups", "discover", "nodes", "assignments", "access",
+NAV_ORDER = ("dashboard", "live", "playback", "cameras", "groups", "schedules", "discover", "nodes", "assignments", "access",
              "audit", "settings")
 
 

@@ -94,3 +94,33 @@ def test_node_download_error_message(tmp_path):
     respx.get(url).mock(return_value=httpx.Response(404, json={"detail": "Segment file missing"}))
     with pytest.raises(ApiError, match="Segment file missing"):
         node_api.download(url, tmp_path / "x.mp4")
+
+
+@respx.mock
+def test_schedules_api():
+    sched = {"id": 3, "name": "Office", "description": None, "camera_count": 2, "recording_now": False,
+             "next_change": "2026-11-17T08:00:00+05:30",
+             "blocks": [{"days": [0, 1, 2, 3, 4], "start": "08:00", "end": "18:00", "mode": "continuous"}],
+             "created_at": "2026-11-16T00:00:00Z", "updated_at": "2026-11-16T00:00:00Z"}
+    respx.get(f"{BASE}/api/v1/schedules").mock(return_value=httpx.Response(200, json=[sched]))
+    put = respx.put(f"{BASE}/api/v1/schedules/3").mock(return_value=httpx.Response(200, json=sched))
+    apply = respx.post(f"{BASE}/api/v1/schedules/apply").mock(return_value=httpx.Response(200, json={"updated": 5}))
+    respx.get(f"{BASE}/api/v1/schedules/site-time").mock(return_value=httpx.Response(
+        200, json={"timezone": "Asia/Kolkata", "now": "2026-11-16T19:12:20+05:30"}))
+    api = CentralApi(BASE)
+    got = api.schedules()[0].to_qml()
+    assert got["next_change"] == "2026-11-17T08:00:00+05:30" and got["blocks"][0]["days"] == [0, 1, 2, 3, 4]
+    api.update_schedule(3, {"name": "Office 2"})
+    assert put.calls.last.request.read() == b'{"name":"Office 2"}'
+    assert api.apply_schedule("never", schedule_id=3, camera_ids=[2, 1, 2]) == 5
+    import json
+    assert json.loads(apply.calls.last.request.read()) == {"mode": "never", "schedule_id": None, "camera_ids": [1, 2],
+                                                           "group_id": None, "include_subgroups": True}
+    assert api.site_time().timezone == "Asia/Kolkata"
+    cam = api_camera_defaults()
+    assert (cam.recording_mode, cam.recording_now) == ("always", True)
+
+
+def api_camera_defaults():
+    from app.core.api.models import Camera
+    return Camera.model_validate(CAMERA)  # an older central without recording fields

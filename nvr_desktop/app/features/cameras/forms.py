@@ -2,6 +2,7 @@
 
 The form arrives from QML as a dict:
   {name, description, username, password, retention_days, keep_until_full, enabled,
+   recording_mode (always | schedule | never), recording_schedule_id (0 = none),
    streams: [{profile, source_url, record, rtsp_transport, existing}]}
 """
 
@@ -47,7 +48,20 @@ def validate(form: dict) -> list[str]:
                 raise ValueError
         except (TypeError, ValueError):
             errors.append("Retention must be a whole number of days (1 or more).")
+    if form.get("recording_mode") == "schedule" and not _schedule_id(form):
+        errors.append("Choose a recording schedule.")
     return errors
+
+
+def _schedule_id(form: dict) -> int | None:
+    value = int(form.get("recording_schedule_id") or 0)
+    return value if value > 0 else None
+
+
+def recording_fields(form: dict) -> dict:
+    """Recording schedules: the schedule id is sent only with mode "schedule" (central clears it otherwise)."""
+    mode = form.get("recording_mode") or "always"
+    return {"recording_mode": mode, "recording_schedule_id": _schedule_id(form) if mode == "schedule" else None}
 
 
 def _stream_body(s: dict) -> dict:
@@ -74,6 +88,7 @@ def create_body(form: dict) -> dict:
         "enabled": bool(form.get("enabled", True)),
         "has_ptz": bool(form.get("has_ptz", False)),
         "group_id": _group_id(form),
+        **recording_fields(form),
         "streams": [_stream_body(s) for s in used_streams(form)],
     }
 
@@ -89,6 +104,8 @@ def update_body(form: dict) -> dict:
     }
     if form.get("password"):  # empty = keep the current password
         body["password"] = form["password"]
+    if "recording_mode" in form:  # an older form without the Recording section leaves it unchanged
+        body.update(recording_fields(form))
     if "group_id" in form:  # sent only when the form shows the field (0 = take it out of its group)
         body["group_id"] = _group_id(form)
     return body

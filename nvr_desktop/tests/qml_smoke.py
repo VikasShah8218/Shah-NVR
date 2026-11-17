@@ -369,6 +369,72 @@ Item {
             settle()
             assert "Gate renamed" in texts()
 
+            # Recording schedules (docs/DESKTOP_RECORDING_SCHEDULES_PLAN.md): the page, the editor with a real mouse
+            # drag on the week grid, the camera form's Recording section and the group "Recording" dialog.
+            from PySide6.QtCore import Q_ARG, QPoint, QPointF
+            schedules = stores["Schedules"]
+            office = {"id": 3, "name": "Office hours", "description": None, "camera_count": 1, "recording_now": False,
+                      "next_change": "2026-11-17T08:00:00+05:30",
+                      "blocks": [{"days": [0, 1, 2, 3, 4], "start": "08:00", "end": "18:00", "mode": "continuous"}]}
+            schedules._apply([office, {**office, "id": 4, "name": "Nights", "camera_count": 0, "recording_now": True,
+                                       "blocks": [{"days": [0, 1, 2, 3, 4, 5, 6], "start": "18:00", "end": "08:00",
+                                                   "mode": "continuous"}]}])
+            schedules._apply_site({"timezone": "Asia/Kolkata", "now": "2026-11-16T19:12:00+05:30"})
+            schedules._set_loading(False)
+            router.go("schedules")
+            settle()
+            assert "Office hours" in texts() and "Nights" in texts(), texts()
+            assert any("Off now, recording from" in (t or "") for t in texts()), texts()
+            assert window.grabWindow().save(str(output / "schedules.png"))
+            QMetaObject.invokeMethod(window.findChild(QObject, "newSchedule"), "clicked")
+            QTest.qWait(250)
+            settle()
+            editor = next(o for o in walk(window) if o.objectName() == "scheduleEditor")
+            assert editor.property("opened"), "editor did not open"
+            area = next(o for o in walk(window) if o.objectName() == "weekGridArea")
+            w, h = area.width(), area.height()
+            start = area.mapToScene(QPointF(w * 10 / 24 + 2, h * 5.5 / 7)).toPoint()
+            end = area.mapToScene(QPointF(w * 14 / 24 - 2, h * 6.5 / 7)).toPoint()
+            QTest.mousePress(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, start)
+            for k in range(1, 6):
+                QTest.mouseMove(window, QPoint(start.x() + (end.x() - start.x()) * k // 5, start.y() + (end.y() - start.y()) * k // 5))
+            settle()
+            assert window.grabWindow().save(str(output / "schedule-editor-drag.png"))
+            QTest.mouseRelease(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, end)
+            settle()
+            labels = [b["label"] for b in schedules.editorState.blocks]
+            assert labels == ["Mon–Fri 08:00–18:00", "Sat, Sun 10:00–14:00"], labels
+            assert window.grabWindow().save(str(output / "schedule-editor.png"))
+            editor.close()
+            QTest.qWait(250)
+            settle()
+
+            router.go("cameras")
+            settle()
+            form = window.findChild(QObject, "cameraForm")
+            QMetaObject.invokeMethod(form, "openFor", Q_ARG("QVariant", {**camera, "recording_mode": "schedule",
+                                     "recording_schedule_id": 3, "recording_now": False,
+                                     "recording_next_change": "2026-11-17T08:00:00+05:30"}))
+            QTest.qWait(300)
+            settle()
+            assert any((t or "").startswith("Off now, recording from") for t in texts()), texts()
+            assert "Recorded on the camera's schedule; always available live." in texts()
+            assert window.grabWindow().save(str(output / "camera-form-recording.png"))
+            form.close()
+            QTest.qWait(300)
+            settle()
+
+            router.go("groups", 7)
+            settle()
+            QMetaObject.invokeMethod(next(o for o in walk(window) if o.objectName() == "groupRecordingButton"), "clicked")
+            QTest.qWait(250)
+            settle()
+            apply_dialog = next(o for o in walk(window) if o.objectName() == "applyRecordingDialog")
+            assert apply_dialog.property("opened") and "Include sub-groups" in texts(), texts()
+            assert window.grabWindow().save(str(output / "group-recording.png"))
+            apply_dialog.close()
+            settle()
+
             # A signed-in operator (live + playback only): the sidebar hides other pages, a forbidden page shows
             # "No access", the user menu appears and actions without permission are hidden.
             auth._enabled = True

@@ -38,6 +38,8 @@ from app.core.api.models import (
     OnvifServer,
     PtzResult,
     PtzState,
+    RecordingSchedule,
+    SiteTime,
     StorageVolume,
     Timeline,
 )
@@ -200,6 +202,29 @@ class CentralApi:
         """Move cameras into a group (None = out of every group), at most 500. Returns how many changed."""
         body = {"camera_ids": sorted(set(camera_ids))[:500], "group_id": group_id}
         return self._request("POST", "/api/v1/groups/assign", json=body)["updated"]
+
+    # ------------------------------------------------------------------ recording schedules
+    def schedules(self) -> list[RecordingSchedule]:
+        return [RecordingSchedule.model_validate(x) for x in self._request("GET", "/api/v1/schedules")]
+
+    def site_time(self) -> SiteTime:
+        return SiteTime.model_validate(self._request("GET", "/api/v1/schedules/site-time"))
+
+    def create_schedule(self, body: dict) -> RecordingSchedule:
+        return RecordingSchedule.model_validate(self._request("POST", "/api/v1/schedules", json=body))
+
+    def update_schedule(self, schedule_id: int, body: dict) -> RecordingSchedule:
+        return RecordingSchedule.model_validate(self._request("PUT", f"/api/v1/schedules/{schedule_id}", json=body))
+
+    def delete_schedule(self, schedule_id: int) -> None:
+        self._request("DELETE", f"/api/v1/schedules/{schedule_id}")
+
+    def apply_schedule(self, mode: str, schedule_id: int | None = None, camera_ids: list[int] | None = None,
+                       group_id: int | None = None, include_subgroups: bool = True) -> int:
+        """Set the recording mode of listed cameras and/or a whole group. Returns how many cameras changed."""
+        body = {"mode": mode, "schedule_id": schedule_id if mode == "schedule" else None,
+                "camera_ids": sorted(set(camera_ids or [])), "group_id": group_id, "include_subgroups": include_subgroups}
+        return self._request("POST", "/api/v1/schedules/apply", json=body)["updated"]
 
     def alerts(self, *, level: str | None = None, limit: int = 10, offset: int = 0) -> tuple[list[CameraAlert], int, dict]:
         """Camera alerts built by central, danger first. Returns (rows, total, {"danger": n, "warning": n})."""
