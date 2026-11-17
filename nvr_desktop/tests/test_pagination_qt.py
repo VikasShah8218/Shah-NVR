@@ -197,6 +197,7 @@ def test_dashboard_pages_camera_alerts_under_node_alerts(sync):
         changed = Signal()
         camerasTotal = camerasEnabled = recording = segmentsLastHour = segmentsTotal = 0
         recordStreams = 4
+        scheduledOff = 0
 
     class Nodes(QObject):
         nodesChanged = Signal()

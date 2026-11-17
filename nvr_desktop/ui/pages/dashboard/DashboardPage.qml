@@ -38,7 +38,7 @@ PageScroll {
             iconName: "circle-check-big"
             label: "Recording"
             value: (root.k.recording ?? 0) + " / " + (root.k.recordStreams ?? 0)
-            hint: "recorded streams healthy"
+            hint: (root.k.scheduledOff ?? 0) > 0 ? "recorded streams healthy · " + root.k.scheduledOff + " off by schedule" : "recorded streams healthy"
             tone: (root.k.recording ?? 0) < (root.k.recordStreams ?? 0) ? "warning" : "success"
         }
         KpiCard {

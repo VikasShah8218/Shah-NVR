@@ -102,6 +102,7 @@ class DashboardStore(BaseStore):
             "camerasEnabled": self._cluster.camerasEnabled,
             "recording": self._cluster.recording,
             "recordStreams": self._cluster.recordStreams,
+            "scheduledOff": self._cluster.scheduledOff,
             "nodesHealthy": totals["healthy"],
             "nodesTotal": totals["nodes"],
             "segmentsLastHour": self._cluster.segmentsLastHour,

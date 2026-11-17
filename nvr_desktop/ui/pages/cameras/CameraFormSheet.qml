@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import App
 import "../../theme"
 import "../../components"
+import "../schedules"
 
 // Add / edit a camera (port of CameraFormSheet.tsx). Validation and the stream diff run in Python
 // (app/features/cameras/forms.py) so both clients behave the same.
@@ -32,6 +33,10 @@ Sheet {
         ptzSwitch.checked = cam ? !!cam.has_ptz : false
         groupId = cam && cam.group_id ? cam.group_id : 0
         groupLabel = cam && cam.group_path ? cam.group_path : ""
+        recording.mode = cam ? (cam.recording_mode || "always") : "always"
+        recording.scheduleId = cam && cam.recording_schedule_id ? cam.recording_schedule_id : 0
+        recording.current = cam ? { mode: cam.recording_mode || "always", scheduleId: cam.recording_schedule_id || 0,
+                                     recordingNow: cam.recording_now !== false, nextChange: cam.recording_next_change || "" } : null
         streams.clear()
         if (cam) {
             for (const s of cam.streams)
@@ -52,7 +57,8 @@ Sheet {
         return {
             name: nameField.text, description: descField.text, username: userField.text, password: passField.text,
             retention_days: retentionField.text, keep_until_full: untilFullSwitch.checked,
-            enabled: enabledSwitch.checked, has_ptz: ptzSwitch.checked, group_id: groupId, streams: list
+            enabled: enabledSwitch.checked, has_ptz: ptzSwitch.checked, group_id: groupId,
+            recording_mode: recording.mode, recording_schedule_id: recording.scheduleId, streams: list
         }
     }
 
@@ -127,6 +133,7 @@ Sheet {
             Layout.fillWidth: true
         }
     }
+    RecordingFields { id: recording; objectName: "cameraRecording"; Layout.fillWidth: true }
     Rectangle {
         Layout.fillWidth: true
         implicitHeight: enabledRow.implicitHeight + 20
@@ -244,7 +251,9 @@ Sheet {
                     onTextEdited: streams.setProperty(streamBox.index, "source_url", text)
                 }
                 AppText {
-                    text: streamBox.record ? "Recorded continuously and available live." : "Live only: connects to the camera when someone watches."
+                    text: streamBox.record ? (recording.mode === "always" ? "Recorded continuously and available live."
+                        : recording.mode === "never" ? "Recording is off for this camera (Recording: Never); live view works."
+                        : "Recorded on the camera's schedule; always available live.") : "Live only: connects to the camera when someone watches."
                     variant: "small"
                     font.pixelSize: 11
                 }

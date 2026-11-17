@@ -70,3 +70,15 @@ def test_keep_until_full_sends_null_and_skips_days_check():
     assert update_body(f)["retention_days"] is None
     assert create_body(form(retention_days="30"))["retention_days"] == 30
     assert any("Retention" in e for e in validate(form(retention_days="", keep_until_full=False)))
+
+
+def test_recording_mode_fields():
+    """Recording schedules: the schedule id only goes with mode "schedule"; a schedule mode needs one."""
+    assert create_body(form())["recording_mode"] == "always" and create_body(form())["recording_schedule_id"] is None
+    assert "Choose a recording schedule." in validate(form(recording_mode="schedule", recording_schedule_id=0))
+    sched = form(recording_mode="schedule", recording_schedule_id=4)
+    assert validate(sched) == []
+    assert (create_body(sched)["recording_mode"], create_body(sched)["recording_schedule_id"]) == ("schedule", 4)
+    never = update_body(form(recording_mode="never", recording_schedule_id=4))
+    assert (never["recording_mode"], never["recording_schedule_id"]) == ("never", None)
+    assert "recording_mode" not in update_body(form())  # older form: recording left unchanged

@@ -146,6 +146,15 @@ PageScroll {
                     }
                     FieldRow { label: "Username"; value: root.c.username ?? "—" }
                     FieldRow { label: "Password"; value: root.c.has_password ? "Set" : "Not set" }
+                    FieldRow {
+                        objectName: "cameraRecordingRow"
+                        label: "Recording"
+                        readonly property string mode: root.c.recording_mode || "always"
+                        value: (mode === "schedule" ? (root.c.recording_schedule_name || "Schedule") : mode === "never" ? "Never" : "Always")
+                            + " · " + (mode === "always" ? "on"
+                                : Schedules.lowerFirst(Schedules.nowText(root.c.recording_now !== false, root.c.recording_next_change || "")))
+                        valueColor: root.c.recording_now !== false ? Theme.success : Theme.mutedForeground
+                    }
                     FieldRow { label: "Keep recordings"; value: Fmt.retention(root.c.retention_days) }
                     FieldRow { label: "Added"; value: Fmt.dateTime(root.c.created_at) }
                 }

@@ -22,6 +22,7 @@ const NodesPage = lazy(() => import("@/features/nodes/NodesPage").then((m) => ({
 const PlaybackPage = lazy(() => import("@/features/playback/PlaybackPage").then((m) => ({ default: m.PlaybackPage })))
 const AccessPage = lazy(() => import("@/features/access/AccessPage").then((m) => ({ default: m.AccessPage })))
 const AuditPage = lazy(() => import("@/features/audit/AuditPage").then((m) => ({ default: m.AuditPage })))
+const SchedulesPage = lazy(() => import("@/features/schedules/SchedulesPage").then((m) => ({ default: m.SchedulesPage })))
 const SettingsPage = lazy(() => import("@/features/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })))
 
 const queryClient = new QueryClient({
@@ -44,6 +45,7 @@ export default function App() {
                   <Route path="cameras" element={<RequirePerm any={CAMERA_READ}><CamerasPage /></RequirePerm>} />
                   <Route path="cameras/:id" element={<RequirePerm any={CAMERA_READ}><CameraDetailPage /></RequirePerm>} />
                   <Route path="discover" element={<RequirePerm any={[Perm.CAMERAS_MANAGE]}><DiscoverPage /></RequirePerm>} />
+                  <Route path="schedules" element={<RequirePerm any={[Perm.CAMERAS_MANAGE, Perm.DASHBOARD]}><SchedulesPage /></RequirePerm>} />
                   <Route path="nodes" element={<RequirePerm any={[Perm.NODES_MANAGE]}><NodesPage /></RequirePerm>} />
                   <Route path="nodes/:id" element={<RequirePerm any={[Perm.NODES_MANAGE]}><NodeDetailPage /></RequirePerm>} />
                   <Route path="groups" element={<RequirePerm any={[Perm.GROUPS_MANAGE]}><GroupsPage /></RequirePerm>} />

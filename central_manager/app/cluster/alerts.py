@@ -17,10 +17,13 @@ from tortoise.expressions import Q, Subquery
 
 from app.assignments.models import CameraAssignment
 from app.cameras.models import Camera, CameraStream, StreamStatus
+from app.schedules.services import scheduled_off_camera_ids
 
 CLOCK_DRIFT_ALERT_SECONDS = 10  # same as nvr_client/src/lib/onvif.ts
 # A recording stream in these states is not a problem (RECORDING) or is about to start (ASSIGNED).
-_OK_STATES = (StreamStatus.RECORDING, StreamStatus.ASSIGNED)
+_OK_STATES = (StreamStatus.RECORDING, StreamStatus.ASSIGNED, StreamStatus.SCHEDULED_OFF)
+# A camera that is off by its recording schedule (or mode "never") is only connected, so these are fine for it
+_IDLE_OK_STATES = (StreamStatus.STREAMING, StreamStatus.NOT_RECORDING)
 _DANGER_STATES = (StreamStatus.NOT_RECORDING, StreamStatus.UNKNOWN)  # StatusBadge toneOf == "danger"
 
 Level = Literal["danger", "warning"]
@@ -71,7 +74,10 @@ async def camera_alerts() -> list[AlertOut]:
 
     streams = await (CameraStream.filter(record=True, camera__enabled=True, camera_id__in=assigned)
                      .exclude(status__in=_OK_STATES).prefetch_related("camera"))
+    idle = await scheduled_off_camera_ids({s.camera_id for s in streams}) if streams else set()
     for s in streams:
+        if s.camera_id in idle and s.status in _IDLE_OK_STATES:
+            continue  # off by schedule: no recording expected (the node reports SCHEDULED_OFF within seconds)
         status = getattr(s.status, "value", s.status)
         alerts.append(AlertOut(
             level="danger" if s.status in _DANGER_STATES else "warning", kind="stream",

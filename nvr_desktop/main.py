@@ -106,6 +106,7 @@ def build_app():
     from app.features.encoder.store import EncoderStore
     from app.features.playback.bookmarks_store import BookmarksStore
     from app.features.playback.store import PlaybackStore
+    from app.features.schedules.store import SchedulesStore
     from app.features.settings.store import SettingsStore
     from app.video import register_video_types
     from app.video.player import set_source_signer
@@ -126,6 +127,11 @@ def build_app():
     playback_cameras = PlaybackCamerasStore(ctx)
     playback = PlaybackStore(ctx, cameras, nodes, playback_cameras)
     live_groups, manage_groups, picker_groups = LiveGroupsStore(ctx), ManageGroupsStore(ctx), PickerGroupsStore(ctx)
+    groups = GroupsStore(ctx, [live_groups, manage_groups, picker_groups])
+    camera_detail = CameraDetailStore(ctx, nodes)
+    # recording schedules: after an apply / a schedule change the camera pages show the new recording mode
+    schedules = SchedulesStore(ctx, [cameras.refresh, cameras._refresh_tracked, camera_detail.refresh, groups.refreshAll])
+    cameras.saved.connect(lambda _id: schedules.notify_camera_changed())
     singletons = {
         "Prefs": prefs,
         "Toasts": toasts,
@@ -142,11 +148,12 @@ def build_app():
         "LiveGroups": live_groups,
         "ManageGroups": manage_groups,
         "PickerGroups": picker_groups,
-        "Groups": GroupsStore(ctx, [live_groups, manage_groups, picker_groups]),
+        "Groups": groups,
+        "Schedules": schedules,
         "Nodes": nodes,
         "Discover": DiscoverStore(ctx, cameras, nodes),
         "Dashboard": DashboardStore(ctx, cluster, nodes),
-        "CameraDetail": CameraDetailStore(ctx, nodes),
+        "CameraDetail": camera_detail,
         "Backfill": BackfillStore(ctx),
         "Encoder": EncoderStore(ctx, cameras),
         "NodeDetail": NodeDetailStore(ctx, cameras, nodes),

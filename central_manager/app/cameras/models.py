@@ -14,6 +14,7 @@ class StreamStatus(str, Enum):
     RECORDING = "RECORDING"
     NOT_RECORDING = "NOT_RECORDING"
     DISABLED = "DISABLED"
+    SCHEDULED_OFF = "SCHEDULED_OFF"  # connected, not recording because the schedule (or mode "never") says so
 
 
 class Camera(Model):
@@ -28,6 +29,11 @@ class Camera(Model):
     # Max days of recordings, counted back from the camera's latest recording (app/recordings/services.py).
     # None = keep until storage is full (only space-based cleanup on the node removes recordings).
     retention_days = fields.IntField(default=7, null=True)
+    # When the recorded streams record (docs/RECORDING_SCHEDULES_PLAN.md): always | schedule | never.
+    # "schedule" uses recording_schedule; streams stay connected (live view) while the schedule is off.
+    recording_mode = fields.CharField(max_length=16, default="always")
+    recording_schedule = fields.ForeignKeyField("models.RecordingSchedule", related_name="cameras", null=True,
+                                                on_delete=fields.RESTRICT)
 
     # ONVIF device (H1). Filled when added through discovery or on the first Device-page refresh; all optional,
     # so manually added cameras keep working. Credentials are the camera's username/password above.

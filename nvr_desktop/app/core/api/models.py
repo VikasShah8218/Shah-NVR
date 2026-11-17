@@ -126,6 +126,37 @@ class Camera(ApiModel):
     onvif_checked_at: datetime | None = None
     group_id: int | None = None
     group_path: str | None = None
+    # recording schedules (docs/RECORDING_SCHEDULES_PLAN.md); defaults = an older central without schedules
+    recording_mode: str = "always"  # always | schedule | never
+    recording_schedule_id: int | None = None
+    recording_schedule_name: str | None = None
+    recording_now: bool = True
+    recording_next_change: str | None = None  # ISO with the site offset, kept as text (site wall clock)
+
+
+class ScheduleBlock(ApiModel):
+    days: list[int]  # 0 = Monday ... 6 = Sunday
+    start: str  # "HH:MM"
+    end: str  # "HH:MM" or "24:00"; end <= start runs past midnight
+    mode: str = "continuous"
+
+
+class RecordingSchedule(ApiModel):
+    """GET /api/v1/schedules: a weekly recording plan."""
+    id: int
+    name: str
+    description: str | None = None
+    blocks: list[ScheduleBlock] = []
+    camera_count: int = 0
+    recording_now: bool = False
+    next_change: str | None = None  # ISO with the site offset
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class SiteTime(ApiModel):
+    timezone: str
+    now: str  # ISO with the site offset
 
 
 class LiveUrls(ApiModel):

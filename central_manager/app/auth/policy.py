@@ -71,6 +71,15 @@ POLICY: dict[tuple[str, str], Rule] = {
     ("POST", "/api/v1/groups/assign"): any_of(P.GROUPS_MANAGE),
     ("PATCH", "/api/v1/groups/{group_id}"): any_of(P.GROUPS_MANAGE),
     ("DELETE", "/api/v1/groups/{group_id}"): any_of(P.GROUPS_MANAGE),
+    # ---------------------------------------------------------------- recording schedules
+    ("GET", "/api/v1/schedules"): any_of(P.CAMERAS_MANAGE, P.DASHBOARD),
+    ("GET", "/api/v1/schedules/site-time"): SIGNED_IN,
+    ("POST", "/api/v1/schedules"): any_of(P.CAMERAS_MANAGE),
+    ("POST", "/api/v1/schedules/apply"): any_of(P.CAMERAS_MANAGE),
+    ("GET", "/api/v1/schedules/{schedule_id}"): any_of(P.CAMERAS_MANAGE, P.DASHBOARD),
+    ("GET", "/api/v1/schedules/{schedule_id}/preview"): any_of(P.CAMERAS_MANAGE, P.DASHBOARD),
+    ("PUT", "/api/v1/schedules/{schedule_id}"): any_of(P.CAMERAS_MANAGE),
+    ("DELETE", "/api/v1/schedules/{schedule_id}"): any_of(P.CAMERAS_MANAGE),
     # ---------------------------------------------------------------- recordings / playback / bookmarks / exports
     ("GET", "/api/v1/cameras/{camera_id}/recordings"): any_of(P.PLAYBACK),
     ("GET", "/api/v1/playback/{camera_id}/index.m3u8"): any_of(P.PLAYBACK, query_token=True, audit="playback.open"),

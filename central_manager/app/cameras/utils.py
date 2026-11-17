@@ -4,6 +4,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 from app.cameras.models import Camera, CameraStream, StreamStatus
 from app.cameras.schemas import AssignmentInfo, CameraOption, CameraOut, StreamOut
 from app.groups.services import group_labels
+from app.schedules.services import camera_state, schedules_by_id
 
 
 DEVICE_FIELDS = ("onvif_host", "onvif_port", "manufacturer", "model", "firmware", "serial", "mac", "onvif_services",
@@ -40,7 +41,8 @@ async def cameras_to_out(cameras: Sequence[Camera]) -> list[CameraOut]:
         streams[s.camera_id].append(s)
     assignments = {a.camera_id: a for a in await CameraAssignment.filter(camera_id__in=ids).prefetch_related("node")}
     labels = await group_labels(c.group_id for c in cameras)
-    return [_camera_out(c, streams[c.id], assignments.get(c.id), labels) for c in cameras]
+    schedules = await schedules_by_id(c.recording_schedule_id for c in cameras)
+    return [_camera_out(c, streams[c.id], assignments.get(c.id), labels, schedules) for c in cameras]
 
 
 async def camera_options_out(cameras: Sequence[Camera]) -> list[CameraOption]:
@@ -68,7 +70,9 @@ async def camera_options_out(cameras: Sequence[Camera]) -> list[CameraOption]:
             for c in cameras]
 
 
-def _camera_out(camera: Camera, streams: list[CameraStream], a, labels: dict[int, str]) -> CameraOut:
+def _camera_out(camera: Camera, streams: list[CameraStream], a, labels: dict[int, str], schedules: dict) -> CameraOut:
+    schedule = schedules.get(camera.recording_schedule_id)
+    recording_now, next_change = camera_state(camera, schedule)
     assignment = None
     if a is not None:
         node = a.node
@@ -88,6 +92,11 @@ def _camera_out(camera: Camera, streams: list[CameraStream], a, labels: dict[int
         expose_via_onvif=camera.expose_via_onvif,
         has_ptz=camera.has_ptz,
         retention_days=camera.retention_days,
+        recording_mode=camera.recording_mode,
+        recording_schedule_id=camera.recording_schedule_id,
+        recording_schedule_name=schedule.name if schedule else None,
+        recording_now=recording_now,
+        recording_next_change=next_change,
         **{f: getattr(camera, f) for f in DEVICE_FIELDS},
         group_id=camera.group_id,
         group_path=labels.get(camera.group_id),

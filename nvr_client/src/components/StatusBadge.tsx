@@ -12,6 +12,7 @@ const TONE: Record<string, Tone> = {
   NOT_RECORDING: "danger",
   UNKNOWN: "danger",
   UNASSIGNED: "muted",
+  SCHEDULED_OFF: "muted",
   DISABLED: "muted",
   // media nodes
   ACTIVE: "success",
@@ -48,8 +49,10 @@ const DOT_CLASS: Record<Tone, string> = {
 
 export const toneOf = (status: string): Tone => TONE[status] ?? "muted"
 
+const LABEL: Record<string, string> = { OK: "OK", SCHEDULED_OFF: "Off (schedule)" }
+
 const label = (status: string) =>
-  status === "OK" ? "OK" : status.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())
+  LABEL[status] ?? status.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())
 
 export function StatusBadge({ status, className, title }: { status: string; className?: string; title?: string }) {
   const tone = toneOf(status)

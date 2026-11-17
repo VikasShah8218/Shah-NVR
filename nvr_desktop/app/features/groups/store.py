@@ -100,6 +100,10 @@ class CameraSelectStore(PagedStore):
     def picked_ids(self) -> list[int]:
         return list(self._picked)
 
+    @Slot(result="QVariantList")
+    def pickedIds(self) -> list[int]:
+        return self.picked_ids()
+
     def _page_all_selected(self) -> bool:
         rows = [r for r in self._rows if self._selectable(r)]
         return bool(rows) and all(r["id"] in self._picked for r in rows)

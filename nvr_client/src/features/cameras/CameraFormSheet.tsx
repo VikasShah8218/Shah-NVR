@@ -1,7 +1,7 @@
 import { Info, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { useCreateCamera, useSyncStreams, useUpdateCamera } from "@/api/queries"
-import type { Camera, StreamIn } from "@/api/types"
+import type { Camera, RecordingMode, StreamIn } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GroupPicker } from "@/components/GroupPicker"
@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { RecordingFields } from "../schedules/RecordingFields"
 
 interface StreamDraft {
   key: number
@@ -67,6 +68,8 @@ export function CameraFormSheet({
   const [enabled, setEnabled] = useState(camera?.enabled ?? true)
   const [hasPtz, setHasPtz] = useState(camera?.has_ptz ?? false)
   const [groupId, setGroupId] = useState<number | null>(camera?.group_id ?? null)
+  const [recMode, setRecMode] = useState<RecordingMode>((camera?.recording_mode as RecordingMode | undefined) ?? "always")
+  const [recSchedule, setRecSchedule] = useState<number | null>(camera?.recording_schedule_id ?? null)
   const [streams, setStreams] = useState<StreamDraft[]>(() => draftFromCamera(camera))
   const [errors, setErrors] = useState<string[]>([])
 
@@ -86,6 +89,7 @@ export function CameraFormSheet({
     }
     const r = Number(retention)
     if (!untilFull && (!Number.isInteger(r) || r < 1)) errs.push("Retention must be a whole number of days (1 or more).")
+    if (recMode === "schedule" && recSchedule == null) errs.push("Choose a recording schedule.")
     return errs
   }
 
@@ -120,6 +124,8 @@ export function CameraFormSheet({
         enabled,
         has_ptz: hasPtz,
         group_id: groupId,
+        recording_mode: recMode,
+        recording_schedule_id: recMode === "schedule" ? recSchedule : null,
         streams: used.map(toIn),
       })
     } else {
@@ -133,6 +139,8 @@ export function CameraFormSheet({
           enabled,
           has_ptz: hasPtz,
           group_id: groupId,
+          recording_mode: recMode,
+          recording_schedule_id: recMode === "schedule" ? recSchedule : null,
           ...(password ? { password } : {}),
         },
       })
@@ -220,6 +228,17 @@ export function CameraFormSheet({
                 : "Days count back from the camera's latest recording, so a stopped camera keeps its history. When all storage is full the oldest recordings are always replaced."}
             </span>
           </div>
+          <RecordingFields
+            mode={recMode}
+            scheduleId={recSchedule}
+            onChange={(m, id) => { setRecMode(m); setRecSchedule(id) }}
+            current={camera && {
+              mode: camera.recording_mode as RecordingMode,
+              scheduleId: camera.recording_schedule_id ?? null,
+              recordingNow: camera.recording_now,
+              nextChange: camera.recording_next_change ?? null,
+            }}
+          />
           <label className="flex items-center justify-between rounded-md border px-3 py-2.5 text-sm">
             <span>
               Camera enabled
@@ -286,7 +305,7 @@ export function CameraFormSheet({
                 placeholder="rtsp://192.168.1.64:554/…"
               />
               <div className="text-[11px] text-muted-foreground">
-                {s.record ? "Recorded continuously and available live." : "Live only: connects to the camera when someone watches."}
+                {s.record ? (recMode === "always" ? "Recorded continuously and available live." : recMode === "never" ? "Recording is off for this camera (Recording: Never); live view works." : "Recorded on the camera's schedule; always available live.") : "Live only: connects to the camera when someone watches."}
               </div>
             </div>
           ))}

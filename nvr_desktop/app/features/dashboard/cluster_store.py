@@ -46,7 +46,11 @@ class ClusterStore(BaseStore):
     recording = Property(int, lambda self: self._count("streams_by_status", "RECORDING"), notify=changed)
     camerasEnabled = Property(int, lambda self: self._health.get("cameras_enabled", 0), notify=changed)
     camerasTotal = Property(int, lambda self: self._health.get("cameras_total", 0), notify=changed)
-    recordStreams = Property(int, lambda self: self._health.get("record_streams", 0), notify=changed)
+    # streams off by their recording schedule are not expected to record now (the "Recording x / y" target)
+    scheduledOff = Property(int, lambda self: self._count("streams_by_status", "SCHEDULED_OFF"), notify=changed)
+    recordStreams = Property(
+        int, lambda self: max(self._health.get("record_streams", 0) - self._count("streams_by_status", "SCHEDULED_OFF"), 0),
+        notify=changed)
     segmentsLastHour = Property(int, lambda self: self._health.get("segments_last_hour", 0), notify=changed)
     segmentsTotal = Property(int, lambda self: self._health.get("segments_total", 0), notify=changed)
     streamsByStatus = Property(

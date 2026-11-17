@@ -15,6 +15,7 @@ TONE = {
     "NOT_RECORDING": "danger",
     "UNKNOWN": "danger",
     "UNASSIGNED": "muted",
+    "SCHEDULED_OFF": "muted",  # recording off by the camera's schedule (grey, not an error)
     "DISABLED": "muted",
     # media nodes
     "ACTIVE": "success",
@@ -41,6 +42,8 @@ def tone_of(status: str | None) -> str:
 def label_of(status: str | None) -> str:
     if status == "OK":
         return "OK"
+    if status == "SCHEDULED_OFF":
+        return "Off (schedule)"
     text = (status or "").replace("_", " ").lower()
     return text[:1].upper() + text[1:]
 

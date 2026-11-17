@@ -135,12 +135,16 @@ class CameraAssignmentOut(BaseModel):
     onvif_host: str | None = None  # the node checks reachability + clock (no login) when set
     onvif_port: int | None = None
     expose_via_onvif: bool = True
+    # When recorded streams record (docs/RECORDING_SCHEDULES_PLAN.md §4.4): {"mode": "always" | "never"} or
+    # {"mode": "schedule", "schedule_id", "blocks", "version"}. The node evaluates it every reconcile tick.
+    recording: dict = Field(default_factory=lambda: {"mode": "always"})
 
 
 class AssignmentsOut(BaseModel):
     node_id: int
     state: NodeState
     cameras: list[CameraAssignmentOut]
+    site_timezone: str = "UTC"  # wall clock the schedules use: IANA name or "+05:30"
 
 
 class AudioTrackIn(BaseModel):

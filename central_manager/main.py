@@ -28,6 +28,7 @@ from app.auth.deps import AuditMiddleware, guard
 from app.auth.provider import check_provider_setting, create_provider, set_provider
 from app.auth.router import router as auth_router
 from app.groups.router import router as groups_router
+from app.schedules.router import router as schedules_router
 from app.nodes.router import internal_router as nodes_internal_router
 from app.nodes.router import router as nodes_router
 from app.nodes.services import node_health_tick
@@ -99,6 +100,7 @@ for r in (
     audit_router,
     cameras_router,
     groups_router,
+    schedules_router,
     recordings_router,
     playback_router,
     bookmarks_router,

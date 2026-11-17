@@ -165,6 +165,7 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
           </span>
           <span className="hidden text-muted-foreground sm:inline">
             Cameras <span className="font-medium text-foreground">{recording}</span> recording of {h.cameras_enabled}
+            {h.streams_by_status.SCHEDULED_OFF ? <span className="hidden xl:inline"> · {h.streams_by_status.SCHEDULED_OFF} off by schedule</span> : null}
           </span>
         </>
       )}

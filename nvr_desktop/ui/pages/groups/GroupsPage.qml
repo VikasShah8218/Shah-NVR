@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import App
 import "../../theme"
 import "../../components"
+import "../schedules"
 
 // Port of nvr_client/src/features/groups/GroupsPage.tsx: the camera-group tree on the left (lazy: ManageGroups),
 // the selection on the right: all groups (top level), ungrouped cameras, or one group with its breadcrumb,
@@ -231,6 +232,12 @@ Item {
                         AppButton { text: "Sub-group"; iconName: "folder-plus"; size: "sm"; variant: "outline"; onClicked: formDialog.openCreate(root.detail.id, root.detail.path_label) }
                         AppButton { text: "Edit"; iconName: "pencil"; size: "sm"; variant: "outline"; onClicked: formDialog.openEdit(root.ref(root.detail)) }
                         AppButton { text: "Move"; iconName: "move-right"; size: "sm"; variant: "outline"; onClicked: moveDialog.openFor(root.ref(root.detail)) }
+                        AppButton {
+                            objectName: "groupRecordingButton"
+                            visible: Auth.allowed["20"] === true
+                            text: "Recording"; iconName: "calendar-clock"; size: "sm"; variant: "outline"
+                            onClicked: recordingDialog.openForGroup(root.detail.id, root.detail.name)
+                        }
                         AppButton { text: "Delete"; iconName: "trash-2"; size: "sm"; variant: "outline"; onClicked: deleteDialog.openFor(root.ref(root.detail)) }
                     }
                 }
@@ -375,6 +382,14 @@ Item {
                                 variant: "outline"
                                 onClicked: Groups.moveSelectedCameras(0)
                             }
+                            AppButton {
+                                visible: Auth.allowed["20"] === true
+                                text: "Recording…"
+                                iconName: "calendar-clock"
+                                size: "sm"
+                                variant: "outline"
+                                onClicked: recordingDialog.openForCameras(root.cams.pickedIds())
+                            }
                             LinkText { text: "clear"; variant: "small"; onActivated: root.cams.clearSelection() }
                         }
                     }
@@ -481,6 +496,12 @@ Item {
         AppMenuItem { text: "New sub-group"; iconName: "folder-plus"; onTriggered: formDialog.openCreate(groupMenu.group.id, groupMenu.group.pathLabel) }
         AppMenuItem { text: "Rename"; iconName: "pencil"; onTriggered: formDialog.openEdit(groupMenu.group) }
         AppMenuItem { text: "Move…"; iconName: "move-right"; onTriggered: moveDialog.openFor(groupMenu.group) }
+        AppMenuItem {
+            visible: Auth.allowed["20"] === true
+            height: visible ? implicitHeight : 0
+            text: "Recording schedule…"; iconName: "calendar-clock"
+            onTriggered: recordingDialog.openForGroup(groupMenu.group.id, groupMenu.group.name)
+        }
         MenuSeparator {}
         AppMenuItem { text: "Delete"; iconName: "trash-2"; danger: true; onTriggered: deleteDialog.openFor(groupMenu.group) }
     }
@@ -488,6 +509,10 @@ Item {
     GroupFormDialog { id: formDialog }
     MoveGroupDialog { id: moveDialog }
     AddCamerasDialog { id: addDialog }
+    ApplyRecordingDialog {
+        id: recordingDialog
+        onDone: if (cameraIds.length > 0) root.cams.clearSelection()
+    }
 
     // an empty group goes at once; a non-empty one only with "move its contents up one level"
     ConfirmDialog {

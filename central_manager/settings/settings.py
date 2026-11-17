@@ -48,6 +48,9 @@ class Settings(BaseSettings):
 
     # Recording / playback
     DEFAULT_RETENTION_DAYS: int = 7
+    # Recording schedules run on this wall clock (docs/RECORDING_SCHEDULES_PLAN.md D2). An IANA name such as
+    # "Asia/Kolkata" (handles DST); empty = this PC's current UTC offset (fine where there is no DST).
+    SITE_TIMEZONE: str = ""
     PLAYBACK_GAP_TOLERANCE_SECONDS: float = 2.0
     PLAYBACK_MAX_HOURS: int = 24
     EXPORT_MAX_HOURS: int = 4

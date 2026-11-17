@@ -67,6 +67,7 @@ Rectangle {
             textFormat: Text.StyledText
             color: Theme.mutedForeground
             text: "Cameras <font color='" + Theme.foreground + "'><b>" + Cluster.recording + "</b></font> recording of " + Cluster.camerasEnabled
+                  + (Cluster.scheduledOff > 0 ? " · " + Cluster.scheduledOff + " off by schedule" : "")
         }
 
         Item { Layout.fillWidth: true }

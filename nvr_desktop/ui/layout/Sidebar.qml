@@ -15,6 +15,7 @@ Rectangle {
         { page: "playback", label: "Playback", icon: "history" },
         { page: "cameras", label: "Cameras", icon: "camera" },
         { page: "groups", label: "Groups", icon: "folder-tree" },
+        { page: "schedules", label: "Schedules", icon: "calendar-clock" },
         { page: "discover", label: "Discover", icon: "search" },
         { page: "nodes", label: "Media Nodes", icon: "server" },
         { page: "assignments", label: "Assignments", icon: "arrow-left-right" },

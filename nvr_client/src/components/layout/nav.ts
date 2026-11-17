@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  CalendarClock,
   Camera,
   FolderTree,
   Gauge,
@@ -30,6 +31,7 @@ export const NAV: NavItem[] = [
   { to: "/playback", label: "Playback", icon: History, perms: [Perm.PLAYBACK] },
   { to: "/cameras", label: "Cameras", icon: Camera, perms: CAMERA_READ },
   { to: "/groups", label: "Groups", icon: FolderTree, perms: [Perm.GROUPS_MANAGE] },
+  { to: "/schedules", label: "Schedules", icon: CalendarClock, perms: [Perm.CAMERAS_MANAGE, Perm.DASHBOARD] },
   { to: "/discover", label: "Discover", icon: Radar, perms: [Perm.CAMERAS_MANAGE] },
   { to: "/nodes", label: "Media Nodes", icon: Server, perms: [Perm.NODES_MANAGE] },
   { to: "/assignments", label: "Assignments", icon: ArrowLeftRight, perms: [Perm.ASSIGNMENTS] },

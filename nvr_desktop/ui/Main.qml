@@ -19,6 +19,7 @@ ApplicationWindow {
         cameras: "pages/cameras/CamerasPage.qml",
         camera: "pages/cameras/CameraDetailPage.qml",
         groups: "pages/groups/GroupsPage.qml",
+        schedules: "pages/schedules/SchedulesPage.qml",
         discover: "pages/onvif/DiscoverPage.qml",
         nodes: "pages/nodes/NodesPage.qml",
         node: "pages/nodes/NodeDetailPage.qml",

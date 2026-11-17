@@ -21,6 +21,7 @@ from app.cameras.utils import camera_options_out, camera_to_out, cameras_to_out
 from app.auth import scope as access
 from app.groups.services import camera_scope, check_group_id
 from app.recordings.models import RecordingSegment
+from app.schedules.services import check_camera_recording
 from settings.settings import settings
 from utilities.pagination import MAX_LIMIT, Page, PageParams, paginate
 
@@ -37,6 +38,7 @@ async def _get_camera(camera_id: int) -> Camera:
 @router.post("", response_model=CameraOut, status_code=status.HTTP_201_CREATED)
 async def create_camera(body: CameraCreate):
     await check_group_id(body.group_id)
+    await check_camera_recording(body.recording_mode, body.recording_schedule_id)
     camera = await create_camera_with_streams(
         {
             "name": body.name,
@@ -46,6 +48,8 @@ async def create_camera(body: CameraCreate):
             "enabled": body.enabled,
             "has_ptz": body.has_ptz,
             "group_id": body.group_id,
+            "recording_mode": body.recording_mode,
+            "recording_schedule_id": body.recording_schedule_id if body.recording_mode == "schedule" else None,
             # omitted -> default; explicit null -> keep until storage is full
             "retention_days": body.retention_days if "retention_days" in body.model_fields_set
             else settings.DEFAULT_RETENTION_DAYS,
@@ -135,6 +139,13 @@ async def update_camera(camera_id: int, body: CameraUpdate):
     data = body.model_dump(exclude_unset=True)
     if "group_id" in data:
         await check_group_id(data["group_id"])
+    if data.get("recording_mode") is None:
+        data.pop("recording_mode", None)  # null = unchanged
+    if "recording_mode" in data or "recording_schedule_id" in data:
+        mode = data.get("recording_mode", camera.recording_mode)
+        schedule_id = data.get("recording_schedule_id", camera.recording_schedule_id)
+        await check_camera_recording(mode, schedule_id)
+        data["recording_schedule_id"] = schedule_id if mode == "schedule" else None
     if data:
         await camera.update_from_dict(data).save()
         if data.get("enabled") is False:

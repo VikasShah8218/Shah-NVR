@@ -7,7 +7,9 @@ import psutil
 from app.mediamtx.utils import MANAGED_PREFIX, mtx, write_config
 from app.node.services import refresh_assignments
 from app.node.utils import runtime
+from app.schedules.services import log_transitions, recording_on
 from app.storage.services import storage
+from utilities.common import utcnow
 from settings.settings import settings
 
 logger = logging.getLogger("node.mediamtx")
@@ -117,12 +119,15 @@ def desired_paths() -> dict[str, dict]:
     MediaMTX reloads the path, which costs a gap of a second or two."""
     target = record_path(storage.target().path)
     desired = {}
+    now = utcnow()
     for cam in runtime.assignments.values():
+        on = recording_on(cam, now)  # the camera's recording mode / schedule (app/schedules)
         for s in cam["streams"]:
             conf = {
                 "source": s["source_url"],
-                "record": bool(s["record"]),
-                # Recorded streams are always pulled; live-only streams connect when someone watches.
+                "record": bool(s["record"]) and on,
+                # Recorded streams are always pulled, also while their schedule is off (live view stays instant,
+                # MediaMTX toggles `record` without dropping the source); live-only streams connect on demand.
                 "sourceOnDemand": not s["record"],
             }
             if s["record"]:
@@ -152,7 +157,7 @@ async def restart_camera_paths(camera_ids: list[int]) -> dict:
                 await mtx.delete_path(name)
                 runtime.ready_since.pop(name, None)
                 await mtx.add_path(name, conf)
-                results[name] = "pending" if conf["record"] else "on_demand"
+                results[name] = "on_demand" if conf.get("sourceOnDemand", not conf.get("record")) else "pending"
             except Exception:
                 # Do not expose authenticated RTSP URLs from HTTP exception messages.
                 results[name] = "restart_failed"
@@ -168,6 +173,7 @@ async def _reconcile_tick() -> None:
     runtime.mediamtx_running = True
 
     desired = desired_paths()
+    log_transitions()
     actual = {n: c for n, c in (await mtx.list_config_paths()).items() if n.startswith(MANAGED_PREFIX)}
 
     for name in actual.keys() - desired.keys():
