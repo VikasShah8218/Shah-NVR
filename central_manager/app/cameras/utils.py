@@ -72,7 +72,7 @@ async def camera_options_out(cameras: Sequence[Camera]) -> list[CameraOption]:
 
 def _camera_out(camera: Camera, streams: list[CameraStream], a, labels: dict[int, str], schedules: dict) -> CameraOut:
     schedule = schedules.get(camera.recording_schedule_id)
-    recording_now, next_change = camera_state(camera, schedule)
+    state, next_change = camera_state(camera, schedule)
     assignment = None
     if a is not None:
         node = a.node
@@ -95,8 +95,12 @@ def _camera_out(camera: Camera, streams: list[CameraStream], a, labels: dict[int
         recording_mode=camera.recording_mode,
         recording_schedule_id=camera.recording_schedule_id,
         recording_schedule_name=schedule.name if schedule else None,
-        recording_now=recording_now,
+        recording_now=state == "continuous",
+        recording_state=state,
         recording_next_change=next_change,
+        event_pre_seconds=camera.event_pre_seconds,
+        event_post_seconds=camera.event_post_seconds,
+        event_marking=camera.event_marking,
         **{f: getattr(camera, f) for f in DEVICE_FIELDS},
         group_id=camera.group_id,
         group_path=labels.get(camera.group_id),

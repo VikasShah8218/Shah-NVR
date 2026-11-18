@@ -17,7 +17,8 @@ from utilities.common import utcnow
 
 logger = logging.getLogger("node.schedules")
 _zone_cache: dict[str, object] = {}
-_last_state: dict[int, bool] = {}  # camera id -> recording on, for the transition log
+_last_state: dict[int, str] = {}  # camera id -> mode (continuous / event / off), for the transition log
+EVENT_DEFAULTS = {"pre": 10, "post": 30, "marking": True, "max": 300}
 
 
 def zone():
@@ -30,9 +31,20 @@ def zone():
     return tz
 
 
+def mode_now(cam: dict, now: datetime | None = None) -> str:
+    """The camera's recording mode at `now`: continuous / event / off."""
+    return camera_mode(cam.get("recording"), now or utcnow(), zone())
+
+
 def recording_on(cam: dict, now: datetime | None = None) -> bool:
-    """Whether the camera's recorded streams should record right now (mode 'event' comes with event recording)."""
-    return camera_mode(cam.get("recording"), now or utcnow(), zone()) == "continuous"
+    """Whether MediaMTX writes chunks for the camera's recorded streams right now. In event mode it does too:
+    the chunks are held and kept only around events (app/events)."""
+    return mode_now(cam, now) != "off"
+
+
+def event_setting(cam: dict | None) -> dict:
+    """{"pre", "post", "marking", "max"} of the camera (defaults for a central older than event recording)."""
+    return {**EVENT_DEFAULTS, **(((cam or {}).get("recording") or {}).get("events") or {})}
 
 
 def next_change(cam: dict, now: datetime | None = None) -> datetime | None:
@@ -51,14 +63,14 @@ def log_transitions(now: datetime | None = None) -> None:
     for cid, cam in runtime.assignments.items():
         if not any(s["record"] for s in cam["streams"]):
             continue
-        on = recording_on(cam, now)
-        if _last_state.get(cid) != on:
-            _last_state[cid] = on
+        state = mode_now(cam, now)
+        if _last_state.get(cid) != state:
+            _last_state[cid] = state
             nxt = next_change(cam, now)
             until = f" until {format_change(nxt, now)}" if nxt else ""
             mode = (cam.get("recording") or {}).get("mode", "always")
-            logger.info("Recording %s for camera %s (%s, %s)%s", "ON" if on else "OFF", cid,
-                        cam.get("camera_name", "?"), mode, until)
+            word = {"continuous": "ON", "off": "OFF"}.get(state, "ON EVENTS (video kept around events)")
+            logger.info("Recording %s for camera %s (%s, %s)%s", word, cid, cam.get("camera_name", "?"), mode, until)
     for cid in list(_last_state):
         if cid not in runtime.assignments:
             del _last_state[cid]

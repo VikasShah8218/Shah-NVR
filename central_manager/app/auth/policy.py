@@ -89,6 +89,12 @@ POLICY: dict[tuple[str, str], Rule] = {
     ("POST", "/api/v1/bookmarks"): any_of(P.BOOKMARKS_EDIT),
     ("PATCH", "/api/v1/bookmarks/{bookmark_id}"): any_of(P.BOOKMARKS_EDIT),
     ("DELETE", "/api/v1/bookmarks/{bookmark_id}"): any_of(P.BOOKMARKS_EDIT),
+    # events (docs/EVENT_RECORDING_PLAN.md E10): read with playback, mark with bookmark editing
+    ("GET", "/api/v1/events"): any_of(P.PLAYBACK),
+    ("GET", "/api/v1/events/{event_id}"): any_of(P.PLAYBACK),
+    ("POST", "/api/v1/cameras/{camera_id}/events"): any_of(P.BOOKMARKS_EDIT),
+    ("POST", "/api/v1/events/{event_id}/end"): any_of(P.BOOKMARKS_EDIT),
+    ("DELETE", "/api/v1/events/{event_id}"): any_of(P.CAMERAS_MANAGE),
     ("POST", "/api/v1/exports"): any_of(P.EXPORT),
     ("GET", "/api/v1/exports"): any_of(P.EXPORT),
     ("GET", "/api/v1/exports/{job_id}"): any_of(P.EXPORT),

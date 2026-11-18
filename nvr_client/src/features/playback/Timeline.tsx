@@ -185,7 +185,7 @@ export function Timeline({
         {placed.map((m) => {
           const color = m.color ?? "var(--primary)"
           return (
-            <g key={m.id} data-marker-t={m.t} className="cursor-pointer">
+            <g key={m.id} data-marker-t={m.seekT ?? m.t} className="cursor-pointer">
               <title>{m.label ?? m.kind}</title>
               {m.width != null ? (
                 <rect x={`${m.x}%`} y={height - 12} width={`${m.width}%`} height="5" rx="2" fill={color} opacity="0.85" />

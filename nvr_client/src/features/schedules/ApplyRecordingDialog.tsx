@@ -5,6 +5,7 @@ import type { RecordingMode } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
+import { EVENT_DEFAULTS, type EventSettings, eventSettingsValid } from "@/lib/eventSettings"
 import { RecordingFields } from "./RecordingFields"
 
 /** Set the recording mode of a whole group (optionally with its sub-groups) or of selected cameras. */
@@ -21,12 +22,16 @@ export function ApplyRecordingDialog({
   const [mode, setMode] = useState<RecordingMode>("schedule")
   const [scheduleId, setScheduleId] = useState<number | null>(null)
   const [subgroups, setSubgroups] = useState(true)
+  const [events, setEvents] = useState<EventSettings>(EVENT_DEFAULTS)
 
   const submit = () =>
     apply.mutate(
       {
         mode,
         schedule_id: mode === "schedule" ? scheduleId : null,
+        event_pre_seconds: events.pre,
+        event_post_seconds: events.post,
+        event_marking: events.marking,
         ...(target.kind === "group" ? { group_id: target.id, include_subgroups: subgroups } : { camera_ids: target.ids, include_subgroups: false }),
       },
       { onSuccess: () => { onDone?.(); onOpenChange(false) } },
@@ -44,7 +49,8 @@ export function ApplyRecordingDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <RecordingFields mode={mode} scheduleId={scheduleId} onChange={(m, id) => { setMode(m); setScheduleId(id) }} />
+          <RecordingFields mode={mode} scheduleId={scheduleId} onChange={(m, id) => { setMode(m); setScheduleId(id) }}
+            events={events} onEventsChange={setEvents} />
           {target.kind === "group" && (
             <label className="flex items-center justify-between rounded-md border px-3 py-2.5 text-sm">
               <span>
@@ -57,7 +63,7 @@ export function ApplyRecordingDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button disabled={apply.isPending || (mode === "schedule" && scheduleId == null)} onClick={submit}>
+          <Button disabled={apply.isPending || (mode === "schedule" && scheduleId == null) || !eventSettingsValid(events)} onClick={submit}>
             {apply.isPending && <Loader2 className="size-4 animate-spin" />} Apply
           </Button>
         </DialogFooter>

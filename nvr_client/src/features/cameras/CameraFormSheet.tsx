@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { EVENT_DEFAULTS, type EventSettings, eventSettingsValid } from "@/lib/eventSettings"
 import { RecordingFields } from "../schedules/RecordingFields"
 
 interface StreamDraft {
@@ -70,6 +71,9 @@ export function CameraFormSheet({
   const [groupId, setGroupId] = useState<number | null>(camera?.group_id ?? null)
   const [recMode, setRecMode] = useState<RecordingMode>((camera?.recording_mode as RecordingMode | undefined) ?? "always")
   const [recSchedule, setRecSchedule] = useState<number | null>(camera?.recording_schedule_id ?? null)
+  const [events, setEvents] = useState<EventSettings>(camera
+    ? { pre: camera.event_pre_seconds ?? 10, post: camera.event_post_seconds ?? 30, marking: camera.event_marking ?? true }
+    : EVENT_DEFAULTS)
   const [streams, setStreams] = useState<StreamDraft[]>(() => draftFromCamera(camera))
   const [errors, setErrors] = useState<string[]>([])
 
@@ -90,6 +94,7 @@ export function CameraFormSheet({
     const r = Number(retention)
     if (!untilFull && (!Number.isInteger(r) || r < 1)) errs.push("Retention must be a whole number of days (1 or more).")
     if (recMode === "schedule" && recSchedule == null) errs.push("Choose a recording schedule.")
+    if (!eventSettingsValid(events)) errs.push("Event seconds: before 0–60, after 0–600 (whole seconds).")
     return errs
   }
 
@@ -126,6 +131,9 @@ export function CameraFormSheet({
         group_id: groupId,
         recording_mode: recMode,
         recording_schedule_id: recMode === "schedule" ? recSchedule : null,
+        event_pre_seconds: events.pre,
+        event_post_seconds: events.post,
+        event_marking: events.marking,
         streams: used.map(toIn),
       })
     } else {
@@ -141,6 +149,9 @@ export function CameraFormSheet({
           group_id: groupId,
           recording_mode: recMode,
           recording_schedule_id: recMode === "schedule" ? recSchedule : null,
+          event_pre_seconds: events.pre,
+          event_post_seconds: events.post,
+          event_marking: events.marking,
           ...(password ? { password } : {}),
         },
       })
@@ -235,9 +246,11 @@ export function CameraFormSheet({
             current={camera && {
               mode: camera.recording_mode as RecordingMode,
               scheduleId: camera.recording_schedule_id ?? null,
-              recordingNow: camera.recording_now,
+              state: camera.recording_state ?? (camera.recording_now ? "continuous" : "off"),
               nextChange: camera.recording_next_change ?? null,
             }}
+            events={events}
+            onEventsChange={setEvents}
           />
           <label className="flex items-center justify-between rounded-md border px-3 py-2.5 text-sm">
             <span>
@@ -305,7 +318,7 @@ export function CameraFormSheet({
                 placeholder="rtsp://192.168.1.64:554/…"
               />
               <div className="text-[11px] text-muted-foreground">
-                {s.record ? (recMode === "always" ? "Recorded continuously and available live." : recMode === "never" ? "Recording is off for this camera (Recording: Never); live view works." : "Recorded on the camera's schedule; always available live.") : "Live only: connects to the camera when someone watches."}
+                {s.record ? (recMode === "always" ? "Recorded continuously and available live." : recMode === "never" ? "Recording is off for this camera (Recording: Never); live view works." : recMode === "event" ? "Video kept only around events; always available live." : "Recorded on the camera's schedule; always available live.") : "Live only: connects to the camera when someone watches."}
               </div>
             </div>
           ))}

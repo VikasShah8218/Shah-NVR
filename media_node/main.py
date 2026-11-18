@@ -29,6 +29,8 @@ from app.onvif_server.service import onvif_server
 from app.recordings.router import router as recordings_router
 from app.recordings.services import deletion_tick, scan_tick, upload_tick
 from app.recordings.backfill import backfill_tick
+from app.events.router import router as events_router
+from app.events.services import event_tick
 from app.exports.router import router as exports_router
 from app.exports.service import export_cleanup_tick, export_tick
 from app.storage.services import storage, storage_tick
@@ -67,6 +69,7 @@ async def lifespan(app: FastAPI):
                 ("scanner", settings.SCAN_INTERVAL_SECONDS, scan_tick),
                 ("uploader", settings.UPLOAD_INTERVAL_SECONDS, upload_tick),
                 ("stream-status", settings.STATUS_INTERVAL_SECONDS, stream_status_tick),
+                ("events", settings.EVENT_INTERVAL_SECONDS, event_tick),
                 ("deletion", settings.DELETION_INTERVAL_SECONDS, deletion_tick),
                 ("storage", settings.STORAGE_CHECK_INTERVAL_SECONDS, storage_tick),
                 ("address", settings.ADDRESS_CHECK_INTERVAL_SECONDS, check_public_host),
@@ -97,6 +100,7 @@ app.include_router(onvif_router)
 app.include_router(ptz_router)
 app.include_router(onvif_server_router)
 app.include_router(exports_router)
+app.include_router(events_router)
 
 
 @app.get("/", tags=["System"])

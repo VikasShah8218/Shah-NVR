@@ -21,6 +21,9 @@ export type ScheduleUpdate = C["schemas"]["ScheduleUpdate"]
 export type ScheduleApply = C["schemas"]["ApplyIn"]
 export type RecordingMode = ScheduleApply["mode"]
 export type SiteTime = C["schemas"]["SiteTimeOut"]
+// events (docs/EVENT_RECORDING_PLAN.md)
+export type NvrEvent = C["schemas"]["EventOut"]
+export type NvrEventCreate = C["schemas"]["EventCreate"]
 // sign-in, access grants, audit (docs/AUTH_INTEGRATION_PLAN.md)
 export type AccessSubjects = C["schemas"]["SubjectsOut"]
 export type AccessGrants = C["schemas"]["GrantsOut"]

@@ -81,6 +81,13 @@ class CentralClient:
     async def upload_segments(self, node_id: int, items: list[dict]) -> dict:
         return await self._request("POST", "/internal/v1/recordings/segments", json={"node_id": node_id, "items": items})
 
+    async def event_windows(self, node_id: int, since: str | None) -> dict:
+        return await self._request("GET", f"/internal/v1/nodes/{node_id}/events",
+                                   params={"since": since} if since else None)
+
+    async def upload_events(self, node_id: int, items: list[dict]) -> dict:
+        return await self._request("POST", f"/internal/v1/nodes/{node_id}/events", json={"items": items})
+
     async def pending_deletions(self, node_id: int, limit: int = 500) -> list[dict]:
         return await self._request("GET", f"/internal/v1/nodes/{node_id}/deletions", params={"limit": limit})
 

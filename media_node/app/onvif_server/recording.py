@@ -84,7 +84,7 @@ def _parse_time(value: str | None) -> datetime | None:
 
 
 async def recordings(start: datetime | None = None, end: datetime | None = None) -> list[Recording]:
-    query = LocalSegment.all().order_by("start_time")
+    query = LocalSegment.filter(held=False).order_by("start_time")  # held = event mode, not kept (yet)
     if start is not None:
         query = query.filter(end_time__gte=start)
     if end is not None:

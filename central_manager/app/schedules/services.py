@@ -37,15 +37,22 @@ def zone():
     return site_zone(site_timezone())
 
 
+def event_setting(camera: Camera) -> dict:
+    """Event recording / marking settings the node needs (docs/EVENT_RECORDING_PLAN.md E6)."""
+    return {"pre": camera.event_pre_seconds, "post": camera.event_post_seconds,
+            "marking": camera.event_marking, "max": settings.EVENT_MAX_SECONDS}
+
+
 def recording_setting(camera: Camera, schedule: RecordingSchedule | None) -> dict:
     """What the node gets (and what the evaluator reads) for one camera."""
     mode = camera.recording_mode or "always"
+    events = event_setting(camera)
     if mode == "schedule":
         if schedule is None:  # should not happen (FK RESTRICT); fail safe = record
-            return {"mode": "always"}
+            return {"mode": "always", "events": events}
         return {"mode": "schedule", "schedule_id": schedule.id, "blocks": schedule.blocks,
-                "version": schedule.updated_at.isoformat() if schedule.updated_at else None}
-    return {"mode": mode}
+                "version": schedule.updated_at.isoformat() if schedule.updated_at else None, "events": events}
+    return {"mode": mode, "events": events}
 
 
 async def schedules_by_id(ids) -> dict[int, RecordingSchedule]:
@@ -53,11 +60,11 @@ async def schedules_by_id(ids) -> dict[int, RecordingSchedule]:
     return {s.id: s for s in await RecordingSchedule.filter(id__in=ids)} if ids else {}
 
 
-def camera_state(camera: Camera, schedule: RecordingSchedule | None, now: datetime | None = None) -> tuple[bool, datetime | None]:
-    """(recording now by the schedule/mode, next change in site wall clock)."""
+def camera_state(camera: Camera, schedule: RecordingSchedule | None, now: datetime | None = None) -> tuple[str, datetime | None]:
+    """(the mode now: continuous / event / off, next change in site wall clock)."""
     now = now or utcnow()
     setting, tz = recording_setting(camera, schedule), zone()
-    return camera_mode(setting, now, tz) == "continuous", camera_next_change(setting, now, tz)
+    return camera_mode(setting, now, tz), camera_next_change(setting, now, tz)
 
 
 async def scheduled_off_camera_ids(camera_ids=None) -> set[int]:
@@ -72,9 +79,10 @@ async def scheduled_off_camera_ids(camera_ids=None) -> set[int]:
             if camera_mode(recording_setting(c, schedules.get(c.recording_schedule_id)), now, tz) == "off"}
 
 
-def schedule_state(schedule: RecordingSchedule, now: datetime | None = None) -> tuple[bool, datetime | None]:
+def schedule_state(schedule: RecordingSchedule, now: datetime | None = None) -> tuple[str, datetime | None]:
+    """(the schedule's mode now: continuous / event / off, next change in site wall clock)."""
     local = (now or utcnow()).astimezone(zone())
-    return mode_at(schedule.blocks, local) == "continuous", next_change(schedule.blocks, local)
+    return mode_at(schedule.blocks, local), next_change(schedule.blocks, local)
 
 
 def preview(schedule: RecordingSchedule, start: datetime, days: int) -> list[dict]:
@@ -107,7 +115,7 @@ async def check_camera_recording(mode: str | None, schedule_id: int | None) -> N
 
 
 async def apply(mode: str, schedule_id: int | None, camera_ids: list[int], group_q: Q | None,
-                visible_q: Q | None) -> int:
+                visible_q: Q | None, events: dict | None = None) -> int:
     if schedule_id is not None:
         await get_schedule(schedule_id)
     target = Q(id__in=list(set(camera_ids))) if camera_ids else None
@@ -116,4 +124,5 @@ async def apply(mode: str, schedule_id: int | None, camera_ids: list[int], group
     qs = Camera.filter(target)
     if visible_q is not None:
         qs = qs.filter(visible_q)
-    return await qs.update(recording_mode=mode, recording_schedule_id=schedule_id if mode == "schedule" else None)
+    return await qs.update(recording_mode=mode, recording_schedule_id=schedule_id if mode == "schedule" else None,
+                           **(events or {}))

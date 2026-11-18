@@ -38,6 +38,9 @@ class LocalSegment(Model):
     parts = fields.JSONField()
     tracks = fields.JSONField(default=dict)  # {track_id: {"ts": timescale, "t0": first decode time}}
     uploaded = fields.BooleanField(default=False)
+    # Event recording (docs/EVENT_RECORDING_PLAN.md E1): written in event mode, not uploaded until an event needs it
+    # (then released) or deleted when none does (app/events).
+    held = fields.BooleanField(default=False)
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:

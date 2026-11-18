@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router"
 import { toast } from "sonner"
 import { exportDownloadUrl, mediaFileUrl, playbackAudioUrl, playbackUrl } from "@/api/client"
-import { useBookmarks, useCamera, useCameraOptions, useCancelExport, useExports, useNodes, useTimeline } from "@/api/queries"
-import type { Bookmark, Segment } from "@/api/types"
+import { useBookmarks, useCamera, useCameraOptions, useCancelExport, useEvents, useExports, useNodes, useTimeline } from "@/api/queries"
+import type { Bookmark, NvrEvent, Segment } from "@/api/types"
 import { CameraPicker } from "@/components/CameraPicker"
 import { EmptyState, ErrorState, PageHeader } from "@/components/common"
 import { Pager } from "@/components/Pager"
@@ -25,7 +25,8 @@ import { readStored, useSettings, writeStored } from "@/lib/settings"
 import { nodeApiUrl, playbackAccess, selectedNodeAccess, useNodeAccessMap } from "@/lib/nodeAccess"
 import { DAY, HOUR, fmtDay, fmtTime, startOfLocalDay } from "@/lib/time"
 import { BookmarkDialog, BookmarksPanel } from "./BookmarksPanel"
-import { bookmarkMarker } from "./markers"
+import { EventsPanel, MarkEventButton } from "../events/EventsPanel"
+import { bookmarkMarker, eventMarker } from "./markers"
 import { thumbnailUrl, thumbTarget } from "./thumbs"
 import { Timeline } from "./Timeline"
 import { VodPlayer } from "./VodPlayer"
@@ -99,7 +100,15 @@ export function PlaybackPage() {
     { cameraId, profile, start: new Date(dayStart), end: new Date(dayEnd), limit: 1000 },
     cameraId != null,
   )
-  const markers = useMemo(() => (dayBookmarks.data?.items ?? []).map(bookmarkMarker), [dayBookmarks.data])
+  // ... and its events (docs/EVENT_RECORDING_PLAN.md): coloured by type; a click plays from the pre-event seconds.
+  const dayEvents = useEvents(
+    { cameraId, start: new Date(dayStart), end: new Date(dayEnd), order: "asc", limit: 1000, refetch: isToday ? 20_000 : 0 },
+    cameraId != null,
+  )
+  const markers = useMemo(
+    () => [...(dayBookmarks.data?.items ?? []).map(bookmarkMarker), ...(dayEvents.data?.items ?? []).map((e) => eventMarker(e))],
+    [dayBookmarks.data, dayEvents.data],
+  )
   const access = playbackAccess(
     nodes.data ?? [], [...new Set(segments.map((segment) => segment.node_id))], settings.nodeAccess, detected.data,
   )
@@ -168,6 +177,17 @@ export function PlaybackPage() {
     const d = startOfLocalDay(t)
     if (d.getTime() !== dayStart) changeDay(d)
     // Not seek(): that caps the playlist at the *current* day's end, which may be another day.
+    setPlayFrom(t)
+    setPlayTo(new Date(Math.min(d.getTime() + DAY, Date.now())))
+    setPlayhead(t)
+  }
+
+  /** Open an event: like a bookmark, but play from its pre-event seconds. */
+  const openEvent = (e: NvrEvent) => {
+    const t = new Date(Date.parse(e.start_time) - e.pre_seconds * 1000)
+    if (e.camera_id !== cameraId) setCameraId(e.camera_id)
+    const d = startOfLocalDay(t)
+    if (d.getTime() !== dayStart) changeDay(d)
     setPlayFrom(t)
     setPlayTo(new Date(Math.min(d.getTime() + DAY, Date.now())))
     setPlayhead(t)
@@ -257,6 +277,7 @@ export function PlaybackPage() {
               <BookmarkPlus className="size-4" /> Bookmark
             </Button>
           )}
+          <MarkEventButton className="w-full sm:w-auto" cameraId={cameraId} at={playhead} />
           {can(Perm.EXPORT) && (
             <Button className="w-full sm:w-auto" onClick={() => setExportOpen(true)} disabled={cameraId == null || segments.length === 0}>
               <FileVideo className="size-4" /> Export
@@ -319,6 +340,8 @@ export function PlaybackPage() {
       </Card>
 
       <BookmarksPanel cameraId={cameraId} onOpen={openBookmark} />
+
+      <EventsPanel cameraId={cameraId} onOpen={openEvent} />
 
       <Card className="gap-2">
         <CardHeader>

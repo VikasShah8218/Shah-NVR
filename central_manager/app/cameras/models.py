@@ -15,6 +15,7 @@ class StreamStatus(str, Enum):
     NOT_RECORDING = "NOT_RECORDING"
     DISABLED = "DISABLED"
     SCHEDULED_OFF = "SCHEDULED_OFF"  # connected, not recording because the schedule (or mode "never") says so
+    EVENT_STANDBY = "EVENT_STANDBY"  # event mode, no event now: chunks are held on the node, kept only around events
 
 
 class Camera(Model):
@@ -29,11 +30,16 @@ class Camera(Model):
     # Max days of recordings, counted back from the camera's latest recording (app/recordings/services.py).
     # None = keep until storage is full (only space-based cleanup on the node removes recordings).
     retention_days = fields.IntField(default=7, null=True)
-    # When the recorded streams record (docs/RECORDING_SCHEDULES_PLAN.md): always | schedule | never.
+    # When the recorded streams record (docs/RECORDING_SCHEDULES_PLAN.md): always | schedule | never | event.
     # "schedule" uses recording_schedule; streams stay connected (live view) while the schedule is off.
     recording_mode = fields.CharField(max_length=16, default="always")
     recording_schedule = fields.ForeignKeyField("models.RecordingSchedule", related_name="cameras", null=True,
                                                 on_delete=fields.RESTRICT)
+    # Event recording (docs/EVENT_RECORDING_PLAN.md): video kept around an event in mode "event" (or an event
+    # schedule block), and whether events are logged / shown as timeline marks (in every mode).
+    event_pre_seconds = fields.IntField(default=10)
+    event_post_seconds = fields.IntField(default=30)
+    event_marking = fields.BooleanField(default=True)
 
     # ONVIF device (H1). Filled when added through discovery or on the first Device-page refresh; all optional,
     # so manually added cameras keep working. Credentials are the camera's username/password above.

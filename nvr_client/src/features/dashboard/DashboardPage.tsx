@@ -70,7 +70,9 @@ export function DashboardPage() {
   const alerts = [...shownNodeAlerts, ...camPage.items.map(cameraAlert)]
   const alertCount = nodeAlerts.length + camPage.counts.danger + camPage.counts.warning
   const dangerCount = nodeAlerts.filter((a) => a.level === "danger").length + camPage.counts.danger
-  const recording = h.streams_by_status.RECORDING ?? 0
+  // event standby = healthy: chunks are written and kept around events (docs/EVENT_RECORDING_PLAN.md E7)
+  const standby = h.streams_by_status.EVENT_STANDBY ?? 0
+  const recording = (h.streams_by_status.RECORDING ?? 0) + standby
   // streams off by their recording schedule are not expected to record now
   const scheduledOff = h.streams_by_status.SCHEDULED_OFF ?? 0
   const recordStreams = Math.max(h.record_streams - scheduledOff, 0)
@@ -89,7 +91,7 @@ export function DashboardPage() {
           icon={CheckCircle2}
           label="Recording"
           value={`${recording} / ${recordStreams}`}
-          hint={scheduledOff ? `recorded streams healthy · ${scheduledOff} off by schedule` : "recorded streams healthy"}
+          hint={["recorded streams healthy", scheduledOff ? `${scheduledOff} off by schedule` : "", standby ? `${standby} on event standby` : ""].filter(Boolean).join(" · ")}
           tone={recording < recordStreams ? "warning" : "success"}
         />
         <KpiCard icon={Server} label="Nodes healthy" value={`${healthy} / ${nodeList.length}`} tone={healthy < nodeList.length ? "danger" : "success"} />

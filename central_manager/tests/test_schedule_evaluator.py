@@ -128,3 +128,17 @@ def test_dst_zone_uses_wall_clock():
 
 def test_unknown_zone_is_utc():
     assert site_zone("Mars/Base") is timezone.utc and site_zone("") is timezone.utc
+
+
+def test_event_mode_and_may_use_events():
+    """docs/EVENT_RECORDING_PLAN.md: camera mode "event", and event blocks in a schedule."""
+    from app.schedules.utils import camera_mode, may_use_events
+
+    now = datetime(2026, 11, 17, 10, 0, tzinfo=timezone.utc)
+    assert camera_mode({"mode": "event"}, now, timezone.utc) == "event"
+    night = {"mode": "schedule", "blocks": [{"days": list(range(7)), "start": "20:00", "end": "08:00", "mode": "event"}]}
+    assert camera_mode(night, now, timezone.utc) == "off"
+    assert camera_mode(night, now.replace(hour=22), timezone.utc) == "event"
+    assert may_use_events({"mode": "event"}) and may_use_events(night)
+    assert not may_use_events({"mode": "always"}) and not may_use_events(None)
+    assert not may_use_events({"mode": "schedule", "blocks": [{"days": [0], "start": "08:00", "end": "09:00"}]})

@@ -13,7 +13,9 @@ import {
 } from "@/lib/schedule"
 import { cn } from "@/lib/utils"
 
-export type Brush = "on" | "off"
+export type Brush = "on" | "event" | "off"
+const BRUSH_VALUE: Record<Brush, number> = { on: 2, event: 1, off: 0 }
+const BRUSH_LABEL: Record<Brush, string> = { on: "Record", event: "Event", off: "Off" }
 type Cell = { d: number; q: number }
 
 const HOURS = [0, 3, 6, 9, 12, 15, 18, 21, 24]
@@ -40,7 +42,7 @@ function HourAxis() {
   )
 }
 
-/** The 7×24 week editor: drag a rectangle to paint Record / Off in 15-minute steps. Read-only without `onChange`. */
+/** The 7×24 week editor: drag a rectangle to paint Record / Event / Off in 15-minute steps. Read-only without `onChange`. */
 export function WeekGrid({
   blocks,
   onChange,
@@ -75,13 +77,13 @@ export function WeekGrid({
     if (!rect || !onChange) return
     const next = bits.slice()
     for (let d = rect.d0; d <= rect.d1; d++) {
-      next.fill(brush === "on" ? 1 : 0, d * DAY_MIN + rect.q0 * SLOT_MIN, d * DAY_MIN + (rect.q1 + 1) * SLOT_MIN)
+      next.fill(BRUSH_VALUE[brush], d * DAY_MIN + rect.q0 * SLOT_MIN, d * DAY_MIN + (rect.q1 + 1) * SLOT_MIN)
     }
     onChange(bitmapToBlocks(next))
   }
 
   const tip = rect
-    ? `${rect.d0 === rect.d1 ? DAYS[rect.d0] : `${DAYS[rect.d0]}–${DAYS[rect.d1]}`} ${fmtHHMM(rect.q0 * SLOT_MIN)}–${fmtHHMM((rect.q1 + 1) * SLOT_MIN)} → ${brush === "on" ? "Record" : "Off"}`
+    ? `${rect.d0 === rect.d1 ? DAYS[rect.d0] : `${DAYS[rect.d0]}–${DAYS[rect.d1]}`} ${fmtHHMM(rect.q0 * SLOT_MIN)}–${fmtHHMM((rect.q1 + 1) * SLOT_MIN)} → ${BRUSH_LABEL[brush]}`
     : hover
       ? `${DAYS[hover.d]} ${fmtHHMM(hover.q * SLOT_MIN)}–${fmtHHMM((hover.q + 1) * SLOT_MIN)}`
       : null
@@ -114,8 +116,9 @@ export function WeekGrid({
                       q % 4 === 0 && q > 0 && "border-l border-border/40",
                       q % 24 === 0 && q > 0 && "border-border",
                       sel
-                        ? brush === "on" ? "bg-primary/70" : "bg-danger/25"
-                        : c === 1 ? "bg-success/60" : c > 0 ? "bg-success/30" : "bg-muted/40",
+                        ? brush === "on" ? "bg-primary/70" : brush === "event" ? "bg-warning/70" : "bg-danger/25"
+                        : c.rec === 1 ? "bg-success/60" : c.ev === 1 ? "bg-warning/50"
+                          : c.rec > 0 ? "bg-success/30" : c.ev > 0 ? "bg-warning/25" : "bg-muted/40",
                     )}
                   />
                 )
@@ -127,6 +130,7 @@ export function WeekGrid({
       </div>
       <div className="mt-1.5 flex min-h-5 flex-wrap items-center gap-x-4 gap-y-1 pl-11 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-success/60" /> Record</span>
+        <span className="flex items-center gap-1.5" title="Video kept only around events"><span className="size-2.5 rounded-sm bg-warning/50" /> Event</span>
         <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm border bg-muted/40" /> Off</span>
         {now && <span className="flex items-center gap-1.5"><span className="h-2.5 w-0.5 bg-danger" /> Now</span>}
         {tip && <span className="ml-auto font-medium text-foreground tabular-nums">{tip}</span>}
@@ -142,8 +146,8 @@ export function WeekStrip({ blocks, className }: { blocks: ScheduleBlock[]; clas
     <div className={cn("grid w-40 grid-rows-7 gap-px", className)} title="Mon (top) to Sun, 00–24">
       {DAYS.map((d, i) => (
         <div key={d} className="relative h-1.5 overflow-hidden rounded-[1px] bg-muted">
-          {dayRuns(bits, i).map(([s, e]) => (
-            <span key={s} className="absolute inset-y-0 bg-success/70" style={{ left: `${(s / DAY_MIN) * 100}%`, width: `${((e - s) / DAY_MIN) * 100}%` }} />
+          {dayRuns(bits, i).map(([s, e, v]) => (
+            <span key={s} className={cn("absolute inset-y-0", v === 2 ? "bg-success/70" : "bg-warning/70")} style={{ left: `${(s / DAY_MIN) * 100}%`, width: `${((e - s) / DAY_MIN) * 100}%` }} />
           ))}
         </div>
       ))}

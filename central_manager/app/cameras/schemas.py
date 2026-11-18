@@ -61,8 +61,12 @@ class CameraCreate(BaseModel):
     has_ptz: bool = False  # PTZ-capable; auto-set from ONVIF detection when added through discovery
     group_id: int | None = None  # camera group (docs/GROUPING_PLAN.md); None = no group
     # When recorded streams record (docs/RECORDING_SCHEDULES_PLAN.md); schedule id needed with "schedule"
-    recording_mode: Literal["always", "schedule", "never"] = "always"
+    recording_mode: Literal["always", "schedule", "never", "event"] = "always"
     recording_schedule_id: int | None = None
+    # Event recording (docs/EVENT_RECORDING_PLAN.md): seconds kept before / after an event, and event marks
+    event_pre_seconds: int = Field(default=10, ge=0, le=60)
+    event_post_seconds: int = Field(default=30, ge=0, le=600)
+    event_marking: bool = True
     streams: list[StreamIn] = Field(min_length=1)
 
     @field_validator("streams")
@@ -87,8 +91,11 @@ class CameraUpdate(BaseModel):
     # unchanged (update); send null to keep recordings until storage is full.
     retention_days: int | None = Field(default=None, ge=1, le=3650)
     # Leave out = unchanged. "schedule" needs recording_schedule_id (in this request or already set).
-    recording_mode: Literal["always", "schedule", "never"] | None = None
+    recording_mode: Literal["always", "schedule", "never", "event"] | None = None
     recording_schedule_id: int | None = None
+    event_pre_seconds: int | None = Field(default=None, ge=0, le=60)  # leave out = unchanged
+    event_post_seconds: int | None = Field(default=None, ge=0, le=600)
+    event_marking: bool | None = None
 
 
 class AssignmentInfo(BaseModel):
@@ -108,10 +115,14 @@ class CameraOut(BaseModel):
     expose_via_onvif: bool
     has_ptz: bool
     retention_days: int | None  # None = keep until storage is full
-    recording_mode: str = "always"  # always | schedule | never
+    recording_mode: str = "always"  # always | schedule | never | event
     recording_schedule_id: int | None = None
     recording_schedule_name: str | None = None
     recording_now: bool = True  # what the mode/schedule says right now (not whether a file is being written)
+    recording_state: Literal["continuous", "event", "off"] = "continuous"  # the mode/schedule right now
+    event_pre_seconds: int = 10
+    event_post_seconds: int = 30
+    event_marking: bool = True
     recording_next_change: datetime | None = None  # site wall clock, with offset
     # ONVIF device (null for cameras never seen over ONVIF)
     onvif_host: str | None = None

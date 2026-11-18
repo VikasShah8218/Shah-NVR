@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.schedules.utils import parse_hhmm
 
-BlockMode = Literal["continuous", "off"]  # "event" comes with event-triggered recording
-CameraRecordingMode = Literal["always", "schedule", "never"]
+BlockMode = Literal["continuous", "event", "off"]  # "event": video kept only around events (EVENT_RECORDING_PLAN)
+CameraRecordingMode = Literal["always", "schedule", "never", "event"]
 MAX_BLOCKS = 50
 
 
@@ -71,6 +71,7 @@ class ScheduleOut(BaseModel):
     blocks: list[ScheduleBlock]
     camera_count: int
     recording_now: bool  # the schedule's mode at this moment is "continuous"
+    state_now: Literal["continuous", "event", "off"] = "continuous"
     next_change: datetime | None  # site wall clock, with its offset
     created_at: datetime
     updated_at: datetime
@@ -84,6 +85,10 @@ class ApplyIn(BaseModel):
     camera_ids: list[int] = Field(default_factory=list, max_length=10000)
     group_id: int | None = None
     include_subgroups: bool = True
+    # Event settings applied with the mode; leave out = unchanged
+    event_pre_seconds: int | None = Field(default=None, ge=0, le=60)
+    event_post_seconds: int | None = Field(default=None, ge=0, le=600)
+    event_marking: bool | None = None
 
     @model_validator(mode="after")
     def check(self):

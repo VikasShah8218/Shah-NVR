@@ -63,9 +63,9 @@ export function SchedulesPage() {
                   </TableCell>
                   <TableCell className="hidden md:table-cell"><WeekStrip blocks={s.blocks} /></TableCell>
                   <TableCell>
-                    <span className={cn("inline-flex items-center gap-1.5 text-sm", s.recording_now ? "text-success" : "text-muted-foreground")}>
-                      <span className={cn("size-1.5 rounded-full", s.recording_now ? "bg-success" : "bg-muted-foreground")} />
-                      {nowText(s.recording_now, s.next_change)}
+                    <span className={cn("inline-flex items-center gap-1.5 text-sm", s.recording_now ? "text-success" : s.state_now === "event" ? "text-warning" : "text-muted-foreground")}>
+                      <span className={cn("size-1.5 rounded-full", s.recording_now ? "bg-success" : s.state_now === "event" ? "bg-warning" : "bg-muted-foreground")} />
+                      {nowText(s.state_now ?? s.recording_now, s.next_change)}
                     </span>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{s.camera_count}</TableCell>

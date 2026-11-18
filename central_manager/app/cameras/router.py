@@ -50,6 +50,9 @@ async def create_camera(body: CameraCreate):
             "group_id": body.group_id,
             "recording_mode": body.recording_mode,
             "recording_schedule_id": body.recording_schedule_id if body.recording_mode == "schedule" else None,
+            "event_pre_seconds": body.event_pre_seconds,
+            "event_post_seconds": body.event_post_seconds,
+            "event_marking": body.event_marking,
             # omitted -> default; explicit null -> keep until storage is full
             "retention_days": body.retention_days if "retention_days" in body.model_fields_set
             else settings.DEFAULT_RETENTION_DAYS,
@@ -139,8 +142,9 @@ async def update_camera(camera_id: int, body: CameraUpdate):
     data = body.model_dump(exclude_unset=True)
     if "group_id" in data:
         await check_group_id(data["group_id"])
-    if data.get("recording_mode") is None:
-        data.pop("recording_mode", None)  # null = unchanged
+    for key in ("recording_mode", "event_pre_seconds", "event_post_seconds", "event_marking"):
+        if key in data and data[key] is None:
+            data.pop(key)  # null = unchanged
     if "recording_mode" in data or "recording_schedule_id" in data:
         mode = data.get("recording_mode", camera.recording_mode)
         schedule_id = data.get("recording_schedule_id", camera.recording_schedule_id)

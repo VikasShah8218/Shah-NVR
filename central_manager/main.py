@@ -20,6 +20,9 @@ from app.backfill.router import internal_router as backfill_internal_router
 from app.backfill.router import router as backfill_router
 from app.backfill.services import backfill_scheduler_tick
 from app.bookmarks.router import router as bookmarks_router
+from app.events.router import internal_router as events_internal_router
+from app.events.router import router as events_router
+from app.events.services import event_upkeep_tick
 from app.cameras.router import router as cameras_router
 from app.cluster.router import router as cluster_router
 from app.audit.router import router as audit_router
@@ -62,6 +65,7 @@ async def lifespan(app: FastAPI):
             asyncio.create_task(run_periodic("backfill", settings.BACKFILL_SCHEDULER_INTERVAL_SECONDS,
                                              backfill_scheduler_tick)),
             asyncio.create_task(run_periodic("audit-retention", 86400, prune_audit)),
+            asyncio.create_task(run_periodic("event-upkeep", 60, event_upkeep_tick)),
         ]
         check_provider_setting()
         auth_provider = None
@@ -104,6 +108,7 @@ for r in (
     recordings_router,
     playback_router,
     bookmarks_router,
+    events_router,
     nodes_router,
     assignments_router,
     cluster_router,
@@ -116,6 +121,7 @@ for r in (
     recordings_internal_router,
     backfill_internal_router,
     exports_internal_router,
+    events_internal_router,
 ):
     app.include_router(r)
 

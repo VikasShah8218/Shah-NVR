@@ -36,3 +36,6 @@ async def migrate() -> None:
     await _add_column(conn, "local_segments", "origin", "VARCHAR(16) NOT NULL DEFAULT 'NVR'")
     await _add_column(conn, "local_segments", "backfill_job_id", "CHAR(36) NULL")
     await conn.execute_script("CREATE INDEX IF NOT EXISTS idx_local_segments_volume ON local_segments (volume_id, start_time)")
+    # 2026-11-17 event recording: chunks held until an event needs them.
+    await _add_column(conn, "local_segments", "held", "INT NOT NULL DEFAULT 0")
+    await conn.execute_script("CREATE INDEX IF NOT EXISTS idx_local_segments_held ON local_segments (held, start_time)")

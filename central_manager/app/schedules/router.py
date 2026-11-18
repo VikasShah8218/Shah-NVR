@@ -26,9 +26,10 @@ async def _out(schedules: list[RecordingSchedule]) -> list[ScheduleOut]:
                   .values_list("recording_schedule_id", "n")) if ids else {}
     now, out = utcnow(), []
     for s in schedules:
-        on, nxt = services.schedule_state(s, now)
+        state, nxt = services.schedule_state(s, now)
         out.append(ScheduleOut(id=s.id, name=s.name, description=s.description, blocks=s.blocks,
-                               camera_count=counts.get(s.id, 0), recording_now=on, next_change=nxt,
+                               camera_count=counts.get(s.id, 0), recording_now=state == "continuous",
+                               state_now=state, next_change=nxt,
                                created_at=s.created_at, updated_at=s.updated_at))
     return out
 
@@ -63,7 +64,9 @@ async def create_schedule(body: ScheduleIn):
              summary="Set the recording mode of cameras and/or a group (with sub-groups); only visible cameras")
 async def apply_schedule(body: ApplyIn):
     group_q = await camera_scope(body.group_id, False, body.include_subgroups) if body.group_id is not None else None
-    updated = await services.apply(body.mode, body.schedule_id, body.camera_ids, group_q, await scope.camera_q())
+    events = body.model_dump(include={"event_pre_seconds", "event_post_seconds", "event_marking"}, exclude_none=True)
+    updated = await services.apply(body.mode, body.schedule_id, body.camera_ids, group_q, await scope.camera_q(),
+                                   events)
     return ApplyOut(updated=updated)
 
 

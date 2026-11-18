@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     # Recording schedules run on this wall clock (docs/RECORDING_SCHEDULES_PLAN.md D2). An IANA name such as
     # "Asia/Kolkata" (handles DST); empty = this PC's current UTC offset (fine where there is no DST).
     SITE_TIMEZONE: str = ""
+    # Events (docs/EVENT_RECORDING_PLAN.md): marks are kept this long (their video follows retention_days);
+    # an event nobody ends is closed after EVENT_MAX_SECONDS.
+    EVENT_RETENTION_DAYS: int = 90
+    EVENT_MAX_SECONDS: int = 300
     PLAYBACK_GAP_TOLERANCE_SECONDS: float = 2.0
     PLAYBACK_MAX_HOURS: int = 24
     EXPORT_MAX_HOURS: int = 4
