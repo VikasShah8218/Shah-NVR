@@ -150,10 +150,18 @@ PageScroll {
                         objectName: "cameraRecordingRow"
                         label: "Recording"
                         readonly property string mode: root.c.recording_mode || "always"
-                        value: (mode === "schedule" ? (root.c.recording_schedule_name || "Schedule") : mode === "never" ? "Never" : "Always")
+                        readonly property string state: Schedules.cameraState(root.c)
+                        value: (mode === "schedule" ? (root.c.recording_schedule_name || "Schedule") : mode === "never" ? "Never"
+                                : mode === "event" ? "Event" : "Always")
                             + " · " + (mode === "always" ? "on"
-                                : Schedules.lowerFirst(Schedules.nowText(root.c.recording_now !== false, root.c.recording_next_change || "")))
-                        valueColor: root.c.recording_now !== false ? Theme.success : Theme.mutedForeground
+                                : mode === "event" ? (root.c.event_pre_seconds ?? 10) + " s before, " + (root.c.event_post_seconds ?? 30) + " s after each event"
+                                : Schedules.lowerFirst(Schedules.nowText(state, root.c.recording_next_change || "")))
+                        valueColor: state === "continuous" ? Theme.success : state === "event" ? Theme.warning : Theme.mutedForeground
+                    }
+                    FieldRow {
+                        objectName: "cameraEventMarksRow"
+                        label: "Event marks"
+                        value: root.c.event_marking === false ? "Off (marks you add by hand are kept)" : "On"
                     }
                     FieldRow { label: "Keep recordings"; value: Fmt.retention(root.c.retention_days) }
                     FieldRow { label: "Added"; value: Fmt.dateTime(root.c.created_at) }

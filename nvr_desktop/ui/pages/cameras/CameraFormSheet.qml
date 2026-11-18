@@ -35,8 +35,9 @@ Sheet {
         groupLabel = cam && cam.group_path ? cam.group_path : ""
         recording.mode = cam ? (cam.recording_mode || "always") : "always"
         recording.scheduleId = cam && cam.recording_schedule_id ? cam.recording_schedule_id : 0
+        recording.events = Schedules.eventSettingsOf(cam)
         recording.current = cam ? { mode: cam.recording_mode || "always", scheduleId: cam.recording_schedule_id || 0,
-                                     recordingNow: cam.recording_now !== false, nextChange: cam.recording_next_change || "" } : null
+                                     state: Schedules.cameraState(cam), nextChange: cam.recording_next_change || "" } : null
         streams.clear()
         if (cam) {
             for (const s of cam.streams)
@@ -58,7 +59,8 @@ Sheet {
             name: nameField.text, description: descField.text, username: userField.text, password: passField.text,
             retention_days: retentionField.text, keep_until_full: untilFullSwitch.checked,
             enabled: enabledSwitch.checked, has_ptz: ptzSwitch.checked, group_id: groupId,
-            recording_mode: recording.mode, recording_schedule_id: recording.scheduleId, streams: list
+            recording_mode: recording.mode, recording_schedule_id: recording.scheduleId, events: recording.events,
+            streams: list
         }
     }
 
@@ -253,6 +255,7 @@ Sheet {
                 AppText {
                     text: streamBox.record ? (recording.mode === "always" ? "Recorded continuously and available live."
                         : recording.mode === "never" ? "Recording is off for this camera (Recording: Never); live view works."
+                        : recording.mode === "event" ? "Recorded around events only; always available live."
                         : "Recorded on the camera's schedule; always available live.") : "Live only: connects to the camera when someone watches."
                     variant: "small"
                     font.pixelSize: 11

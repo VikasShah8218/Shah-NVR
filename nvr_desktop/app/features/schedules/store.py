@@ -21,17 +21,25 @@ from app.core.context import AppContext
 from app.core.list_model import DictListModel
 from app.core.poller import Poller
 from app.core.store import BaseStore
+from app.features.events import event_settings
 from app.features.schedules import schedule as sch
 
-ROLES = ["id", "name", "description", "summary", "nowText", "recordingNow", "cameraCount", "rows", "blocks"]
+ROLES = ["id", "name", "description", "summary", "nowText", "recordingNow", "state", "usesEvents", "cameraCount", "rows",
+         "blocks"]
+
+
+def _state(s: dict) -> str:
+    """The schedule's mode now (an older central only says recording or not)."""
+    return s.get("state_now") or sch.state_of(bool(s.get("recording_now")))
 
 
 def _row(s: dict) -> dict:
     return {
         "id": s["id"], "name": s["name"], "description": s.get("description") or "",
         "summary": s.get("description") or sch.blocks_summary(s["blocks"]),
-        "nowText": sch.now_text(s["recording_now"], s.get("next_change")),
-        "recordingNow": s["recording_now"], "nextChange": s.get("next_change") or "",
+        "nowText": sch.now_text(_state(s), s.get("next_change")),
+        "recordingNow": s["recording_now"], "state": _state(s), "usesEvents": sch.uses_events(s["blocks"]),
+        "nextChange": s.get("next_change") or "",
         "cameraCount": s["camera_count"], "rows": sch.week_rows(s["blocks"]), "blocks": s["blocks"],
     }
 
@@ -81,14 +89,14 @@ class ScheduleEditor(QObject):
 
     @Slot(str)
     def setBrush(self, value: str) -> None:
-        self._brush = "off" if value == "off" else "on"
+        self._brush = value if value in ("off", "event") else "on"
         self.changed.emit()
 
     @Slot(int, int, int, int)
     def paint(self, d0: int, d1: int, q0: int, q1: int) -> None:
-        """A drag on the grid: days d0..d1 x 15-min slots q0..q1 become Record or Off (the brush)."""
+        """A drag on the grid: days d0..d1 x 15-min slots q0..q1 become Record, Event or Off (the brush)."""
         if not self._read_only:
-            self._set_blocks(sch.paint(self._valid(), d0, d1, q0, q1, self._brush == "on") + self._invalid())
+            self._set_blocks(sch.paint(self._valid(), d0, d1, q0, q1, self._brush) + self._invalid())
 
     @Slot(str)
     def applyTemplate(self, key: str) -> None:
@@ -120,6 +128,12 @@ class ScheduleEditor(QObject):
     def setTime(self, index: int, which: str, value: str) -> None:
         key = "end" if which == "end" else "start"
         self._set_blocks([dict(b, **{key: value.strip()}) if i == index else b for i, b in enumerate(self._blocks)])
+
+    @Slot(int, str)
+    def setMode(self, index: int, mode: str) -> None:
+        """A block's mode: continuous (record) / event / off."""
+        if mode in sch.MODE_VALUE:
+            self._set_blocks([dict(b, mode=mode) if i == index else b for i, b in enumerate(self._blocks)])
 
     @Slot()
     def save(self) -> None:
@@ -154,14 +168,17 @@ class ScheduleEditor(QObject):
             if not err and b["end"] != "00:00" and sch.parse_hhmm(b["end"]) <= sch.parse_hhmm(b["start"]):
                 hint = "24 h" if b["start"] == b["end"] else "next day"
             out.append({"index": i, "days": b["days"], "start": b["start"], "end": b["end"], "error": err,
+                        "mode": b.get("mode") or "continuous",
                         "startBad": not sch.TIME_RE.match(b["start"]), "endBad": not sch.TIME_RE.match(b["end"]),
                         "hint": hint, "label": sch.block_label(b) if not err else ""})
         return out
 
     def _hours_text(self) -> str:
         hours = sch.recorded_hours(self._valid())
+        events = sch.event_hours(self._valid())
         pct = f" ({round(hours / 168 * 100)}%)" if 0 < hours < 168 else ""
-        return f"Records {round(hours * 10) / 10:g} h of 168 h a week{pct}."
+        ev = f", event recording {round(events * 10) / 10:g} h" if events else ""
+        return f"Records {round(hours * 10) / 10:g} h of 168 h a week{pct}{ev}."
 
     scheduleId = Property(int, lambda self: self._id, notify=changed)
     name = Property(str, lambda self: self._name, notify=changed)
@@ -263,9 +280,25 @@ class SchedulesStore(BaseStore):
     def byId(self, schedule_id: int):
         return next((s for s in self._items if s["id"] == schedule_id), None)
 
-    @Slot(bool, str, result=str)
-    def nowText(self, recording_now: bool, next_change: str) -> str:
-        return sch.now_text(recording_now, next_change or None)
+    @Slot("QVariant", str, result=str)
+    def nowText(self, state, next_change: str) -> str:
+        """`state`: "continuous" / "event" / "off", or a bool (recording now) from an older central."""
+        return sch.now_text(state, next_change or None)
+
+    @Slot("QVariant", result=bool)
+    def eventSettingsValid(self, events) -> bool:
+        return event_settings.valid(dict(events or {}))
+
+    @Slot("QVariant", result="QVariant")
+    def eventSettingsOf(self, camera):
+        """The event settings of a camera (API dict), or the defaults for a new one."""
+        return event_settings.of_camera(dict(camera) if camera else None)
+
+    @Slot("QVariant", result=str)
+    def cameraState(self, camera) -> str:
+        """A camera's recording mode now: continuous / event / off."""
+        c = dict(camera or {})
+        return c.get("recording_state") or sch.state_of(c.get("recording_now") is not False)
 
     @Slot(str, result=str)
     def lowerFirst(self, text: str) -> str:
@@ -300,16 +333,24 @@ class SchedulesStore(BaseStore):
         self.act(lambda: self.api.delete_schedule(schedule_id), success="Schedule deleted",
                  after=lambda _r: self._changed(), on_error=lambda _e: self.failed.emit())
 
-    @Slot(str, int, "QVariantList", int, bool)
-    def apply(self, mode: str, schedule_id: int, camera_ids, group_id: int, include_subgroups: bool) -> None:
-        """Set the recording mode of listed cameras and/or a whole group (ids: 0 = none)."""
+    @Slot(str, int, "QVariantList", int, bool, "QVariant")
+    def apply(self, mode: str, schedule_id: int, camera_ids, group_id: int, include_subgroups: bool,
+              events=None) -> None:
+        """Set the recording mode of listed cameras and/or a whole group (ids: 0 = none), and the event settings
+        (`events` {pre, post, marking}; null = unchanged)."""
         ids = [int(x) for x in camera_ids or []]
+        events = dict(events) if events else None
+        if events and not event_settings.valid(events):
+            self.ctx.toasts.error(event_settings.INVALID_TEXT)
+            self.failed.emit()
+            return
 
         def after(n):
             self._changed()
             self.applied.emit(n)
 
-        self.act(lambda: self.api.apply_schedule(mode, schedule_id or None, ids, group_id or None, include_subgroups),
+        self.act(lambda: self.api.apply_schedule(mode, schedule_id or None, ids, group_id or None, include_subgroups,
+                                                 events),
                  success=lambda n: f"Recording updated for {n} camera{'' if n == 1 else 's'}",
                  after=after, on_error=lambda _e: self.failed.emit())
 

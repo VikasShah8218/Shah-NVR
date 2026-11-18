@@ -121,6 +121,54 @@ def test_schedules_api():
     assert (cam.recording_mode, cam.recording_now) == ("always", True)
 
 
+@respx.mock
+def test_events_api():
+    import json
+    ev = {"id": 7, "camera_id": 1, "camera_name": "Gate", "type": "video_loss", "source": "node:2",
+          "start_time": "2026-11-18T10:00:00Z", "end_time": None, "label": None, "data": None,
+          "pre_seconds": 10, "post_seconds": 30, "created_at": "2026-11-18T10:00:00Z",
+          "updated_at": "2026-11-18T10:00:00Z"}
+    listed = respx.get(f"{BASE}/api/v1/events").mock(return_value=httpx.Response(
+        200, json={"items": [ev], "total": 1, "limit": 25, "offset": 25}))
+    created = respx.post(f"{BASE}/api/v1/cameras/1/events").mock(return_value=httpx.Response(
+        201, json={**ev, "id": 8, "type": "manual", "merged": True}))
+    ended = respx.post(f"{BASE}/api/v1/events/7/end").mock(return_value=httpx.Response(
+        200, json={**ev, "end_time": "2026-11-18T10:05:00Z"}))
+    deleted = respx.delete(f"{BASE}/api/v1/events/7").mock(return_value=httpx.Response(204))
+    api = CentralApi(BASE)
+    start = datetime(2026, 11, 18, tzinfo=timezone.utc)
+    rows, total = api.events(camera_id=1, types=["manual", "video_loss"], start=start, order="asc", limit=25,
+                             offset=25)
+    assert total == 1 and rows[0].end_time is None and rows[0].to_qml()["type"] == "video_loss"
+    assert dict(listed.calls.last.request.url.params) == {
+        "camera_id": "1", "type": "manual,video_loss", "start": "2026-11-18T00:00:00+00:00", "order": "asc",
+        "limit": "25", "offset": "25"}
+    assert api.create_event(1, {"type": "manual"}).merged
+    assert json.loads(created.calls.last.request.read()) == {"type": "manual"}
+    assert api.end_event(7).end_time is not None and ended.called
+    api.delete_event(7)
+    assert deleted.called
+
+
+@respx.mock
+def test_apply_with_event_settings_and_camera_event_fields():
+    import json
+    from app.core.api.models import Camera, RecordingSchedule
+    apply = respx.post(f"{BASE}/api/v1/schedules/apply").mock(return_value=httpx.Response(200, json={"updated": 2}))
+    api = CentralApi(BASE)
+    assert api.apply_schedule("event", group_id=4, events={"pre": 5, "post": 60, "marking": False}) == 2
+    assert json.loads(apply.calls.last.request.read()) == {
+        "mode": "event", "schedule_id": None, "camera_ids": [], "group_id": 4, "include_subgroups": True,
+        "event_pre_seconds": 5, "event_post_seconds": 60, "event_marking": False}
+    old = Camera.model_validate(CAMERA)  # an older central: defaults
+    assert (old.recording_state, old.event_pre_seconds, old.event_post_seconds, old.event_marking) == (None, 10, 30, True)
+    cam = Camera.model_validate({**CAMERA, "recording_mode": "event", "recording_state": "event", "event_marking": False})
+    assert cam.recording_state == "event" and not cam.event_marking
+    sched = RecordingSchedule.model_validate({"id": 1, "name": "x", "state_now": "event",
+                                              "blocks": [{"days": [0], "start": "18:00", "end": "08:00", "mode": "event"}]})
+    assert sched.state_now == "event" and sched.blocks[0].mode == "event"
+
+
 def api_camera_defaults():
     from app.core.api.models import Camera
     return Camera.model_validate(CAMERA)  # an older central without recording fields

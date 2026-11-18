@@ -2,13 +2,15 @@
 
 The form arrives from QML as a dict:
   {name, description, username, password, retention_days, keep_until_full, enabled,
-   recording_mode (always | schedule | never), recording_schedule_id (0 = none),
-   streams: [{profile, source_url, record, rtsp_transport, existing}]}
+   recording_mode (always | schedule | event | never), recording_schedule_id (0 = none),
+   events: {pre, post, marking} (optional), streams: [{profile, source_url, record, rtsp_transport, existing}]}
 """
 
 from __future__ import annotations
 
 import re
+
+from app.features.events import event_settings
 
 PROFILE_RE = re.compile(r"^[a-z0-9_-]{1,32}$")
 URL_RE = re.compile(r"^(rtsps?|rtmp|srt|https?)://", re.IGNORECASE)
@@ -50,6 +52,8 @@ def validate(form: dict) -> list[str]:
             errors.append("Retention must be a whole number of days (1 or more).")
     if form.get("recording_mode") == "schedule" and not _schedule_id(form):
         errors.append("Choose a recording schedule.")
+    if form.get("events") and not event_settings.valid(form["events"]):
+        errors.append(event_settings.INVALID_TEXT)
     return errors
 
 
@@ -61,7 +65,10 @@ def _schedule_id(form: dict) -> int | None:
 def recording_fields(form: dict) -> dict:
     """Recording schedules: the schedule id is sent only with mode "schedule" (central clears it otherwise)."""
     mode = form.get("recording_mode") or "always"
-    return {"recording_mode": mode, "recording_schedule_id": _schedule_id(form) if mode == "schedule" else None}
+    out = {"recording_mode": mode, "recording_schedule_id": _schedule_id(form) if mode == "schedule" else None}
+    if form.get("events"):  # event recording settings (pre / post seconds, event marks)
+        out.update(event_settings.body(form["events"]))
+    return out
 
 
 def _stream_body(s: dict) -> dict:

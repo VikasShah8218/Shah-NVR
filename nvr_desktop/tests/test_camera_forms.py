@@ -82,3 +82,16 @@ def test_recording_mode_fields():
     never = update_body(form(recording_mode="never", recording_schedule_id=4))
     assert (never["recording_mode"], never["recording_schedule_id"]) == ("never", None)
     assert "recording_mode" not in update_body(form())  # older form: recording left unchanged
+
+
+def test_event_recording_fields():
+    """Event recording: Event mode, the before / after seconds and the marks switch go with the recording fields."""
+    ev = form(recording_mode="event", events={"pre": 5, "post": 45, "marking": False})
+    assert validate(ev) == []
+    body = create_body(ev)
+    assert body["recording_mode"] == "event" and body["recording_schedule_id"] is None
+    assert (body["event_pre_seconds"], body["event_post_seconds"], body["event_marking"]) == (5, 45, False)
+    assert update_body(ev)["event_post_seconds"] == 45
+    assert "Before: 0–60 s, after: 0–600 s." in validate(form(events={"pre": 61, "post": 30, "marking": True}))
+    assert "Before: 0–60 s, after: 0–600 s." in validate(form(events={"pre": -1, "post": 30, "marking": True}))
+    assert "event_pre_seconds" not in create_body(form())  # no event section: left to the server's defaults

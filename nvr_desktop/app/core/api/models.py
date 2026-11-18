@@ -127,11 +127,16 @@ class Camera(ApiModel):
     group_id: int | None = None
     group_path: str | None = None
     # recording schedules (docs/RECORDING_SCHEDULES_PLAN.md); defaults = an older central without schedules
-    recording_mode: str = "always"  # always | schedule | never
+    recording_mode: str = "always"  # always | schedule | event | never
     recording_schedule_id: int | None = None
     recording_schedule_name: str | None = None
     recording_now: bool = True
     recording_next_change: str | None = None  # ISO with the site offset, kept as text (site wall clock)
+    # event recording (docs/EVENT_RECORDING_PLAN.md); defaults = an older central without events
+    recording_state: str | None = None  # continuous | event | off right now (None: older central, use recording_now)
+    event_pre_seconds: int = 10
+    event_post_seconds: int = 30
+    event_marking: bool = True
 
 
 class ScheduleBlock(ApiModel):
@@ -149,6 +154,7 @@ class RecordingSchedule(ApiModel):
     blocks: list[ScheduleBlock] = []
     camera_count: int = 0
     recording_now: bool = False
+    state_now: str | None = None  # continuous | event | off (None: older central, use recording_now)
     next_change: str | None = None  # ISO with the site offset
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -548,6 +554,25 @@ class ExportJob(ApiModel):
     finished_at: datetime | None = None
     expires_at: datetime | None = None
     updated_at: datetime
+
+
+# ---------------------------------------------------------------- events (central /api/v1/events)
+class NvrEvent(ApiModel):
+    """An event: a moment (end == start), a range, or still going on (end None)."""
+    id: int
+    camera_id: int
+    camera_name: str = ""
+    type: str  # manual | api | video_loss (ONVIF types later)
+    source: str = ""
+    start_time: datetime
+    end_time: datetime | None = None
+    label: str | None = None
+    data: dict | None = None
+    pre_seconds: int = 10
+    post_seconds: int = 30
+    merged: bool = False
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 # ---------------------------------------------------------------- bookmarks (central /api/v1/bookmarks)

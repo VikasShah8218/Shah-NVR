@@ -104,6 +104,7 @@ def build_app():
     from app.features.nodes.store import NodesStore
     from app.features.onvif.store import DiscoverStore
     from app.features.encoder.store import EncoderStore
+    from app.features.events.store import EventsStore
     from app.features.playback.bookmarks_store import BookmarksStore
     from app.features.playback.store import PlaybackStore
     from app.features.schedules.store import SchedulesStore
@@ -132,6 +133,7 @@ def build_app():
     # recording schedules: after an apply / a schedule change the camera pages show the new recording mode
     schedules = SchedulesStore(ctx, [cameras.refresh, cameras._refresh_tracked, camera_detail.refresh, groups.refreshAll])
     cameras.saved.connect(lambda _id: schedules.notify_camera_changed())
+    bookmarks = BookmarksStore(ctx, playback)
     singletons = {
         "Prefs": prefs,
         "Toasts": toasts,
@@ -162,7 +164,8 @@ def build_app():
         "Ptz": PtzStore(ctx),
         "PtzWs": PtzWsStore(ctx, cameras, nodes),
         "Playback": playback,
-        "Bookmarks": BookmarksStore(ctx, playback),
+        "Bookmarks": bookmarks,
+        "Events": EventsStore(ctx, playback, bookmarks),
         "SettingsPage": SettingsStore(ctx),
         "Access": AccessStore(ctx),
         "AuditLog": AuditStore(ctx),

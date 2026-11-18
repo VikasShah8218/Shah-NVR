@@ -51,41 +51,50 @@ def block_error(b: dict) -> str | None:
     return None
 
 
+# Minute values in the bitmap, weakest -> strongest (the server's MODES order): overlapping blocks keep the strongest.
+MODE_VALUE = {"off": 0, "event": 1, "continuous": 2}
+VALUE_MODE = ("off", "event", "continuous")
+BRUSHES = {"on": 2, "record": 2, "continuous": 2, "event": 1, "off": 0}
+
+
 def blocks_to_bitmap(blocks: list[dict]) -> bytearray:
-    """One byte per minute of the week: 1 = recording. "off" blocks never win over "continuous", so they add nothing."""
+    """One value per minute of the week: 0 off, 1 event (video kept around events), 2 record."""
     bits = bytearray(WEEK_MIN)
     for b in blocks:
-        if b.get("mode", "continuous") != "continuous" or block_error(b):
+        v = MODE_VALUE.get(b.get("mode") or "continuous", 0)
+        if not v or block_error(b):
             continue
         s, e = parse_hhmm(b["start"]), parse_hhmm(b["end"])
         length = e - s if e > s else DAY_MIN - s + e  # e == s -> 24 h
         for d in b["days"]:
             base = d * DAY_MIN + s
-            end = base + length
-            if end <= WEEK_MIN:
-                bits[base:end] = b"\x01" * length
-            else:  # Sunday night into Monday
-                bits[base:] = b"\x01" * (WEEK_MIN - base)
-                bits[: end - WEEK_MIN] = b"\x01" * (end - WEEK_MIN)
+            for i in range(length):
+                at = (base + i) % WEEK_MIN  # Sunday night runs into Monday
+                if bits[at] < v:
+                    bits[at] = v
     return bits
 
 
 def bitmap_to_blocks(bits: bytearray) -> list[dict]:
-    """Minute bitmap -> the fewest readable blocks: runs split at midnight, except one overnight block
-    (e.g. 18:00-08:00) when the run ends the next morning; equal times on several days share one block."""
+    """Minute bitmap -> the fewest readable blocks: runs of one mode split at midnight, except one overnight block
+    (e.g. 18:00-08:00) when the run ends the next morning; equal times and mode on several days share one block."""
+    # walk the circular week from a mode change (an "off" minute if any), so no run is cut at the array end
     try:
-        off = bits.index(0)
+        origin = bits.index(0)
     except ValueError:
-        return [block(ALL_WEEK, "00:00", "24:00")]
-    chunks: list[tuple[int, int, int]] = []
+        origin = next((i for i in range(WEEK_MIN) if bits[i] != bits[i - 1]), -1)
+        if origin < 0:
+            return [block(ALL_WEEK, "00:00", "24:00", VALUE_MODE[bits[0]])]
+    chunks: list[tuple[int, int, int, int]] = []
     i = 0
-    while i < WEEK_MIN:  # walk the circular week from an "off" minute, so no run is cut at the array end
-        at = (off + i) % WEEK_MIN
-        if not bits[at]:
+    while i < WEEK_MIN:
+        at = (origin + i) % WEEK_MIN
+        v = bits[at]
+        if not v:
             i += 1
             continue
         length = 0
-        while length < WEEK_MIN and bits[(at + length) % WEEK_MIN]:
+        while length < WEEK_MIN - i and bits[(at + length) % WEEK_MIN] == v:
             length += 1
         i += length
         s, left = at, length
@@ -99,50 +108,62 @@ def bitmap_to_blocks(bits: bytearray) -> list[dict]:
             else:
                 take = to_midnight
             end = DAY_MIN if take == to_midnight else (t + take) % DAY_MIN
-            chunks.append((day, t, end))
+            chunks.append((day, t, end, v))
             s = (s + take) % WEEK_MIN
             left -= take
-    by_times: dict[tuple[int, int], list[int]] = {}
-    for day, s, e in chunks:
-        by_times.setdefault((s, e), []).append(day)
-    out = [block(sorted(set(days)), fmt_hhmm(s), fmt_hhmm(e)) for (s, e), days in by_times.items()]
+    by_times: dict[tuple[int, int, int], list[int]] = {}
+    for day, s, e, v in chunks:
+        by_times.setdefault((s, e, v), []).append(day)
+    out = [block(sorted(set(days)), fmt_hhmm(s), fmt_hhmm(e), VALUE_MODE[v]) for (s, e, v), days in by_times.items()]
     return sorted(out, key=lambda b: (b["days"][0], b["start"]))
 
 
-def paint(blocks: list[dict], d0: int, d1: int, q0: int, q1: int, on: bool) -> list[dict]:
-    """The grid's drag: set days d0..d1 x 15-min slots q0..q1 (inclusive) to record (on) or off."""
+def paint(blocks: list[dict], d0: int, d1: int, q0: int, q1: int, brush="on") -> list[dict]:
+    """The grid's drag: set days d0..d1 x 15-min slots q0..q1 (inclusive) to the brush: "on" / "record" (2),
+    "event" (1) or "off" (0); a bool means record / off."""
+    value = (2 if brush else 0) if isinstance(brush, bool) else BRUSHES.get(brush, 0)
     bits = blocks_to_bitmap(blocks)
     d0, d1 = sorted((max(0, min(6, d0)), max(0, min(6, d1))))
     q0, q1 = sorted((max(0, min(SLOTS - 1, q0)), max(0, min(SLOTS - 1, q1))))
-    value = b"\x01" if on else b"\x00"
     for d in range(d0, d1 + 1):
         a, b = d * DAY_MIN + q0 * SLOT_MIN, d * DAY_MIN + (q1 + 1) * SLOT_MIN
-        bits[a:b] = value * (b - a)
+        bits[a:b] = bytes([value]) * (b - a)
     return bitmap_to_blocks(bits)
 
 
-def day_runs(bits: bytearray, day: int) -> list[tuple[int, int]]:
-    """Recording runs of one day as (start_min, end_min) for drawing."""
-    runs, start = [], -1
+def day_runs(bits: bytearray, day: int) -> list[tuple[int, int, int]]:
+    """Runs of one day as (start_min, end_min, value) for drawing (value 2 record, 1 event)."""
+    runs, start, cur = [], -1, 0
     base = day * DAY_MIN
     for m in range(DAY_MIN + 1):
-        on = m < DAY_MIN and bits[base + m] == 1
-        if on and start < 0:
-            start = m
-        if not on and start >= 0:
-            runs.append((start, m))
-            start = -1
+        v = bits[base + m] if m < DAY_MIN else 0
+        if v != cur:
+            if cur:
+                runs.append((start, m, cur))
+            start, cur = m, v
     return runs
 
 
 def week_rows(blocks: list[dict]) -> list[list[dict]]:
-    """Per day, the recording runs as [{"start": min, "end": min}] (what WeekGrid / WeekStrip draw)."""
+    """Per day, the runs as [{"start": min, "end": min, "event": bool}] (what WeekGrid / WeekStrip draw)."""
     bits = blocks_to_bitmap(blocks)
-    return [[{"start": s, "end": e} for s, e in day_runs(bits, d)] for d in range(7)]
+    return [[{"start": s, "end": e, "event": v == 1} for s, e, v in day_runs(bits, d)] for d in range(7)]
+
+
+def _hours(blocks: list[dict], value: int) -> float:
+    return blocks_to_bitmap(blocks).count(value) / 60
 
 
 def recorded_hours(blocks: list[dict]) -> float:
-    return sum(blocks_to_bitmap(blocks)) / 60
+    return _hours(blocks, 2)
+
+
+def event_hours(blocks: list[dict]) -> float:
+    return _hours(blocks, 1)
+
+
+def uses_events(blocks: list[dict]) -> bool:
+    return any(b.get("mode") == "event" for b in blocks)
 
 
 def days_label(days: list[int]) -> str:
@@ -154,11 +175,12 @@ def days_label(days: list[int]) -> str:
 
 
 def block_label(b: dict) -> str:
+    mode = {"event": " · event", "off": " · off"}.get(b.get("mode") or "continuous", "")
     all_day = b["start"] == "00:00" and b["end"] in ("24:00", "00:00")
     if all_day:
-        return f"{days_label(b['days'])} all day"
+        return f"{days_label(b['days'])} all day{mode}"
     next_day = " (next day)" if parse_hhmm(b["end"]) <= parse_hhmm(b["start"]) else ""
-    return f"{days_label(b['days'])} {b['start']}–{b['end']}{next_day}"
+    return f"{days_label(b['days'])} {b['start']}–{b['end']}{next_day}{mode}"
 
 
 def blocks_summary(blocks: list[dict]) -> str:
@@ -186,12 +208,23 @@ def fmt_change(iso: str, now: datetime | None = None) -> str:
     return f"{DAYS[weekday]}{f' {d} {MONTHS[mo - 1]}' if far else ''} {fmt_hhmm(minute)}"
 
 
-def now_text(recording_now: bool, next_change: str | None, now: datetime | None = None) -> str:
-    """'Recording now, until Mon 18:00' / 'Off now, recording from Tue 08:00' / 'Recording all the time'."""
+def state_of(value) -> str:
+    """The recording state now: "continuous" / "event" / "off" (a bool from an older central = continuous / off)."""
+    if isinstance(value, bool):
+        return "continuous" if value else "off"
+    return value if value in VALUE_MODE else "off"
+
+
+def now_text(state, next_change: str | None, now: datetime | None = None) -> str:
+    """'Recording now, until Mon 18:00' / 'Event recording now, until Tue 08:00' / 'Off now, until Tue 08:00' /
+    'Recording all the time'. `state` is the mode now (True / False = continuous / off, for older callers)."""
+    mode = state_of(state)
     if not next_change:
-        return "Recording all the time" if recording_now else "Never records"
+        return {"continuous": "Recording all the time", "event": "Keeps video around events, all the time"}.get(
+            mode, "Never records")
     when = fmt_change(next_change, now)
-    return f"Recording now, until {when}" if recording_now else f"Off now, recording from {when}"
+    return {"continuous": f"Recording now, until {when}", "event": f"Event recording now, until {when}"}.get(
+        mode, f"Off now, until {when}")
 
 
 def lower_first(text: str) -> str:

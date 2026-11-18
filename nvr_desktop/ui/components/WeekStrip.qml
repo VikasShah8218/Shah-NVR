@@ -1,7 +1,8 @@
 import QtQuick
 import "../theme"
 
-// Small read-only week strip (Mon on top, 00–24): `rows` = per day the recording runs {start, end} in minutes.
+// Small read-only week strip (Mon on top, 00–24): `rows` = per day the runs {start, end, event} in minutes
+// (green = record, amber = event recording).
 Item {
     id: strip
 
@@ -32,7 +33,7 @@ Item {
                         x: day.width * modelData.start / 1440
                         width: Math.max(1, day.width * (modelData.end - modelData.start) / 1440)
                         height: day.height
-                        color: Theme.alpha(Theme.success, 0.7)
+                        color: modelData.event ? Theme.alpha(Theme.warning, 0.75) : Theme.alpha(Theme.success, 0.7)
                     }
                 }
             }

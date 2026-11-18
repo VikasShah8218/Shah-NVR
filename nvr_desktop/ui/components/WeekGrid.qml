@@ -3,14 +3,15 @@ import QtQuick.Layouts
 import "../theme"
 
 // The 7×24 week editor (port of nvr_client features/schedules/WeekGrid.tsx): drag a rectangle across days and hours
-// to paint Record / Off in 15-minute steps. It only draws `rows` (per day, the recording runs {start, end} in
+// to paint Record / Event / Off in 15-minute steps. It only draws `rows` (per day, the runs {start, end, event} in
 // minutes) and reports the drag (`painted`); the store does the painting. Read-only when `editable` is false.
 ColumnLayout {
     id: grid
 
     property var rows: [[], [], [], [], [], [], []]
     property bool editable: false
-    property string brush: "on"  // "on" = Record, "off" = Off
+    property string brush: "on"  // "on" = Record, "event" = Event, "off" = Off
+    readonly property color brushColor: brush === "on" ? Theme.primary : brush === "event" ? Theme.warning : Theme.danger
     property int nowDay: -1
     property int nowMinute: -1
     signal painted(int d0, int d1, int q0, int q1)
@@ -30,7 +31,7 @@ ColumnLayout {
     readonly property var sel: rect()
     readonly property string tip: sel
         ? (sel.d0 === sel.d1 ? days[sel.d0] : days[sel.d0] + "–" + days[sel.d1]) + " " + hhmm(sel.q0 * 15) + "–"
-          + hhmm((sel.q1 + 1) * 15) + " → " + (brush === "on" ? "Record" : "Off")
+          + hhmm((sel.q1 + 1) * 15) + " → " + (brush === "on" ? "Record" : brush === "event" ? "Event" : "Off")
         : hover ? days[hover.d] + " " + hhmm(hover.q * 15) + "–" + hhmm((hover.q + 1) * 15) : ""
 
     spacing: 4
@@ -99,7 +100,7 @@ ColumnLayout {
                             x: area.width * modelData.start / 1440
                             width: Math.max(1, area.width * (modelData.end - modelData.start) / 1440)
                             height: dayRow.height
-                            color: Theme.alpha(Theme.success, 0.6)
+                            color: modelData.event ? Theme.alpha(Theme.warning, 0.6) : Theme.alpha(Theme.success, 0.6)
                         }
                     }
                     Rectangle {  // the "now" line (site time)
@@ -120,8 +121,8 @@ ColumnLayout {
                 y: grid.sel ? grid.sel.d0 * grid.rowHeight : 0
                 width: grid.sel ? area.width * (grid.sel.q1 - grid.sel.q0 + 1) / 96 : 0
                 height: grid.sel ? (grid.sel.d1 - grid.sel.d0 + 1) * grid.rowHeight : 0
-                color: grid.brush === "on" ? Theme.alpha(Theme.primary, 0.6) : Theme.alpha(Theme.danger, 0.3)
-                border.color: grid.brush === "on" ? Theme.primary : Theme.danger
+                color: Theme.alpha(grid.brushColor, grid.brush === "off" ? 0.3 : 0.6)
+                border.color: grid.brushColor
                 z: 3
             }
             // day lines and hour lines (every hour faint, every 6 h stronger)
@@ -191,6 +192,11 @@ ColumnLayout {
             spacing: 6
             Rectangle { width: 10; height: 10; radius: 2; color: Theme.alpha(Theme.success, 0.6); anchors.verticalCenter: parent.verticalCenter }
             Text { text: "Record"; color: Theme.mutedForeground; font.family: Theme.font; font.pixelSize: Theme.textXs }
+        }
+        Row {
+            spacing: 6
+            Rectangle { width: 10; height: 10; radius: 2; color: Theme.alpha(Theme.warning, 0.6); anchors.verticalCenter: parent.verticalCenter }
+            Text { text: "Event"; color: Theme.mutedForeground; font.family: Theme.font; font.pixelSize: Theme.textXs }
         }
         Row {
             spacing: 6

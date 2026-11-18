@@ -34,6 +34,8 @@ Rectangle {
         return cameraId ? Live.sources(cameraId, profile, protocol) : ({})
     }
     readonly property bool recording: !!camera && camera.streams.some(s => s.record && s.status === "RECORDING")
+    // event recording mode, waiting for an event (docs/EVENT_RECORDING_PLAN.md E7)
+    readonly property bool standby: !recording && !!camera && camera.streams.some(s => s.record && s.status === "EVENT_STANDBY")
 
     color: Theme.video
     radius: Theme.radiusSm
@@ -141,6 +143,15 @@ Rectangle {
                     Text { text: "REC"; color: "white"; font.family: Theme.font; font.pixelSize: 10; font.weight: Font.DemiBold }
                 }
             }
+            Rectangle {
+                objectName: "eventStandbyBadge"
+                visible: tile.standby && tile.width >= 220
+                implicitWidth: evText.implicitWidth + 8
+                implicitHeight: 16
+                radius: 3
+                color: Theme.alpha(Theme.warning, 0.85)
+                Text { id: evText; anchors.centerIn: parent; text: "EVENT"; color: "black"; font.family: Theme.font; font.pixelSize: 10; font.weight: Font.DemiBold }
+            }
             Text {
                 visible: tile.width >= 180
                 text: tile.profile
@@ -223,6 +234,14 @@ Rectangle {
             text: "Copy RTSP URL"
             iconName: "copy"
             onTriggered: tile.urls.rtsp ? Utils.copy(tile.urls.rtsp, "RTSP URL copied (open it in VLC)") : Toasts.error("Stream URL not available")
+        }
+        AppMenuItem {
+            objectName: "markEventNow"
+            visible: Auth.allowed["4"] === true
+            height: visible ? implicitHeight : 0
+            text: "Mark event now"
+            iconName: "flag"
+            onTriggered: Events.mark(tile.cameraId, 0)
         }
         AppMenuItem { text: "Camera details"; iconName: "external-link"; onTriggered: Router.go("camera", tile.cameraId) }
         MenuSeparator {}

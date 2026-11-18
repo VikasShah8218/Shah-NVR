@@ -31,6 +31,7 @@ AppDialog {
     function reset() {
         fields.mode = "schedule"
         fields.scheduleId = 0
+        fields.events = Schedules.eventSettingsOf(null)
         subgroups.checked = true
         pending = false
         open()
@@ -83,11 +84,11 @@ AppDialog {
         AppButton {
             objectName: "applyRecording"
             text: dialog.pending ? "Applying…" : "Apply"
-            enabled: !dialog.pending && (fields.mode !== "schedule" || fields.scheduleId > 0)
+            enabled: !dialog.pending && (fields.mode !== "schedule" || fields.scheduleId > 0) && fields.eventsValid
             onClicked: {
                 dialog.pending = true
                 Schedules.apply(fields.mode, fields.mode === "schedule" ? fields.scheduleId : 0,
-                                dialog.cameraIds, dialog.groupId, subgroups.checked)
+                                dialog.cameraIds, dialog.groupId, subgroups.checked, fields.events)
             }
         }
     ]

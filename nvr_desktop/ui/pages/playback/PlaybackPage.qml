@@ -5,6 +5,7 @@ import App
 import "../../theme"
 import "../../components"
 import "../../video"
+import "../events"
 
 // Port of nvr_client/src/features/playback/PlaybackPage.tsx (+ VodPlayer.tsx):
 // camera / profile / day pickers, HH:MM:SS go-to, VLC URL, the recording player with its wall clock,
@@ -29,7 +30,8 @@ PageScroll {
             Playback.openAt(p.camera, p.profile ?? "", p.t ?? 0)
     }
 
-    Component.onCompleted: openFromRouter()
+    Component.onCompleted: { openFromRouter(); Events.setScope("camera"); Events.setActive(true) }
+    property string panelTab: "bookmarks"  // bookmarks | events
 
     // , / . step one frame, K / Space play-pause (text fields keep their own typing). Arrows stay with zoom.
     Shortcut { sequence: ","; enabled: root.hasSource; onActivated: video.player.frameBackStep() }
@@ -42,7 +44,7 @@ PageScroll {
         else
             video.player.paused = !video.player.paused
     }
-    Component.onDestruction: if (appWindow) appWindow.immersive = false
+    Component.onDestruction: { Events.setActive(false); if (appWindow) appWindow.immersive = false }
     Connections {
         target: Router
         function onChanged() { if (Router.page === "playback") root.openFromRouter() }
@@ -121,6 +123,16 @@ PageScroll {
             variant: "outline"
             enabled: Playback.cameraId > 0
             onClicked: bookmarkDialog.openAdd(root.hasSource ? Playback.playhead : 0)
+        }
+        AppButton {
+            objectName: "markEventButton"
+            visible: Auth.allowed["4"] === true
+            text: "Mark event"
+            iconName: "flag"
+            variant: "outline"
+            tip: root.hasSource ? "Mark an event at the playhead" : "Mark an event now (keeps the video around it in event recording mode)"
+            enabled: Playback.cameraId > 0
+            onClicked: Events.mark(Playback.cameraId, root.hasSource ? Playback.playhead : 0)
         }
         AppButton {
             visible: Auth.allowed["3"] === true
@@ -390,18 +402,30 @@ PageScroll {
             boundsEnd: Playback.day + 86400000
             playhead: root.hasSource ? Playback.playhead : -1
             pannable: Playback.zoom < 86400000
-            markers: Bookmarks.markers
+            markers: Bookmarks.markers.concat(Events.markers)
             thumbAt: ms => Playback.thumbAt(ms)
             onSeek: ms => Playback.seek(ms)
             onPan: start => Playback.pan(start)
         }
     }
 
-    // ================================================================= bookmarks
-    BookmarksPanel {
+    // ================================================================= bookmarks | events
+    AppTabs {
+        objectName: "playbackPanelTabs"
         visible: root.hasCameras
+        options: [{ value: "bookmarks", label: "Bookmarks" }, { value: "events", label: "Events" }]
+        current: root.panelTab
+        onPicked: v => root.panelTab = v
+    }
+    BookmarksPanel {
+        visible: root.hasCameras && root.panelTab === "bookmarks"
         Layout.fillWidth: true
         dialog: bookmarkDialog
+    }
+    EventsPanel {
+        visible: root.hasCameras && root.panelTab === "events"
+        Layout.fillWidth: true
+        onOpened: row => Playback.openBookmark(row.camera_id, "", row.seekMs)
     }
 
     // ================================================================= chunks in view
