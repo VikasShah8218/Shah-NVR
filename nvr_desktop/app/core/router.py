@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
-PAGES = ("dashboard", "live", "playback", "cameras", "camera", "groups", "schedules", "discover", "nodes", "node", "assignments",
+PAGES = ("dashboard", "live", "playback", "events", "cameras", "camera", "groups", "schedules", "discover", "nodes", "node", "assignments",
          "access", "audit", "settings")
 
 

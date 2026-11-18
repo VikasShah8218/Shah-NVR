@@ -13,6 +13,7 @@ Rectangle {
         { page: "dashboard", label: "Dashboard", icon: "gauge" },
         { page: "live", label: "Live View", icon: "monitor-play" },
         { page: "playback", label: "Playback", icon: "history" },
+        { page: "events", label: "Events", icon: "zap" },
         { page: "cameras", label: "Cameras", icon: "camera" },
         { page: "groups", label: "Groups", icon: "folder-tree" },
         { page: "schedules", label: "Schedules", icon: "calendar-clock" },

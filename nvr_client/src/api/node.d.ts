@@ -470,6 +470,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent event windows on this node (debug) */
+        get: operations["list_windows_api_v1_events_get"];
+        put?: never;
+        /** An event of one of this node's cameras (central pushes each change) */
+        post: operations["push_event_api_v1_events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -756,6 +774,49 @@ export interface components {
             rate_control?: ("CBR" | "VBR") | null;
             /** Codec Profile */
             codec_profile?: string | null;
+        };
+        /** EventWindowIn */
+        EventWindowIn: {
+            /** Id */
+            id: number;
+            /** Camera Id */
+            camera_id: number;
+            /**
+             * Type
+             * @default event
+             */
+            type: string;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /** End Time */
+            end_time?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** EventWindowOut */
+        EventWindowOut: {
+            /** Key */
+            key: string;
+            /** Camera Id */
+            camera_id: number;
+            /** Type */
+            type: string;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /** End Time */
+            end_time: string | null;
+            /** Central Id */
+            central_id: number | null;
+            /** Node Made */
+            node_made: boolean;
+            /** Uploaded */
+            uploaded: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2052,6 +2113,71 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_windows_api_v1_events_get: {
+        parameters: {
+            query?: {
+                camera_id?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventWindowOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    push_event_api_v1_events_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventWindowIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

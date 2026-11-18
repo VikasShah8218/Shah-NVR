@@ -119,6 +119,7 @@ def test_permission_numbers_match_the_server_and_the_web_client():
 def test_pages_and_start_page():
     assert allows(False, [1], PAGE_PERMS["live"]) and not allows(False, [1], PAGE_PERMS["nodes"])
     assert allows(True, [], PAGE_PERMS["access"])  # admins pass everything
+    assert allows(False, [2], PAGE_PERMS["events"]) and not allows(False, [1], PAGE_PERMS["events"])  # events = playback
     assert start_page(False, [1, 2]) == "live"  # no dashboard permission: first allowed page
     assert start_page(False, [40, 1]) == "dashboard"
     assert start_page(False, []) == "settings"  # everyone may open Settings

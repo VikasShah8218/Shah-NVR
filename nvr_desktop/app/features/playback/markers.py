@@ -6,6 +6,8 @@ Bookmarks today; motion / ONVIF events later use the same layer. A marker is a p
 
 from __future__ import annotations
 
+import re
+
 from app.features.playback.timeline import to_ms
 
 MIN_RANGE_WIDTH = 0.004  # a range never shrinks below 0.4 % of the bar, so it stays visible and clickable
@@ -39,4 +41,38 @@ def bookmark_marker(b: dict) -> dict:
         "kind": "bookmark",
         "label": label,
         "color": b.get("color") or "",
+    }
+
+
+# Colours of event types (same as nvr_client markers.ts); unknown types are grey.
+EVENT_COLORS = {"manual": "#3b82f6", "api": "#8b5cf6", "video_loss": "#ef4444", "motion": "#f59e0b"}
+EVENT_LABELS = {"manual": "Marked", "api": "External", "video_loss": "Video loss", "motion": "Motion"}
+UNKNOWN_COLOR = "#94a3b8"
+
+
+def event_color(type_: str) -> str:
+    return EVENT_COLORS.get(type_, UNKNOWN_COLOR)
+
+
+def event_type_label(type_: str) -> str:
+    if type_ in EVENT_LABELS:
+        return EVENT_LABELS[type_]
+    text = re.sub(r"[_.:-]+", " ", type_)
+    return text[:1].upper() + text[1:]
+
+
+def event_marker(e: dict, now_ms: float) -> dict:
+    """Event (from the API) -> timeline marker: a moment is a pin, a range a band, an open event runs to now.
+    A click plays from `seek_t` (the camera's pre-event seconds before the start)."""
+    t = to_ms(e["start_time"])
+    end = to_ms(e["end_time"]) if e.get("end_time") else now_ms
+    label = event_type_label(e["type"]) + (f": {e['label']}" if e.get("label") else "") + ("" if e.get("end_time") else " (ongoing)")
+    return {
+        "id": f"event-{e['id']}",
+        "t": t,
+        "end_t": end if end > t else None,
+        "kind": "event",
+        "label": label,
+        "color": event_color(e["type"]),
+        "seek_t": t - int(e.get("pre_seconds") or 0) * 1000,
     }

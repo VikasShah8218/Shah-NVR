@@ -22,6 +22,7 @@ const NodesPage = lazy(() => import("@/features/nodes/NodesPage").then((m) => ({
 const PlaybackPage = lazy(() => import("@/features/playback/PlaybackPage").then((m) => ({ default: m.PlaybackPage })))
 const AccessPage = lazy(() => import("@/features/access/AccessPage").then((m) => ({ default: m.AccessPage })))
 const AuditPage = lazy(() => import("@/features/audit/AuditPage").then((m) => ({ default: m.AuditPage })))
+const EventsPage = lazy(() => import("@/features/events/EventsPage").then((m) => ({ default: m.EventsPage })))
 const SchedulesPage = lazy(() => import("@/features/schedules/SchedulesPage").then((m) => ({ default: m.SchedulesPage })))
 const SettingsPage = lazy(() => import("@/features/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })))
 
@@ -42,6 +43,7 @@ export default function App() {
                   <Route index element={<HomeRoute perms={[Perm.DASHBOARD]}><DashboardPage /></HomeRoute>} />
                   <Route path="live" element={<RequirePerm any={[Perm.LIVE]}><LivePage /></RequirePerm>} />
                   <Route path="playback" element={<RequirePerm any={[Perm.PLAYBACK]}><PlaybackPage /></RequirePerm>} />
+                  <Route path="events" element={<RequirePerm any={[Perm.PLAYBACK]}><EventsPage /></RequirePerm>} />
                   <Route path="cameras" element={<RequirePerm any={CAMERA_READ}><CamerasPage /></RequirePerm>} />
                   <Route path="cameras/:id" element={<RequirePerm any={CAMERA_READ}><CameraDetailPage /></RequirePerm>} />
                   <Route path="discover" element={<RequirePerm any={[Perm.CAMERAS_MANAGE]}><DiscoverPage /></RequirePerm>} />

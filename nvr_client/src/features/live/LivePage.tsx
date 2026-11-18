@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Copy,
   ExternalLink,
+  Flag,
   Folder,
   ImageDown,
   Maximize,
@@ -24,7 +25,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 import { ApiError, unwrap } from "@/api/client"
-import { useCameraOptions, useCamerasByIds, useCentral, useGroupSearch, useLive } from "@/api/queries"
+import { useCameraOptions, useCamerasByIds, useCentral, useCreateEvent, useGroupSearch, useLive } from "@/api/queries"
 import type { Camera, CameraGroup, CameraOption, GroupDetail } from "@/api/types"
 import { EmptyState, ErrorState, Loading } from "@/components/common"
 import { DigitalZoom } from "@/components/DigitalZoom"
@@ -523,6 +524,8 @@ function LiveTile({
   onExpand: () => void
 }) {
   const navigate = useNavigate()
+  const { can } = useAuth()
+  const markEvent = useCreateEvent()
   const live = useLive(camera.id)
   const [override, setOverride] = useState<LiveProtocol | null>(null)
   const videoEl = useRef<HTMLVideoElement | null>(null)
@@ -531,6 +534,7 @@ function LiveTile({
   }, [])
   const protocol = override ?? gridProtocol
   const recording = camera.streams.some((s) => s.record && s.status === "RECORDING")
+  const standby = !recording && camera.streams.some((s) => s.record && s.status === "EVENT_STANDBY")
   const [reconnects, setReconnects] = useState(0) // ↻: bump = fresh connection
 
   const copyRtsp = () => {
@@ -548,6 +552,11 @@ function LiveTile({
         {recording && (
           <span className="flex shrink-0 items-center gap-1 rounded bg-danger/80 px-1 text-[10px] font-semibold">
             <span className="size-1.5 animate-pulse rounded-full bg-white" /> REC
+          </span>
+        )}
+        {standby && (
+          <span className="shrink-0 rounded bg-warning/80 px-1 text-[10px] font-semibold text-black" title="Event recording: video is kept only around events">
+            EVENT
           </span>
         )}
         <span className="shrink-0 text-white/60">{profile}</span>
@@ -582,6 +591,11 @@ function LiveTile({
               <DropdownMenuItem onClick={() => saveSnapshot(videoEl.current, camera.name) || toast.error("No video frame yet")}>
                 <ImageDown className="size-4" /> Snapshot
               </DropdownMenuItem>
+              {can(Perm.BOOKMARKS_EDIT) && (
+                <DropdownMenuItem onClick={() => markEvent.mutate({ cameraId: camera.id, body: { type: "manual", duration_seconds: 0, ongoing: false } })}>
+                  <Flag className="size-4" /> Mark event now
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={copyRtsp}>
                 <Copy className="size-4" /> Copy RTSP URL
               </DropdownMenuItem>

@@ -22,6 +22,7 @@ from tortoise.functions import Sum
 
 from app.node.models import KeyValue
 from app.node.utils import CentralError, central, runtime
+from app.events.services import chunk_held
 from app.recordings.models import LocalSegment, SegmentOrigin, SkippedFile
 from app.recordings.thumbnails import thumbnails
 from app.recordings.utils import Mp4IndexError, decoder_signature, index_fmp4, parse_rel_path, segment_uuid
@@ -127,6 +128,7 @@ async def scan_tick() -> None:
             continue
 
         end_time = info.start_time + timedelta(milliseconds=idx.duration_ms)
+        held = chunk_held(info.camera_id, info.start_time, end_time)
         await LocalSegment.update_or_create(
             rel_path=rel,
             defaults=dict(
@@ -147,6 +149,7 @@ async def scan_tick() -> None:
                 parts=idx.parts,
                 tracks=idx.tracks,
                 uploaded=False,
+                held=held,
             ),
         )
         _known.add(rel)
@@ -185,7 +188,7 @@ async def upload_tick() -> None:
     if runtime.node_id is None:
         return
     while True:
-        batch = await LocalSegment.filter(uploaded=False).order_by("created_at").limit(UPLOAD_BATCH)
+        batch = await LocalSegment.filter(uploaded=False, held=False).order_by("created_at").limit(UPLOAD_BATCH)
         if not batch:
             return
         items = [

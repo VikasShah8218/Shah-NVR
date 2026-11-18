@@ -27,7 +27,7 @@ AppDialog {
 
     width: Math.min(920, parent ? parent.width - 40 : 920)
     title: ed.readOnly ? ed.name : ed.scheduleId > 0 ? "Edit " + ed.name : "New recording schedule"
-    description: "Times are site time. Cameras record in the green times only; a change applies within a few seconds"
+    description: "Times are site time. Cameras record in the green times and keep video around events in the amber times; a change applies within a few seconds"
         + (cameraCount > 0 ? " to the " + cameraCount + " camera" + (cameraCount === 1 ? "" : "s") + " using it." : ".")
 
     Connections {
@@ -99,7 +99,8 @@ AppDialog {
                 Item { Layout.fillWidth: true }
                 ToggleGroup {
                     objectName: "scheduleBrush"
-                    options: [{ value: "on", label: "Paint record" }, { value: "off", label: "Paint off" }]
+                    options: [{ value: "on", label: "Paint record" }, { value: "event", label: "Paint event" },
+                              { value: "off", label: "Paint off" }]
                     value: dialog.ed.brush
                     onPicked: v => dialog.ed.setBrush(v)
                 }
@@ -216,6 +217,14 @@ AppDialog {
                             maximumLength: 5
                             color: blockRow.modelData.endBad ? Theme.danger : Theme.foreground
                             onEditingFinished: if (text !== blockRow.modelData.end) dialog.ed.setTime(blockRow.modelData.index, "end", text)
+                        }
+                        AppSelect {
+                            visible: !dialog.ed.readOnly
+                            objectName: "blockMode"
+                            Layout.preferredWidth: 104
+                            options: [{ value: "continuous", label: "Record" }, { value: "event", label: "Event" }, { value: "off", label: "Off" }]
+                            value: blockRow.modelData.mode
+                            onPicked: v => dialog.ed.setMode(blockRow.modelData.index, v)
                         }
                         AppText {
                             visible: !dialog.ed.readOnly && (blockRow.modelData.hint !== "" || blockRow.modelData.error !== "")

@@ -8,6 +8,7 @@ from app.mediamtx.utils import MANAGED_PREFIX, mtx, write_config
 from app.node.services import refresh_assignments
 from app.node.utils import runtime
 from app.schedules.services import log_transitions, recording_on
+from app.schedules.utils import may_use_events
 from app.storage.services import storage
 from utilities.common import utcnow
 from settings.settings import settings
@@ -132,10 +133,35 @@ def desired_paths() -> dict[str, dict]:
             }
             if s["record"]:
                 conf["recordPath"] = target
+                # Event-capable cameras record short chunks: whole chunks are kept or deleted around events.
+                seconds = settings.EVENT_SEGMENT_SECONDS if may_use_events(cam.get("recording")) else settings.SEGMENT_SECONDS
+                conf["recordSegmentDuration"] = f"{seconds}s"
             if s["source_url"].lower().startswith(("rtsp://", "rtsps://")):
                 conf["rtspTransport"] = s["rtsp_transport"]
             desired[s["path_name"]] = conf
     return desired
+
+
+_DURATION_UNITS_MS = {"h": 3_600_000, "m": 60_000, "s": 1000, "ms": 1, "us": 0.001, "µs": 0.001, "ns": 0.000001}
+
+
+def duration_ms(value) -> float | None:
+    """MediaMTX durations: we send "10s", the API answers in Go style ("10s", "1m0s", "1h0m0s"), the file has "60000ms"."""
+    import re
+
+    if isinstance(value, (int, float)):
+        return float(value) * 1000
+    parts = re.findall(r"([0-9.]+)(ms|us|µs|ns|h|m|s)", str(value or ""))
+    if not parts or "".join(n + u for n, u in parts) != str(value):
+        return None
+    return sum(float(n) * _DURATION_UNITS_MS[u] for n, u in parts)
+
+
+def same_value(key: str, actual, desired) -> bool:
+    if key == "recordSegmentDuration":
+        a = duration_ms(actual)
+        return a is not None and abs(a - duration_ms(desired)) < 1
+    return actual == desired
 
 
 async def reconcile_tick() -> None:
@@ -187,7 +213,7 @@ async def _reconcile_tick() -> None:
                 await mtx.add_path(name, conf)
                 logger.info("Started path %s (record=%s)", name, conf["record"])
             else:
-                changed = {k: v for k, v in conf.items() if actual[name].get(k) != v}
+                changed = {k: v for k, v in conf.items() if not same_value(k, actual[name].get(k), v)}
                 if changed:
                     await mtx.patch_path(name, changed)
                     logger.info("Updated path %s: %s", name, sorted(changed))

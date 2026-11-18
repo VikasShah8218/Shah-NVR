@@ -8,6 +8,7 @@ APP_MODELS = [
     "app.assignments.models",
     "app.recordings.models",
     "app.bookmarks.models",
+    "app.events.models",
     "app.access.models",
     "app.audit.models",
 ]

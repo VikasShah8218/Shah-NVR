@@ -8,8 +8,10 @@ export type TimelineMarker = {
   t: number
   /** end, ms epoch; null/undefined = a point in time */
   endT?: number | null
-  /** "bookmark" today; "motion", "event"... later */
+  /** "bookmark" or "event" */
   kind: string
+  /** where a click plays from (default `t`): an event plays from its pre-event seconds */
+  seekT?: number
   label?: string
   color?: string
 }
@@ -56,5 +58,39 @@ export function bookmarkMarker(b: {
     kind: "bookmark",
     label: b.label ? `${b.label}: ${b.note}` : b.note,
     color: b.color ?? undefined,
+  }
+}
+
+/** Colours of event types (docs/EVENT_RECORDING_PLAN.md §10); unknown types are grey. */
+export const EVENT_COLORS: Record<string, string> = {
+  manual: "#3b82f6",
+  api: "#8b5cf6",
+  video_loss: "#ef4444",
+  motion: "#f59e0b",
+}
+export const EVENT_LABELS: Record<string, string> = {
+  manual: "Marked",
+  api: "External",
+  video_loss: "Video loss",
+  motion: "Motion",
+}
+export const eventColor = (type: string) => EVENT_COLORS[type] ?? "#94a3b8"
+export const eventTypeLabel = (type: string) => EVENT_LABELS[type] ?? type.replace(/[_.:-]+/g, " ").replace(/^\w/, (c) => c.toUpperCase())
+
+/** Event (from the API) -> timeline marker: a moment is a pin, a range a band; an open event runs to `now`. */
+export function eventMarker(
+  e: { id: number; type: string; start_time: string; end_time?: string | null; label?: string | null; pre_seconds: number },
+  now = Date.now(),
+): TimelineMarker {
+  const t = new Date(e.start_time).getTime()
+  const end = e.end_time ? new Date(e.end_time).getTime() : now
+  return {
+    id: `event-${e.id}`,
+    t,
+    endT: end > t ? end : null,
+    kind: "event",
+    label: `${eventTypeLabel(e.type)}${e.label ? `: ${e.label}` : ""}${e.end_time ? "" : " (ongoing)"}`,
+    color: eventColor(e.type),
+    seekT: t - e.pre_seconds * 1000,
   }
 }

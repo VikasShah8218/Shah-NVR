@@ -53,3 +53,19 @@ test("bookmarks become markers with label and optional range", () => {
   assert.equal(range.label, "vehicle: Truck")
   assert.equal(range.color, "#ff8800")
 })
+
+test("event markers: moment, range, ongoing; click plays from the pre-event seconds", async () => {
+  const { eventMarker, eventTypeLabel } = await import("../src/features/playback/markers.ts")
+  const base = { id: 7, type: "manual", label: "Door", pre_seconds: 10 }
+  const point = eventMarker({ ...base, start_time: "2026-11-17T10:00:00Z", end_time: "2026-11-17T10:00:00Z" })
+  assert.equal(point.endT, null)
+  assert.equal(point.seekT, Date.parse("2026-11-17T09:59:50Z"))
+  assert.equal(point.label, "Marked: Door")
+  const range = eventMarker({ ...base, type: "video_loss", label: null, start_time: "2026-11-17T10:00:00Z", end_time: "2026-11-17T10:05:00Z" })
+  assert.equal(range.endT, Date.parse("2026-11-17T10:05:00Z"))
+  assert.equal(range.color, "#ef4444")
+  const open = eventMarker({ ...base, start_time: "2026-11-17T10:00:00Z", end_time: null }, Date.parse("2026-11-17T10:01:00Z"))
+  assert.equal(open.endT, Date.parse("2026-11-17T10:01:00Z"))
+  assert.ok(open.label?.endsWith("(ongoing)"))
+  assert.equal(eventTypeLabel("onvif_line.crossing"), "Onvif line crossing")
+})

@@ -16,6 +16,7 @@ ApplicationWindow {
         dashboard: "pages/dashboard/DashboardPage.qml",
         live: "pages/live/LivePage.qml",
         playback: "pages/playback/PlaybackPage.qml",
+        events: "pages/events/EventsPage.qml",
         cameras: "pages/cameras/CamerasPage.qml",
         camera: "pages/cameras/CameraDetailPage.qml",
         groups: "pages/groups/GroupsPage.qml",

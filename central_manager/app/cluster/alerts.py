@@ -21,7 +21,7 @@ from app.schedules.services import scheduled_off_camera_ids
 
 CLOCK_DRIFT_ALERT_SECONDS = 10  # same as nvr_client/src/lib/onvif.ts
 # A recording stream in these states is not a problem (RECORDING) or is about to start (ASSIGNED).
-_OK_STATES = (StreamStatus.RECORDING, StreamStatus.ASSIGNED, StreamStatus.SCHEDULED_OFF)
+_OK_STATES = (StreamStatus.RECORDING, StreamStatus.ASSIGNED, StreamStatus.SCHEDULED_OFF, StreamStatus.EVENT_STANDBY)
 # A camera that is off by its recording schedule (or mode "never") is only connected, so these are fine for it
 _IDLE_OK_STATES = (StreamStatus.STREAMING, StreamStatus.NOT_RECORDING)
 _DANGER_STATES = (StreamStatus.NOT_RECORDING, StreamStatus.UNKNOWN)  # StatusBadge toneOf == "danger"

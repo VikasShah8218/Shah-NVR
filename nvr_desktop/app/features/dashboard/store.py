@@ -103,6 +103,7 @@ class DashboardStore(BaseStore):
             "recording": self._cluster.recording,
             "recordStreams": self._cluster.recordStreams,
             "scheduledOff": self._cluster.scheduledOff,
+            "eventStandby": self._cluster.eventStandby,
             "nodesHealthy": totals["healthy"],
             "nodesTotal": totals["nodes"],
             "segmentsLastHour": self._cluster.segmentsLastHour,

@@ -88,10 +88,12 @@ PageScroll {
                         Layout.fillWidth: false  // nested layouts fill by default; the Name column must get the space
                         Layout.preferredWidth: 290
                         spacing: 6
-                        Rectangle { width: 6; height: 6; radius: 3; color: row.model.recordingNow ? Theme.success : Theme.mutedForeground }
+                        readonly property color tone: row.model.state === "continuous" ? Theme.success
+                            : row.model.state === "event" ? Theme.warning : Theme.mutedForeground
+                        Rectangle { width: 6; height: 6; radius: 3; color: parent.tone }
                         AppText {
                             text: row.model.nowText
-                            color: row.model.recordingNow ? Theme.success : Theme.mutedForeground
+                            color: parent.tone
                             Layout.fillWidth: true
                         }
                     }

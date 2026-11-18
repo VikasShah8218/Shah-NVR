@@ -27,6 +27,11 @@ from tests.test_onvif import DISCOVERED, PROBE
 from tests.test_encoder import immediate, mock_api
 
 
+def playback_iso(ms: float) -> str:
+    from datetime import datetime, timezone
+    return datetime.fromtimestamp(ms / 1000, timezone.utc).isoformat()
+
+
 def walk(obj):
     seen = set()
     todo = [obj]
@@ -230,6 +235,44 @@ Item {
             QTest.keyClick(window, Qt.Key.Key_Escape)
             settle()
 
+            # Event recording (docs/DESKTOP_EVENT_RECORDING_PLAN.md): event marks on the timeline, Mark event, the
+            # Bookmarks | Events tabs and the Events page.
+            from PySide6.QtCore import Q_ARG
+            from app.features.events.store import event_row
+            events = stores["Events"]
+            ev_manual = {"id": 11, "camera_id": 1, "camera_name": "Gate", "type": "manual", "source": "user:admin",
+                         "start_time": "2026-11-09T02:00:00+00:00", "end_time": "2026-11-09T02:00:00+00:00",
+                         "label": "Fight at gate", "data": None, "pre_seconds": 10, "post_seconds": 30}
+            ev_loss = {**ev_manual, "id": 12, "type": "video_loss", "source": "node:1", "label": None,
+                       "start_time": "2026-11-09T03:00:00+00:00", "end_time": None}
+            from app.features.playback.timeline import to_ms
+            shift = day + 3 * 3_600_000 - to_ms(ev_loss["start_time"])  # into the selected day
+            events._day_events = [{**e, "start_time": playback_iso(to_ms(e["start_time"]) + shift),
+                                   "end_time": playback_iso(to_ms(e["end_time"]) + shift) if e["end_time"] else None}
+                                  for e in (ev_manual, ev_loss)]
+            events.markersChanged.emit()
+            events._rows = [event_row(ev_loss), event_row(ev_manual)]
+            events._total = 2
+            events._set_loading(False)
+            events.rowsChanged.emit()
+            settle()
+            kinds = [m["kind"] for m in events.markers]
+            assert kinds == ["event", "event"] and events.markers[1]["width"] is not None, events.markers
+            assert visible("markEventButton"), "Mark event needs permission 4 (local admin has it)"
+            QMetaObject.invokeMethod(next(o for o in walk(window) if o.objectName() == "playbackPanelTabs"), "picked",
+                                     Q_ARG("QString", "events"))
+            settle()
+            assert visible("eventsPanel") and not visible("bookmarksPanel"), texts()
+            assert "Marked: Fight at gate" in texts() and "Video loss" in texts() and "ongoing" in texts(), texts()
+            assert window.grabWindow().save(str(output / "playback-events.png"))
+            router.go("events")
+            settle()
+            events._rows = [event_row(ev_loss), event_row(ev_manual)]
+            events.rowsChanged.emit()
+            settle()
+            assert visible("eventsPage") and "Marked: Fight at gate" in texts(), texts()
+            assert window.grabWindow().save(str(output / "events-page.png"))
+
             # Camera groups (2026-11-10): the live sidebar tree, the Play-group chip and the Groups page.
             group = {"id": 7, "name": "Anantnag", "description": "District", "parent_id": None, "depth": 0,
                      "path": "/7/", "path_label": "Anantnag", "sort_order": 0, "child_groups": 1,
@@ -384,7 +427,7 @@ Item {
             router.go("schedules")
             settle()
             assert "Office hours" in texts() and "Nights" in texts(), texts()
-            assert any("Off now, recording from" in (t or "") for t in texts()), texts()
+            assert any("Off now, until" in (t or "") for t in texts()), texts()
             assert window.grabWindow().save(str(output / "schedules.png"))
             QMetaObject.invokeMethod(window.findChild(QObject, "newSchedule"), "clicked")
             QTest.qWait(250)
@@ -428,9 +471,22 @@ Item {
                                      "recording_next_change": "2026-11-17T08:00:00+05:30"}))
             QTest.qWait(300)
             settle()
-            assert any((t or "").startswith("Off now, recording from") for t in texts()), texts()
+            assert any((t or "").startswith("Off now, until") for t in texts()), texts()
             assert "Recorded on the camera's schedule; always available live." in texts()
             assert window.grabWindow().save(str(output / "camera-form-recording.png"))
+            form.close()
+            QTest.qWait(300)
+            settle()
+            QMetaObject.invokeMethod(form, "openFor", Q_ARG("QVariant", {**camera, "recording_mode": "event",
+                                     "recording_state": "event", "event_pre_seconds": 5, "event_post_seconds": 45,
+                                     "event_marking": True}))
+            QTest.qWait(300)
+            settle()
+            assert visible("eventSeconds") and visible("eventMarking"), texts()
+            assert "Show events on the timeline" in texts() and "Recorded around events only; always available live." in texts()
+            pre = next(o for o in walk(window) if o.objectName() == "eventPre")
+            assert pre.property("text") == "5", pre.property("text")
+            assert window.grabWindow().save(str(output / "camera-form-event.png"))
             form.close()
             QTest.qWait(300)
             settle()
@@ -463,6 +519,10 @@ Item {
             router.go("playback")
             settle()
             assert not visible("addBookmarkButton"), "bookmark button needs permission 4"
+            assert not visible("markEventButton"), "Mark event needs permission 4"
+            router.go("events")
+            settle()
+            assert visible("eventsPage"), "the Events page needs permission 2 only"
             router.go("settings")
             settle()
             assert visible("accountCard") and "Live view" in texts() and "Playback" in texts(), texts()

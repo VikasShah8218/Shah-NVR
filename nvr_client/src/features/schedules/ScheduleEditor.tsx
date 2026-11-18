@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { blockLabel, blocksToBitmap, DAYS, parseHHMM, recordedHours, TEMPLATES } from "@/lib/schedule"
+import { blockLabel, blocksToBitmap, DAYS, eventHours, parseHHMM, recordedHours, TEMPLATES } from "@/lib/schedule"
 import { cn } from "@/lib/utils"
 import { type Brush, WeekGrid } from "./WeekGrid"
 
@@ -42,7 +42,10 @@ export function ScheduleEditor({
 
   const errors = blocks.map(blockError)
   const valid = useMemo(() => blocks.filter((b) => !blockError(b)), [blocks])
-  const hours = useMemo(() => recordedHours(blocksToBitmap(valid)), [valid])
+  const [hours, evHours] = useMemo(() => {
+    const bits = blocksToBitmap(valid)
+    return [recordedHours(bits), eventHours(bits)]
+  }, [valid])
   const busy = create.isPending || update.isPending
   const canSave = !readOnly && name.trim() !== "" && errors.every((e) => !e) && blocks.length <= MAX_BLOCKS
 
@@ -61,7 +64,8 @@ export function ScheduleEditor({
         <DialogHeader>
           <DialogTitle>{readOnly ? schedule?.name : schedule ? `Edit ${schedule.name}` : "New recording schedule"}</DialogTitle>
           <DialogDescription>
-            Times are site time. Cameras record in the green times only; a change applies within a few seconds
+            Times are site time. Cameras record in the green times, keep video only around events in the amber
+            times, and record nothing in the rest; a change applies within a few seconds
             {schedule?.camera_count ? ` to the ${schedule.camera_count} camera${schedule.camera_count === 1 ? "" : "s"} using it` : ""}.
           </DialogDescription>
         </DialogHeader>
@@ -91,6 +95,7 @@ export function ScheduleEditor({
               <Button type="button" variant="ghost" size="sm" onClick={() => setBlocks([])}><Eraser className="size-4" /> Clear</Button>
               <ToggleGroup type="single" variant="outline" size="sm" className="ml-auto" value={brush} onValueChange={(v) => v && setBrush(v as Brush)}>
                 <ToggleGroupItem value="on" className="px-3"><span className="size-2.5 rounded-sm bg-success/70" /> Paint record</ToggleGroupItem>
+                <ToggleGroupItem value="event" className="px-3" title="Keep video only around events"><span className="size-2.5 rounded-sm bg-warning/70" /> Paint event</ToggleGroupItem>
                 <ToggleGroupItem value="off" className="px-3"><span className="size-2.5 rounded-sm border bg-muted" /> Paint off</ToggleGroupItem>
               </ToggleGroup>
             </div>
@@ -99,7 +104,8 @@ export function ScheduleEditor({
           <WeekGrid blocks={valid} brush={brush} now={now} onChange={readOnly ? undefined : setBlocks} />
           <p className="text-xs text-muted-foreground">
             {readOnly ? "" : "Drag across days and hours to paint (15-minute steps). "}
-            Records {Math.round(hours * 10) / 10} h of 168 h a week{hours > 0 && hours < 168 ? ` (${Math.round((hours / 168) * 100)}%)` : ""}.
+            Records {Math.round(hours * 10) / 10} h of 168 h a week{hours > 0 && hours < 168 ? ` (${Math.round((hours / 168) * 100)}%)` : ""}
+            {evHours > 0 ? `; event recording ${Math.round(evHours * 10) / 10} h` : ""}.
           </p>
 
           <div className="space-y-2">
@@ -131,6 +137,12 @@ export function ScheduleEditor({
                     {!errors[i] && parseHHMM(b.end) <= parseHHMM(b.start) && b.end !== "00:00" && (
                       <span className="text-xs text-muted-foreground">{b.start === b.end ? "24 h" : "next day"}</span>
                     )}
+                    <ToggleGroup type="single" variant="outline" size="sm" value={b.mode ?? "continuous"}
+                      onValueChange={(v) => v && setBlock(i, { mode: v as ScheduleBlock["mode"] })}>
+                      <ToggleGroupItem value="continuous" className="px-2 text-xs">Record</ToggleGroupItem>
+                      <ToggleGroupItem value="event" className="px-2 text-xs">Event</ToggleGroupItem>
+                      <ToggleGroupItem value="off" className="px-2 text-xs">Off</ToggleGroupItem>
+                    </ToggleGroup>
                     {errors[i] && <span className="text-xs text-danger">{errors[i]}</span>}
                     <Button type="button" variant="ghost" size="icon-sm" className="ml-auto" title="Remove block" onClick={() => setBlocks((l) => l.filter((_, j) => j !== i))}>
                       <Trash2 />

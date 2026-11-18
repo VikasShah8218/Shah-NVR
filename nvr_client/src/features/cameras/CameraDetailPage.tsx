@@ -145,12 +145,14 @@ function Overview({ camera: c }: { camera: Camera }) {
             <Field label="Username">{c.username ?? "—"}</Field>
             <Field label="Password">{c.has_password ? "Set" : "Not set"}</Field>
             <Field label="Recording">
-              <span title={nowText(c.recording_now, c.recording_next_change)}>
+              <span title={nowText(c.recording_state ?? c.recording_now, c.recording_next_change)}>
                 {c.recording_mode === "schedule" ? (
                   <Link to="/schedules" className="hover:text-primary">{c.recording_schedule_name ?? "Schedule"}</Link>
-                ) : c.recording_mode === "never" ? "Never" : "Always"}
-                <span className={c.recording_now ? "text-success" : "text-muted-foreground"}>
-                  {" · "}{c.recording_mode === "always" ? "on" : nowText(c.recording_now, c.recording_next_change).replace(/^./, (x) => x.toLowerCase())}
+                ) : c.recording_mode === "never" ? "Never" : c.recording_mode === "event" ? "Event" : "Always"}
+                <span className={c.recording_now ? "text-success" : c.recording_state === "event" ? "text-warning" : "text-muted-foreground"}>
+                  {" · "}{c.recording_mode === "always" ? "on"
+                    : c.recording_mode === "event" ? `${c.event_pre_seconds} s before to ${c.event_post_seconds} s after each event`
+                      : nowText(c.recording_state ?? c.recording_now, c.recording_next_change).replace(/^./, (x) => x.toLowerCase())}
                 </span>
               </span>
             </Field>

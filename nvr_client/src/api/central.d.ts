@@ -517,6 +517,75 @@ export interface paths {
         patch: operations["update_bookmark_api_v1_bookmarks__bookmark_id__patch"];
         trace?: never;
     };
+    "/api/v1/cameras/{camera_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark an event (operator button or another system); extends a recent one of the same type */
+        post: operations["create_event_api_v1_cameras__camera_id__events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List events (paged; timeline marks and the Events page) */
+        get: operations["list_events_api_v1_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Event */
+        get: operations["get_event_api_v1_events__event_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete an event mark (video already kept for it stays) */
+        delete: operations["delete_event_api_v1_events__event_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End an ongoing event (now) */
+        post: operations["end_event_api_v1_events__event_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nodes": {
         parameters: {
             query?: never;
@@ -1479,6 +1548,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/nodes/{node_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Event changes for this node's cameras since a time (the node's catch-up) */
+        get: operations["node_event_windows_internal_v1_nodes__node_id__events_get"];
+        put?: never;
+        /** Events the node detected */
+        post: operations["upload_node_events_internal_v1_nodes__node_id__events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -1553,7 +1640,7 @@ export interface components {
              * Mode
              * @enum {string}
              */
-            mode: "always" | "schedule" | "never";
+            mode: "always" | "schedule" | "never" | "event";
             /** Schedule Id */
             schedule_id?: number | null;
             /** Camera Ids */
@@ -1565,6 +1652,12 @@ export interface components {
              * @default true
              */
             include_subgroups: boolean;
+            /** Event Pre Seconds */
+            event_pre_seconds?: number | null;
+            /** Event Post Seconds */
+            event_post_seconds?: number | null;
+            /** Event Marking */
+            event_marking?: boolean | null;
         };
         /** ApplyOut */
         ApplyOut: {
@@ -1994,9 +2087,24 @@ export interface components {
              * @default always
              * @enum {string}
              */
-            recording_mode: "always" | "schedule" | "never";
+            recording_mode: "always" | "schedule" | "never" | "event";
             /** Recording Schedule Id */
             recording_schedule_id?: number | null;
+            /**
+             * Event Pre Seconds
+             * @default 10
+             */
+            event_pre_seconds: number;
+            /**
+             * Event Post Seconds
+             * @default 30
+             */
+            event_post_seconds: number;
+            /**
+             * Event Marking
+             * @default true
+             */
+            event_marking: boolean;
             /** Streams */
             streams: components["schemas"]["StreamIn"][];
         };
@@ -2057,6 +2165,27 @@ export interface components {
              * @default true
              */
             recording_now: boolean;
+            /**
+             * Recording State
+             * @default continuous
+             * @enum {string}
+             */
+            recording_state: "continuous" | "event" | "off";
+            /**
+             * Event Pre Seconds
+             * @default 10
+             */
+            event_pre_seconds: number;
+            /**
+             * Event Post Seconds
+             * @default 30
+             */
+            event_post_seconds: number;
+            /**
+             * Event Marking
+             * @default true
+             */
+            event_marking: boolean;
             /** Recording Next Change */
             recording_next_change?: string | null;
             /** Onvif Host */
@@ -2120,9 +2249,15 @@ export interface components {
             /** Retention Days */
             retention_days?: number | null;
             /** Recording Mode */
-            recording_mode?: ("always" | "schedule" | "never") | null;
+            recording_mode?: ("always" | "schedule" | "never" | "event") | null;
             /** Recording Schedule Id */
             recording_schedule_id?: number | null;
+            /** Event Pre Seconds */
+            event_pre_seconds?: number | null;
+            /** Event Post Seconds */
+            event_post_seconds?: number | null;
+            /** Event Marking */
+            event_marking?: boolean | null;
         };
         /** ChangeOut */
         ChangeOut: {
@@ -2548,6 +2683,120 @@ export interface components {
             acknowledge_shared: boolean;
             /** Restore From */
             restore_from?: string | null;
+        };
+        /**
+         * EventCreate
+         * @description Mark an event on a camera. Default: a moment, now. `ongoing` starts an event that is ended later
+         *     (POST /events/{id}/end, or automatically after EVENT_MAX_SECONDS).
+         */
+        EventCreate: {
+            /**
+             * Type
+             * @default manual
+             * @enum {string}
+             */
+            type: "manual" | "api";
+            /** Label */
+            label?: string | null;
+            /** Data */
+            data?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Start Time
+             * @description Default: now
+             */
+            start_time?: string | null;
+            /**
+             * Duration Seconds
+             * @description 0 = a moment
+             * @default 0
+             */
+            duration_seconds: number;
+            /**
+             * Ongoing
+             * @default false
+             */
+            ongoing: boolean;
+        };
+        /** EventOut */
+        EventOut: {
+            /** Id */
+            id: number;
+            /** Camera Id */
+            camera_id: number;
+            /** Camera Name */
+            camera_name: string;
+            /** Type */
+            type: string;
+            /** Source */
+            source: string;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /** End Time */
+            end_time: string | null;
+            /** Label */
+            label: string | null;
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            } | null;
+            /** Pre Seconds */
+            pre_seconds: number;
+            /** Post Seconds */
+            post_seconds: number;
+            /**
+             * Merged
+             * @default false
+             */
+            merged: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * EventWindow
+         * @description What a node needs to keep video for an event: central -> node push and the node's catch-up.
+         */
+        EventWindow: {
+            /** Id */
+            id: number;
+            /** Camera Id */
+            camera_id: number;
+            /** Type */
+            type: string;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /** End Time */
+            end_time: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** EventWindowsOut */
+        EventWindowsOut: {
+            /** Items */
+            items: components["schemas"]["EventWindow"][];
+            /**
+             * Now
+             * Format: date-time
+             */
+            now: string;
         };
         /** ExportCreate */
         ExportCreate: {
@@ -3157,6 +3406,40 @@ export interface components {
             /** Prefix Length */
             prefix_length: number | null;
         };
+        /** NodeEventIn */
+        NodeEventIn: {
+            /** Key */
+            key: string;
+            /** Camera Id */
+            camera_id: number;
+            /** Type */
+            type: string;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /** End Time */
+            end_time?: string | null;
+            /** Label */
+            label?: string | null;
+            /** Data */
+            data?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** NodeEventsIn */
+        NodeEventsIn: {
+            /** Items */
+            items: components["schemas"]["NodeEventIn"][];
+        };
+        /** NodeEventsOut */
+        NodeEventsOut: {
+            /** Ids */
+            ids: {
+                [key: string]: number;
+            };
+        };
         /** NodeOut */
         NodeOut: {
             /** Id */
@@ -3468,6 +3751,17 @@ export interface components {
         Page_CameraOut_: {
             /** Items */
             items: components["schemas"]["CameraOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[EventOut] */
+        Page_EventOut_: {
+            /** Items */
+            items: components["schemas"]["EventOut"][];
             /** Total */
             total: number;
             /** Limit */
@@ -3795,7 +4089,7 @@ export interface components {
              * @default continuous
              * @enum {string}
              */
-            mode: "continuous" | "off";
+            mode: "continuous" | "event" | "off";
         };
         /** ScheduleIn */
         ScheduleIn: {
@@ -3820,6 +4114,12 @@ export interface components {
             camera_count: number;
             /** Recording Now */
             recording_now: boolean;
+            /**
+             * State Now
+             * @default continuous
+             * @enum {string}
+             */
+            state_now: "continuous" | "event" | "off";
             /** Next Change */
             next_change: string | null;
             /**
@@ -4097,7 +4397,7 @@ export interface components {
          * StreamStatus
          * @enum {string}
          */
-        StreamStatus: "UNKNOWN" | "UNASSIGNED" | "ASSIGNED" | "CONNECTING" | "IDLE" | "STREAMING" | "RECORDING" | "NOT_RECORDING" | "DISABLED" | "SCHEDULED_OFF";
+        StreamStatus: "UNKNOWN" | "UNASSIGNED" | "ASSIGNED" | "CONNECTING" | "IDLE" | "STREAMING" | "RECORDING" | "NOT_RECORDING" | "DISABLED" | "SCHEDULED_OFF" | "EVENT_STANDBY";
         /** StreamStatusBatchIn */
         StreamStatusBatchIn: {
             /** Items */
@@ -5733,6 +6033,172 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BookmarkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_event_api_v1_cameras__camera_id__events_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_events_api_v1_events_get: {
+        parameters: {
+            query?: {
+                camera_id?: number | null;
+                /** @description One type or several, comma separated */
+                type?: string | null;
+                /** @description Only events overlapping [start, end) */
+                start?: string | null;
+                end?: string | null;
+                /** @description By start time; desc = newest first */
+                order?: "asc" | "desc";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_EventOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_event_api_v1_events__event_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_event_api_v1_events__event_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    end_event_api_v1_events__event_id__end_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
                 };
             };
             /** @description Validation Error */
@@ -7787,6 +8253,74 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    node_event_windows_internal_v1_nodes__node_id__events_get: {
+        parameters: {
+            query?: {
+                since?: string | null;
+            };
+            header?: never;
+            path: {
+                node_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventWindowsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_node_events_internal_v1_nodes__node_id__events_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NodeEventsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeEventsOut"];
+                };
             };
             /** @description Validation Error */
             422: {

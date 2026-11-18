@@ -71,6 +71,12 @@ class Settings(BaseSettings):
     SEGMENT_SECONDS: int = 60  # length of one recorded chunk
     PART_SECONDS: float = 1.0  # MediaMTX fMP4 fragment length (= max data lost on power cut)
     HLS_PART_TARGET_SECONDS: float = 4.0  # playback part length (grouped on keyframes)
+    # Event recording (docs/EVENT_RECORDING_PLAN.md): cameras that can be in event mode record shorter chunks
+    # (whole chunks are kept or deleted); a held chunk no event covers is deleted this long after its pre-event
+    # seconds have passed (time for a late event to arrive); a camera down this long makes a video_loss event.
+    EVENT_SEGMENT_SECONDS: int = 10
+    EVENT_GRACE_SECONDS: int = 30
+    VIDEO_LOSS_SECONDS: int = 15
 
     # Loops
     HEARTBEAT_INTERVAL_SECONDS: int = 5
@@ -78,6 +84,7 @@ class Settings(BaseSettings):
     SCAN_INTERVAL_SECONDS: int = 5
     UPLOAD_INTERVAL_SECONDS: int = 3
     STATUS_INTERVAL_SECONDS: int = 10
+    EVENT_INTERVAL_SECONDS: int = 5
     DELETION_INTERVAL_SECONDS: int = 60
     ONVIF_CHECK_INTERVAL_SECONDS: float = 300  # camera reachable + clock offset (no login, see app/onvif/health.py)
     BACKFILL_INTERVAL_SECONDS: float = 5

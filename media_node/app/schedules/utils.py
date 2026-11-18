@@ -9,8 +9,10 @@ Mon=0 ... Sun=6, in the site's wall-clock time. `end <= start` runs past midnigh
 (continuous > event > off). A time no block covers is "off". Malformed blocks are ignored here (the API
 validates them on write).
 
-A camera's recording setting is `{"mode": "always" | "never" | "schedule", "blocks": [...]}`; a missing setting is
-"always" (central older than the node, or a camera saved before schedules existed).
+A camera's recording setting is `{"mode": "always" | "never" | "schedule" | "event", "blocks": [...],
+"events": {"pre": s, "post": s, "marking": bool, "max": s}}`; a missing setting is "always" (central older than the
+node, or a camera saved before schedules existed). Mode "event" (and schedule blocks with mode "event") keep video only
+around events (docs/EVENT_RECORDING_PLAN.md).
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone, tzinfo
 
 MODES = ("off", "event", "continuous")  # weakest -> strongest
-CAMERA_MODES = ("always", "schedule", "never")
+CAMERA_MODES = ("always", "schedule", "never", "event")
 WEEK = 7 * 24 * 60
 
 
@@ -105,9 +107,20 @@ def camera_mode(recording: dict | None, now: datetime, zone: tzinfo) -> str:
     mode = (recording or {}).get("mode", "always")
     if mode == "never":
         return "off"
+    if mode == "event":
+        return "event"
     if mode == "schedule":
         return mode_at(recording.get("blocks"), now.astimezone(zone))
     return "continuous"
+
+
+def may_use_events(recording: dict | None) -> bool:
+    """Whether the camera can ever be in event mode (mode "event", or a schedule with an event block)."""
+    mode = (recording or {}).get("mode", "always")
+    if mode == "event":
+        return True
+    return mode == "schedule" and any(b.get("mode") == "event" for b in recording.get("blocks") or ()
+                                      if isinstance(b, dict))
 
 
 def camera_next_change(recording: dict | None, now: datetime, zone: tzinfo) -> datetime | None:

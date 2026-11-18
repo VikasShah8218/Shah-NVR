@@ -5,6 +5,7 @@ settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
 APP_MODELS = [
     "app.node.models",
     "app.recordings.models",
+    "app.events.models",
 ]
 
 # Local node state (SQLite): upload queue, segment index, cached assignments.

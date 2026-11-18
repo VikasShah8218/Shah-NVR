@@ -5,7 +5,8 @@ import "../theme"
 
 // Recording timeline (port of nvr_client/src/features/playback/Timeline.tsx): recorded ranges vs gaps
 // for the visible window, local-time ticks, a "now" marker, markers (bookmarks), a hover line with a
-// preview picture, and the playhead. Click to seek (a click on a marker seeks to its exact start);
+// preview picture, and the playhead. Click to seek (a click on a marker seeks to its start, an event to its
+// pre-event seconds);
 // drag to pan (when `pannable`). All times are epoch milliseconds.
 ColumnLayout {
     id: timeline
@@ -128,7 +129,7 @@ ColumnLayout {
             }
         }
 
-        // markers (bookmarks; motion / ONVIF events later): a range is a band under the bar, a point a pin
+        // markers (bookmarks and events): a range is a band under the bar, a point a pin
         Repeater {
             model: timeline.markers
             delegate: Item {
@@ -213,7 +214,8 @@ ColumnLayout {
                 if (moved)
                     return
                 const marker = timeline.markerAt(mouse.x, mouse.y)
-                const t = marker ? marker.t : timeline.timeAt(mouse.x)
+                // a marker plays from its start (an event from its pre-event seconds: `seek_t`)
+                const t = marker ? (marker.seek_t ?? marker.t) : timeline.timeAt(mouse.x)
                 timeline.seek(timeline.clamp(t, timeline.boundsStart, timeline.boundsEnd))
             }
             onExited: {

@@ -45,7 +45,7 @@ def test_crud_and_validation():
         for bad in ({"days": [7], "start": "08:00", "end": "18:00"}, {"days": [1, 1], "start": "08:00", "end": "18:00"},
                     {"days": [], "start": "08:00", "end": "18:00"}, {"days": [1], "start": "8:00", "end": "18:00"},
                     {"days": [1], "start": "24:00", "end": "18:00"}, {"days": [1], "start": "08:00", "end": "24:30"},
-                    {"days": [1], "start": "08:00", "end": "18:00", "mode": "event"}):
+                    {"days": [1], "start": "08:00", "end": "18:00", "mode": "motion"}):
             _schedule(c, "Bad", [bad], expect=422)
         _schedule(c, "Many", [{"days": [1], "start": "08:00", "end": "09:00"}] * 51, expect=422)
 
@@ -132,7 +132,7 @@ def test_assignments_payload_and_alerts():
         data = c.get(f"/internal/v1/nodes/{node['node_id']}/assignments").json()
         assert data["site_timezone"]
         rec = {x["camera_id"]: x["recording"] for x in data["cameras"]}
-        assert rec[plain["id"]] == {"mode": "always"}
+        assert rec[plain["id"]] == {"mode": "always", "events": {"pre": 10, "post": 30, "marking": True, "max": 300}}
         assert rec[cam["id"]]["mode"] == "schedule" and rec[cam["id"]]["blocks"] == off["blocks"]
         assert rec[cam["id"]]["schedule_id"] == off["id"] and rec[cam["id"]]["version"]
 

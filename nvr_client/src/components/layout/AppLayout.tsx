@@ -145,7 +145,7 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
   const online = health.isSuccess && !health.isError
   const nodesTotal = h ? Object.values(h.nodes_by_state).reduce((a, b) => a + b, 0) : 0
   const nodesHealthy = h ? (h.nodes_by_state.ACTIVE ?? 0) + (h.nodes_by_state.READY ?? 0) : 0
-  const recording = h?.streams_by_status.RECORDING ?? 0
+  const recording = (h?.streams_by_status.RECORDING ?? 0) + (h?.streams_by_status.EVENT_STANDBY ?? 0) // standby = healthy
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-card/40 px-3 text-sm sm:px-4 lg:gap-5 lg:px-5">
@@ -166,6 +166,7 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
           <span className="hidden text-muted-foreground sm:inline">
             Cameras <span className="font-medium text-foreground">{recording}</span> recording of {h.cameras_enabled}
             {h.streams_by_status.SCHEDULED_OFF ? <span className="hidden xl:inline"> · {h.streams_by_status.SCHEDULED_OFF} off by schedule</span> : null}
+            {h.streams_by_status.EVENT_STANDBY ? <span className="hidden xl:inline"> · {h.streams_by_status.EVENT_STANDBY} on event standby</span> : null}
           </span>
         </>
       )}

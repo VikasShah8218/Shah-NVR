@@ -17,6 +17,8 @@ import type {
   Bookmark,
   BookmarkCreate,
   BookmarkUpdate,
+  NvrEvent,
+  NvrEventCreate,
   AlertPage,
   Camera,
   CameraCreate,
@@ -441,6 +443,59 @@ export const useDeleteBookmark = () =>
   useCentralMutation(
     (api, id: number) => unwrap(api.DELETE("/api/v1/bookmarks/{bookmark_id}", { params: { path: { bookmark_id: id } } })),
     { success: "Bookmark deleted", invalidate: ["bookmarks"] },
+  )
+
+export interface EventQuery {
+  cameraId?: number | null
+  /** one type or several, comma separated */
+  type?: string
+  start?: Date
+  end?: Date
+  order?: "asc" | "desc"
+  limit?: number
+  offset?: number
+  /** refetch every N ms (today's timeline, the Events page) */
+  refetch?: number
+}
+
+/** Events (docs/EVENT_RECORDING_PLAN.md): timeline marks and the Events page. */
+export function useEvents(params: EventQuery, enabled = true) {
+  const { url, api } = useCentral()
+  const query = {
+    camera_id: params.cameraId ?? undefined,
+    type: params.type || undefined,
+    start: params.start?.toISOString(),
+    end: params.end?.toISOString(),
+    order: params.order,
+    limit: params.limit,
+    offset: params.offset,
+  }
+  return useQuery({
+    queryKey: [url, "events", query],
+    enabled,
+    placeholderData: keepPreviousData,
+    refetchInterval: params.refetch || false,
+    queryFn: () => unwrap<Paged<NvrEvent>>(api.GET("/api/v1/events", { params: { query } })),
+  })
+}
+
+export const useCreateEvent = () =>
+  useCentralMutation(
+    (api, { cameraId, body }: { cameraId: number; body: NvrEventCreate }) =>
+      unwrap<NvrEvent>(api.POST("/api/v1/cameras/{camera_id}/events", { params: { path: { camera_id: cameraId } }, body })),
+    { success: "Event marked", invalidate: ["events"] },
+  )
+
+export const useEndEvent = () =>
+  useCentralMutation(
+    (api, id: number) => unwrap<NvrEvent>(api.POST("/api/v1/events/{event_id}/end", { params: { path: { event_id: id } } })),
+    { success: "Event ended", invalidate: ["events"] },
+  )
+
+export const useDeleteEvent = () =>
+  useCentralMutation(
+    (api, id: number) => unwrap(api.DELETE("/api/v1/events/{event_id}", { params: { path: { event_id: id } } })),
+    { success: "Event deleted", invalidate: ["events"] },
   )
 
 export function useAssignments(params: { q?: string; nodeId?: number; limit: number; offset: number }) {

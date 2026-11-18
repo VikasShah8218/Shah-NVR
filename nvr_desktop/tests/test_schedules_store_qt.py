@@ -47,8 +47,8 @@ class FakeApi:
         self.calls.append(("delete", sid))
         raise ApiError(409, "2 camera(s) use this schedule. Move them to another schedule or mode first.")
 
-    def apply_schedule(self, mode, schedule_id, camera_ids, group_id, include_subgroups):
-        self.calls.append(("apply", mode, schedule_id, camera_ids, group_id, include_subgroups))
+    def apply_schedule(self, mode, schedule_id, camera_ids, group_id, include_subgroups, events=None):
+        self.calls.append(("apply", mode, schedule_id, camera_ids, group_id, include_subgroups, events))
         return 3
 
 
@@ -110,8 +110,9 @@ def test_list_site_clock_and_texts(sync):
     store.setActive(True)
     row = store.items[0]
     assert row["name"] == "Office" and row["cameraCount"] == 2 and row["summary"] == "Mon–Fri 08:00–18:00"
-    assert row["nowText"].startswith("Off now, recording from Tue 08:00") or "Nov" in row["nowText"]
-    assert row["rows"][0] == [{"start": 480, "end": 1080}] and row["rows"][6] == []
+    assert row["nowText"].startswith("Off now, until Tue 08:00") or "Nov" in row["nowText"]
+    assert row["state"] == "off" and not row["usesEvents"]
+    assert row["rows"][0] == [{"start": 480, "end": 1080, "event": False}] and row["rows"][6] == []
     assert store.siteZone == "Asia/Kolkata" and (store.siteNowDay, store.siteNowMinute) == (0, 19 * 60 + 12)
     assert store.siteText == "Site time: Asia/Kolkata, now Mon 19:12."
     assert store.byId(1)["name"] == "Office" and store.byId(9) is None
@@ -137,11 +138,16 @@ def test_actions_refresh_camera_pages_and_report_errors(sync):
     store.applied.connect(applied.append)
     store.failed.connect(lambda: failed.append(1))
 
-    store.apply("schedule", 1, [5, 6], 7, False)
-    assert last(sync, "apply") == ("apply", "schedule", 1, [5, 6], 7, False)
+    store.apply("schedule", 1, [5, 6], 7, False, None)
+    assert last(sync, "apply") == ("apply", "schedule", 1, [5, 6], 7, False, None)
     assert applied == [3] and refreshed == ["cameras"] and ctx.successes[-1] == "Recording updated for 3 cameras"
-    store.apply("always", 0, [], 7, True)
-    assert last(sync, "apply") == ("apply", "always", None, [], 7, True)
+    events = {"pre": 5, "post": 60, "marking": False}
+    store.apply("event", 0, [], 7, True, events)
+    assert last(sync, "apply") == ("apply", "event", None, [], 7, True, events)
+    calls = len(sync.calls)
+    store.apply("event", 0, [], 7, True, {"pre": 61, "post": 30, "marking": True})  # refused before the API
+    assert len(sync.calls) == calls and failed == [1] and ctx.errors[-1] == "Before: 0–60 s, after: 0–600 s."
+    failed.clear()
 
     store.remove(1)
     assert failed == [1] and "2 camera(s) use this schedule" in ctx.errors[-1]
@@ -165,12 +171,20 @@ def test_editor_painting_and_block_edits(sync):
     store = SchedulesStore(Ctx(sync))
     ed = store.editorState
     ed.open(None, False)  # new = Office hours
-    assert ed.rows[0] == [{"start": 480, "end": 1080}] and ed.hoursText == "Records 50 h of 168 h a week (30%)."
+    assert ed.rows[0] == [{"start": 480, "end": 1080, "event": False}] and ed.hoursText == "Records 50 h of 168 h a week (30%)."
     ed.paint(6, 5, 55, 40)  # Sat-Sun 10:00-14:00, dragged backwards
     assert [b["label"] for b in ed.blocks] == ["Mon–Fri 08:00–18:00", "Sat, Sun 10:00–14:00"]
     ed.setBrush("off")
     ed.paint(0, 4, 32, 71)
     assert [b["label"] for b in ed.blocks] == ["Sat, Sun 10:00–14:00"]
+
+    ed.setBrush("event")  # Sat-Sun 18:00-24:00 keeps video around events
+    ed.paint(5, 6, 72, 95)
+    assert [b["label"] for b in ed.blocks] == ["Sat, Sun 10:00–14:00", "Sat, Sun 18:00–24:00 · event"]
+    assert ed.blocks[1]["mode"] == "event" and ed.hoursText.endswith(", event recording 12 h.")
+    ed.setMode(1, "continuous")
+    assert ed.blocks[1]["label"] == "Sat, Sun 18:00–24:00" and ed.hoursText == "Records 20 h of 168 h a week (12%)."
+    ed.removeBlock(1)
 
     ed.addBlock()
     ed.setTime(1, "start", "8:00")

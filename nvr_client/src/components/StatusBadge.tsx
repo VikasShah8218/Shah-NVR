@@ -13,6 +13,7 @@ const TONE: Record<string, Tone> = {
   UNKNOWN: "danger",
   UNASSIGNED: "muted",
   SCHEDULED_OFF: "muted",
+  EVENT_STANDBY: "muted",
   DISABLED: "muted",
   // media nodes
   ACTIVE: "success",
@@ -49,7 +50,7 @@ const DOT_CLASS: Record<Tone, string> = {
 
 export const toneOf = (status: string): Tone => TONE[status] ?? "muted"
 
-const LABEL: Record<string, string> = { OK: "OK", SCHEDULED_OFF: "Off (schedule)" }
+const LABEL: Record<string, string> = { OK: "OK", SCHEDULED_OFF: "Off (schedule)", EVENT_STANDBY: "Event standby" }
 
 const label = (status: string) =>
   LABEL[status] ?? status.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())
