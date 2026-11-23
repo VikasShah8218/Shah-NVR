@@ -1000,6 +1000,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/onvif/cameras/{camera_id}/events/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Detect which camera events (motion, tamper, inputs) the camera offers */
+        post: operations["camera_events_probe_api_v1_onvif_cameras__camera_id__events_probe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onvif/events/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Switch camera events on/off for cameras and/or a group (with sub-groups); only visible cameras */
+        post: operations["camera_events_apply_api_v1_onvif_events_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cameras/{camera_id}/streams/{profile}/encoder": {
         parameters: {
             query?: never;
@@ -1605,7 +1639,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "unassigned" | "stream" | "onvif" | "clock";
+            kind: "unassigned" | "stream" | "onvif" | "clock" | "camera_events";
             /** Title */
             title: string;
             /** Detail */
@@ -2053,6 +2087,10 @@ export interface components {
              * @default true
              */
             expose_via_onvif: boolean;
+            /** Onvif Events */
+            onvif_events?: {
+                [key: string]: unknown;
+            } | null;
             /** Recording */
             recording?: {
                 [key: string]: unknown;
@@ -2105,6 +2143,18 @@ export interface components {
              * @default true
              */
             event_marking: boolean;
+            /**
+             * Onvif Events Enabled
+             * @default false
+             */
+            onvif_events_enabled: boolean;
+            /** Onvif Event Kinds */
+            onvif_event_kinds?: ("motion" | "tamper" | "digital_input")[] | null;
+            /**
+             * Onvif Events Store Other
+             * @default false
+             */
+            onvif_events_store_other: boolean;
             /** Streams */
             streams: components["schemas"]["StreamIn"][];
         };
@@ -2186,6 +2236,22 @@ export interface components {
              * @default true
              */
             event_marking: boolean;
+            /**
+             * Onvif Events Enabled
+             * @default false
+             */
+            onvif_events_enabled: boolean;
+            /** Onvif Event Kinds */
+            onvif_event_kinds?: string[] | null;
+            /**
+             * Onvif Events Store Other
+             * @default false
+             */
+            onvif_events_store_other: boolean;
+            /** Onvif Events Status */
+            onvif_events_status?: {
+                [key: string]: unknown;
+            } | null;
             /** Recording Next Change */
             recording_next_change?: string | null;
             /** Onvif Host */
@@ -2258,6 +2324,12 @@ export interface components {
             event_post_seconds?: number | null;
             /** Event Marking */
             event_marking?: boolean | null;
+            /** Onvif Events Enabled */
+            onvif_events_enabled?: boolean | null;
+            /** Onvif Event Kinds */
+            onvif_event_kinds?: ("motion" | "tamper" | "digital_input")[] | null;
+            /** Onvif Events Store Other */
+            onvif_events_store_other?: boolean | null;
         };
         /** ChangeOut */
         ChangeOut: {
@@ -2764,6 +2836,19 @@ export interface components {
              */
             updated_at: string;
         };
+        /** EventProbeOut */
+        EventProbeOut: {
+            /** Camera Id */
+            camera_id: number;
+            /** Offered */
+            offered: string[];
+            /** Topics */
+            topics: {
+                [key: string]: string;
+            };
+            /** All Topics */
+            all_topics: string[];
+        };
         /**
          * EventWindow
          * @description What a node needs to keep video for an event: central -> node push and the node's catch-up.
@@ -2797,6 +2882,32 @@ export interface components {
              * Format: date-time
              */
             now: string;
+        };
+        /**
+         * EventsApplyIn
+         * @description Switch camera events for many cameras: listed ones, a group (optionally with sub-groups), or both.
+         */
+        EventsApplyIn: {
+            /** Enabled */
+            enabled: boolean;
+            /** Kinds */
+            kinds?: ("motion" | "tamper" | "digital_input")[] | null;
+            /** Store Other */
+            store_other?: boolean | null;
+            /** Camera Ids */
+            camera_ids?: number[];
+            /** Group Id */
+            group_id?: number | null;
+            /**
+             * Include Subgroups
+             * @default true
+             */
+            include_subgroups: boolean;
+        };
+        /** EventsApplyOut */
+        EventsApplyOut: {
+            /** Updated */
+            updated: number;
         };
         /** ExportCreate */
         ExportCreate: {
@@ -3210,6 +3321,11 @@ export interface components {
              * @default []
              */
             onvif: components["schemas"]["OnvifHealthIn"][];
+            /**
+             * Onvif Events
+             * @default []
+             */
+            onvif_events: components["schemas"]["OnvifEventsStatusIn"][];
             /** Onvif Server */
             onvif_server?: {
                 [key: string]: unknown;
@@ -3626,6 +3742,25 @@ export interface components {
              * @default false
              */
             allow_duplicate: boolean;
+        };
+        /** OnvifEventsStatusIn */
+        OnvifEventsStatusIn: {
+            /** Camera Id */
+            camera_id: number;
+            /** State */
+            state: string;
+            /** Topics */
+            topics?: {
+                [key: string]: string;
+            } | null;
+            /** Offered */
+            offered?: string[] | null;
+            /** Detail */
+            detail?: string | null;
+            /** Last Event At */
+            last_event_at?: string | null;
+            /** Since */
+            since?: string | null;
         };
         /** OnvifHealthIn */
         OnvifHealthIn: {
@@ -7086,6 +7221,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    camera_events_probe_api_v1_onvif_cameras__camera_id__events_probe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                camera_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventProbeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    camera_events_apply_api_v1_onvif_events_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventsApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventsApplyOut"];
                 };
             };
             /** @description Validation Error */

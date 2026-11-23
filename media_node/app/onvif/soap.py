@@ -130,17 +130,23 @@ class SoapClient:
         self.http_digest = False  # device wants HTTP Digest instead of (or besides) WS-UsernameToken
         self.auth_failed: NotAuthorized | None = None
 
-    async def call(self, url: str, body: str, *, auth: bool = True) -> etree._Element:
+    async def call(self, url: str, body: str, *, auth: bool = True, headers: str = "",
+                   timeout: float | None = None) -> etree._Element:
+        """`headers`: extra SOAP header XML (WS-Addressing for event subscriptions); `timeout`: seconds for this
+        request only (PullMessages waits on the camera)."""
         if auth and self.auth_failed:
             raise self.auth_failed  # never send a second wrong login (account lockout)
         use_auth = auth and bool(self.username)
-        header = security_header(self.username, self.password, self.offset) if use_auth else ""
+
+        def make() -> bytes:  # a fresh token per send (nonce + Created)
+            return envelope(body, (security_header(self.username, self.password, self.offset) if use_auth else "") + headers)
+
         try:
-            r = await self._post(url, envelope(body, header), digest=use_auth and self.http_digest)
+            r = await self._post(url, make(), digest=use_auth and self.http_digest, timeout=timeout)
             if r.status_code == 401 and use_auth and not self.http_digest and "digest" in r.headers.get("www-authenticate", "").lower():
                 # HTTP-level challenge before the WS token was even read: switch to HTTP Digest (Hikvision-style).
                 self.http_digest = True
-                r = await self._post(url, envelope(body, header), digest=True)
+                r = await self._post(url, make(), digest=True, timeout=timeout)
             return parse_response(r.status_code, r.content)
         except NotAuthorized as exc:
             if use_auth:
@@ -151,8 +157,9 @@ class SoapClient:
         except httpx.HTTPError as exc:
             raise Unreachable(f"{url}: {type(exc).__name__}") from None
 
-    async def _post(self, url: str, content: bytes, *, digest: bool) -> httpx.Response:
+    async def _post(self, url: str, content: bytes, *, digest: bool, timeout: float | None = None) -> httpx.Response:
         return await self.http.post(
             url, content=content, headers={"Content-Type": "application/soap+xml; charset=utf-8"},
             auth=httpx.DigestAuth(self.username, self.password) if digest else None,
+            timeout=timeout if timeout is not None else httpx.USE_CLIENT_DEFAULT,
         )

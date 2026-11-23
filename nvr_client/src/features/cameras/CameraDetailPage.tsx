@@ -25,6 +25,8 @@ import { CameraFormSheet } from "./CameraFormSheet"
 import { DeviceTab } from "./DeviceTab"
 import { VideoTab } from "./VideoTab"
 import { BackfillTab } from "./BackfillTab"
+import { CameraEventsTab } from "./CameraEventsTab"
+import { cameraEventsKey } from "@/lib/cameraEvents"
 import { Pager } from "@/components/Pager"
 
 export function CameraDetailPage() {
@@ -70,6 +72,7 @@ export function CameraDetailPage() {
           {can(Perm.PLAYBACK) && <TabsTrigger value="recordings">Recordings</TabsTrigger>}
           {can(Perm.ASSIGNMENTS, Perm.CAMERAS_MANAGE) && <TabsTrigger value="assignment">Assignment</TabsTrigger>}
           {can(Perm.CAMERAS_MANAGE) && <TabsTrigger value="device">Device</TabsTrigger>}
+          {can(Perm.CAMERAS_MANAGE) && <TabsTrigger value="events">Camera events</TabsTrigger>}
           {can(Perm.ENCODER) && <TabsTrigger value="video">Video</TabsTrigger>}
           {can(Perm.BACKFILL) && <TabsTrigger value="backfill">Edge storage</TabsTrigger>}
         </TabsList>
@@ -84,6 +87,9 @@ export function CameraDetailPage() {
         </TabsContent>
         <TabsContent value="device">
           <DeviceTab camera={c} active={tab === "device"} />
+        </TabsContent>
+        <TabsContent value="events">
+          <CameraEventsTab key={cameraEventsKey(c)} camera={c} />
         </TabsContent>
         <TabsContent value="video">
           <VideoTab key={c.id} camera={c} active={tab === "video"} />

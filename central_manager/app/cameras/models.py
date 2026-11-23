@@ -40,6 +40,13 @@ class Camera(Model):
     event_pre_seconds = fields.IntField(default=10)
     event_post_seconds = fields.IntField(default=30)
     event_marking = fields.BooleanField(default=True)
+    # Camera events from ONVIF (docs/ONVIF_EVENTS_PLAN.md): opt-in per camera (D2). The node that records the camera
+    # holds the PullPoint subscription and reports its status in the heartbeat (`onvif_events_status`).
+    onvif_events_enabled = fields.BooleanField(default=False)
+    onvif_event_kinds = fields.JSONField(null=True)  # motion / tamper / digital_input; null = all three
+    onvif_events_store_other = fields.BooleanField(default=False)
+    # {state, topics, offered, detail, last_event_at, since} from the node; or the last Detect result
+    onvif_events_status = fields.JSONField(null=True)
 
     # ONVIF device (H1). Filled when added through discovery or on the first Device-page refresh; all optional,
     # so manually added cameras keep working. Credentials are the camera's username/password above.

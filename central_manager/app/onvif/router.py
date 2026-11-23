@@ -15,8 +15,12 @@ from app.cameras.services import create_camera_with_streams
 from app.groups.services import check_group_id
 from app.cameras.utils import camera_to_out
 from app.nodes.client import call_node, online_nodes, pick_node
-from app.onvif.schemas import (ClockOut, DeviceIn, DeviceStateOut, DiscoveredOut, DiscoverIn, MessageOut, NtpIn,
-                               OnvifCameraCreate, ProbeOut, SnapshotIn)
+from app.auth import scope as access
+from app.groups.services import camera_scope
+from app.onvif.schemas import (ClockOut, DeviceIn, DeviceStateOut, DiscoveredOut, DiscoverIn, EventProbeOut,
+                               EventsApplyIn, EventsApplyOut, MessageOut, NtpIn, OnvifCameraCreate, ProbeOut,
+                               SnapshotIn)
+from tortoise.expressions import Q
 from app.onvif.services import cameras_by_host, default_name, device_fields, device_target, find_existing, pick_streams
 from settings.settings import settings
 from utilities.common import utcnow
@@ -164,3 +168,37 @@ async def camera_reboot(camera_id: int):
     camera = await _camera(camera_id)
     _, result = await _camera_call(camera, "/api/v1/onvif/device/reboot")
     return result
+
+
+# ------------------------------------------------------------------ camera events (docs/ONVIF_EVENTS_PLAN.md §6)
+@router.post("/cameras/{camera_id}/events/probe", response_model=EventProbeOut,
+             summary="Detect which camera events (motion, tamper, inputs) the camera offers")
+async def camera_events_probe(camera_id: int):
+    camera = await _camera(camera_id)
+    _node, result = await _camera_call(camera, "/api/v1/onvif/events/probe")
+    status_ = dict(camera.onvif_events_status or {})
+    status_.update(topics=result.get("topics") or {}, offered=result.get("offered") or [],
+                   detected_at=utcnow().isoformat())
+    status_.setdefault("state", "detected")
+    await Camera.filter(id=camera.id).update(onvif_events_status=status_)
+    return {**result, "camera_id": camera.id}
+
+
+@router.post("/events/apply", response_model=EventsApplyOut,
+             summary="Switch camera events on/off for cameras and/or a group (with sub-groups); only visible cameras")
+async def camera_events_apply(body: EventsApplyIn):
+    target = Q(id__in=list(set(body.camera_ids))) if body.camera_ids else None
+    if body.group_id is not None:
+        group_q = await camera_scope(body.group_id, False, body.include_subgroups)
+        target = group_q if target is None else (target | group_q)
+    qs = Camera.filter(target)
+    if (visible := await access.camera_q()) is not None:
+        qs = qs.filter(visible)
+    fields: dict = {"onvif_events_enabled": body.enabled}
+    if body.enabled:
+        fields["onvif_event_kinds"] = body.kinds
+        if body.store_other is not None:
+            fields["onvif_events_store_other"] = body.store_other
+    else:
+        fields["onvif_events_status"] = None
+    return EventsApplyOut(updated=await qs.update(**fields))

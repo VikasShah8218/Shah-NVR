@@ -27,7 +27,18 @@ _IDLE_OK_STATES = (StreamStatus.STREAMING, StreamStatus.NOT_RECORDING)
 _DANGER_STATES = (StreamStatus.NOT_RECORDING, StreamStatus.UNKNOWN)  # StatusBadge toneOf == "danger"
 
 Level = Literal["danger", "warning"]
-Kind = Literal["unassigned", "stream", "onvif", "clock"]
+Kind = Literal["unassigned", "stream", "onvif", "clock", "camera_events"]
+# camera event states worth a warning, with what to do (docs/ONVIF_EVENTS_PLAN.md §6.5)
+_EVENT_PROBLEMS = {
+    "auth_failed": "camera events login failed",
+    "no_topics": "camera offers none of the chosen events",
+    "unsupported": "camera has no ONVIF event service",
+}
+_EVENT_HINTS = {
+    "auth_failed": "Check the camera's username and password; it is retried when they change",
+    "no_topics": "Enable motion detection (or the event) in the camera's own web page, then press Detect",
+    "unsupported": "This camera cannot send ONVIF events",
+}
 
 
 class AlertOut(BaseModel):
@@ -96,6 +107,14 @@ async def camera_alerts() -> list[AlertOut]:
             alerts.append(AlertOut(level="warning", kind="clock",
                                    title=f"{c.name}: camera clock {format_offset(c.clock_offset_seconds)} off",
                                    detail="Open the Device tab to sync the time or set NTP",
+                                   camera_id=c.id, camera_name=c.name))
+
+    for c in await Camera.filter(enabled=True, onvif_events_enabled=True, id__in=assigned,
+                                 onvif_events_status__not_isnull=True):
+        state = (c.onvif_events_status or {}).get("state")
+        if state in _EVENT_PROBLEMS:
+            alerts.append(AlertOut(level="warning", kind="camera_events", title=f"{c.name}: {_EVENT_PROBLEMS[state]}",
+                                   detail=_EVENT_HINTS[state], since=(c.onvif_events_status or {}).get("since"),
                                    camera_id=c.id, camera_name=c.name))
 
     alerts.sort(key=lambda a: (a.level != "danger", a.camera_name.lower(), a.camera_id, a.kind, a.profile or ""))

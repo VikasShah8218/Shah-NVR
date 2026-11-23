@@ -21,6 +21,7 @@ from app.mediamtx.utils import mtx
 from app.node.router import router as node_router
 from app.node.services import check_public_host, heartbeat_tick, load_local_state, register, stream_status_tick
 from app.node.utils import central
+from app.onvif.event_watch import events_supervisor_tick, stop_all as stop_camera_events
 from app.onvif.health import onvif_tick
 from app.onvif.router import router as onvif_router
 from app.onvif.ptz_router import router as ptz_router
@@ -74,6 +75,7 @@ async def lifespan(app: FastAPI):
                 ("storage", settings.STORAGE_CHECK_INTERVAL_SECONDS, storage_tick),
                 ("address", settings.ADDRESS_CHECK_INTERVAL_SECONDS, check_public_host),
                 ("onvif-health", settings.ONVIF_CHECK_INTERVAL_SECONDS, onvif_tick),
+                ("onvif-events", settings.RECONCILE_INTERVAL_SECONDS, events_supervisor_tick),
                 ("backfill", settings.BACKFILL_INTERVAL_SECONDS, backfill_tick),
                 ("exports", settings.EXPORT_INTERVAL_SECONDS, export_tick),
                 ("export-cleanup", 3600, export_cleanup_tick),
@@ -86,6 +88,7 @@ async def lifespan(app: FastAPI):
             for t in tasks:
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            await stop_camera_events()
             await onvif_server.stop()
             await supervisor.stop()
             await mtx.close()

@@ -134,6 +134,8 @@ export function CameraFormSheet({
         event_pre_seconds: events.pre,
         event_post_seconds: events.post,
         event_marking: events.marking,
+        onvif_events_enabled: false, // switched on in the Camera events tab (it needs the ONVIF address)
+        onvif_events_store_other: false,
         streams: used.map(toIn),
       })
     } else {

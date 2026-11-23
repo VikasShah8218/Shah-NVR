@@ -53,6 +53,9 @@ async def create_camera(body: CameraCreate):
             "event_pre_seconds": body.event_pre_seconds,
             "event_post_seconds": body.event_post_seconds,
             "event_marking": body.event_marking,
+            "onvif_events_enabled": body.onvif_events_enabled,
+            "onvif_event_kinds": body.onvif_event_kinds,
+            "onvif_events_store_other": body.onvif_events_store_other,
             # omitted -> default; explicit null -> keep until storage is full
             "retention_days": body.retention_days if "retention_days" in body.model_fields_set
             else settings.DEFAULT_RETENTION_DAYS,
@@ -142,9 +145,12 @@ async def update_camera(camera_id: int, body: CameraUpdate):
     data = body.model_dump(exclude_unset=True)
     if "group_id" in data:
         await check_group_id(data["group_id"])
-    for key in ("recording_mode", "event_pre_seconds", "event_post_seconds", "event_marking"):
+    for key in ("recording_mode", "event_pre_seconds", "event_post_seconds", "event_marking", "onvif_events_enabled",
+                "onvif_events_store_other"):
         if key in data and data[key] is None:
             data.pop(key)  # null = unchanged
+    if data.get("onvif_events_enabled") is False:
+        data["onvif_events_status"] = None  # the node stops; an old status would only mislead
     if "recording_mode" in data or "recording_schedule_id" in data:
         mode = data.get("recording_mode", camera.recording_mode)
         schedule_id = data.get("recording_schedule_id", camera.recording_schedule_id)

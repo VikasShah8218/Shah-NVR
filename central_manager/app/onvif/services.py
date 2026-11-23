@@ -85,6 +85,30 @@ def device_fields(host: str, port: int, info: dict | None = None, services: list
     return out
 
 
+EVENT_KINDS = ("motion", "tamper", "digital_input")
+
+
+def onvif_events_setting(camera: Camera) -> dict | None:
+    """What the node needs to subscribe to the camera's events (docs/ONVIF_EVENTS_PLAN.md D3), or None."""
+    if not camera.onvif_events_enabled or not camera.onvif_host:
+        return None
+    return {"kinds": list(camera.onvif_event_kinds or EVENT_KINDS), "store_other": camera.onvif_events_store_other,
+            "username": camera.username or "", "password": camera.password or ""}
+
+
+async def apply_onvif_events_status(node_id: int, reports: list) -> None:
+    """Heartbeat: the event subscription state of cameras this node owns (and that still have events on)."""
+    if not reports:
+        return
+    from app.assignments.models import CameraAssignment
+
+    owned = set(await CameraAssignment.filter(node_id=node_id).values_list("camera_id", flat=True))
+    for r in reports:
+        if r.camera_id in owned:
+            await Camera.filter(id=r.camera_id, onvif_events_enabled=True).update(
+                onvif_events_status=r.model_dump(mode="json", exclude={"camera_id"}))
+
+
 def device_target(camera: Camera) -> tuple[str, int]:
     """Where the camera's ONVIF service is: saved address, else the host of its first stream on port 80."""
     if camera.onvif_host:

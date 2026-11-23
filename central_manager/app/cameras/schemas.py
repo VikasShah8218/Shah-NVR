@@ -6,6 +6,10 @@ from pydantic import BaseModel, Field, field_validator
 from app.cameras.models import StreamStatus
 
 
+# Camera events from ONVIF (docs/ONVIF_EVENTS_PLAN.md)
+OnvifEventKind = Literal["motion", "tamper", "digital_input"]
+
+
 class StreamIn(BaseModel):
     profile: str = Field(default="main", pattern=r"^[a-z0-9_-]{1,32}$", examples=["main"])
     source_url: str = Field(examples=["rtsp://192.168.1.64:554/Streaming/Channels/101"])
@@ -67,6 +71,10 @@ class CameraCreate(BaseModel):
     event_pre_seconds: int = Field(default=10, ge=0, le=60)
     event_post_seconds: int = Field(default=30, ge=0, le=600)
     event_marking: bool = True
+    # Camera events from ONVIF: off by default (plan D2); kinds null = all the camera offers
+    onvif_events_enabled: bool = False
+    onvif_event_kinds: list[OnvifEventKind] | None = None
+    onvif_events_store_other: bool = False
     streams: list[StreamIn] = Field(min_length=1)
 
     @field_validator("streams")
@@ -96,6 +104,9 @@ class CameraUpdate(BaseModel):
     event_pre_seconds: int | None = Field(default=None, ge=0, le=60)  # leave out = unchanged
     event_post_seconds: int | None = Field(default=None, ge=0, le=600)
     event_marking: bool | None = None
+    onvif_events_enabled: bool | None = None  # leave out = unchanged
+    onvif_event_kinds: list[OnvifEventKind] | None = None  # send null = all kinds
+    onvif_events_store_other: bool | None = None
 
 
 class AssignmentInfo(BaseModel):
@@ -123,6 +134,12 @@ class CameraOut(BaseModel):
     event_pre_seconds: int = 10
     event_post_seconds: int = 30
     event_marking: bool = True
+    onvif_events_enabled: bool = False
+    onvif_event_kinds: list[str] | None = None
+    onvif_events_store_other: bool = False
+    # From the recording node: state ok | auth_failed | no_topics | unsupported | unreachable | error, the topics in
+    # use per kind, the kinds the camera offers, detail, last_event_at, since (also filled by "Detect")
+    onvif_events_status: dict | None = None
     recording_next_change: datetime | None = None  # site wall clock, with offset
     # ONVIF device (null for cameras never seen over ONVIF)
     onvif_host: str | None = None

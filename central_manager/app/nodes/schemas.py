@@ -71,6 +71,16 @@ class OnvifHealthIn(BaseModel):
     checked_at: datetime
 
 
+class OnvifEventsStatusIn(BaseModel):
+    camera_id: int
+    state: str = Field(max_length=32)  # ok | auth_failed | no_topics | unsupported | unreachable | error
+    topics: dict[str, str] | None = None
+    offered: list[str] | None = None
+    detail: str | None = Field(default=None, max_length=300)
+    last_event_at: datetime | None = None
+    since: datetime | None = None
+
+
 class HeartbeatIn(BaseModel):
     cpu_percent: float | None = None
     cpu_count: int | None = None
@@ -93,6 +103,7 @@ class HeartbeatIn(BaseModel):
     drives: list[DriveInfo] = []
     volumes: list[VolumeReport] = []
     onvif: list[OnvifHealthIn] = []  # fresh ONVIF checks of this node's cameras
+    onvif_events: list[OnvifEventsStatusIn] = []  # camera event subscriptions that changed state
     onvif_server: dict[str, Any] | None = None
     extra: dict[str, Any] | None = None
 
@@ -135,6 +146,9 @@ class CameraAssignmentOut(BaseModel):
     onvif_host: str | None = None  # the node checks reachability + clock (no login) when set
     onvif_port: int | None = None
     expose_via_onvif: bool = True
+    # Camera events from ONVIF (docs/ONVIF_EVENTS_PLAN.md D3): only for cameras with camera events on and an ONVIF
+    # address. {"kinds", "store_other", "username", "password"}; the node holds the PullPoint subscription.
+    onvif_events: dict | None = None
     # When recorded streams record (docs/RECORDING_SCHEDULES_PLAN.md §4.4): {"mode": "always" | "never"} or
     # {"mode": "schedule", "schedule_id", "blocks", "version"}. The node evaluates it every reconcile tick.
     recording: dict = Field(default_factory=lambda: {"mode": "always"})

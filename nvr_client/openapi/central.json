@@ -4253,6 +4253,89 @@
         }
       }
     },
+    "/api/v1/onvif/cameras/{camera_id}/events/probe": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Detect which camera events (motion, tamper, inputs) the camera offers",
+        "operationId": "camera_events_probe_api_v1_onvif_cameras__camera_id__events_probe_post",
+        "parameters": [
+          {
+            "name": "camera_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Camera Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventProbeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onvif/events/apply": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Switch camera events on/off for cameras and/or a group (with sub-groups); only visible cameras",
+        "operationId": "camera_events_apply_api_v1_onvif_events_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventsApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventsApplyOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/cameras/{camera_id}/streams/{profile}/encoder": {
       "get": {
         "tags": [
@@ -6193,7 +6276,8 @@
               "unassigned",
               "stream",
               "onvif",
-              "clock"
+              "clock",
+              "camera_events"
             ],
             "title": "Kind"
           },
@@ -7690,6 +7774,18 @@
             "title": "Expose Via Onvif",
             "default": true
           },
+          "onvif_events": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Events"
+          },
           "recording": {
             "additionalProperties": true,
             "type": "object",
@@ -7820,6 +7916,35 @@
             "type": "boolean",
             "title": "Event Marking",
             "default": true
+          },
+          "onvif_events_enabled": {
+            "type": "boolean",
+            "title": "Onvif Events Enabled",
+            "default": false
+          },
+          "onvif_event_kinds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "motion",
+                    "tamper",
+                    "digital_input"
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Event Kinds"
+          },
+          "onvif_events_store_other": {
+            "type": "boolean",
+            "title": "Onvif Events Store Other",
+            "default": false
           },
           "streams": {
             "items": {
@@ -8027,6 +8152,42 @@
             "type": "boolean",
             "title": "Event Marking",
             "default": true
+          },
+          "onvif_events_enabled": {
+            "type": "boolean",
+            "title": "Onvif Events Enabled",
+            "default": false
+          },
+          "onvif_event_kinds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Event Kinds"
+          },
+          "onvif_events_store_other": {
+            "type": "boolean",
+            "title": "Onvif Events Store Other",
+            "default": false
+          },
+          "onvif_events_status": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Events Status"
           },
           "recording_next_change": {
             "anyOf": [
@@ -8402,6 +8563,47 @@
               }
             ],
             "title": "Event Marking"
+          },
+          "onvif_events_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Events Enabled"
+          },
+          "onvif_event_kinds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "motion",
+                    "tamper",
+                    "digital_input"
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Event Kinds"
+          },
+          "onvif_events_store_other": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onvif Events Store Other"
           }
         },
         "type": "object",
@@ -9868,6 +10070,43 @@
         ],
         "title": "EventOut"
       },
+      "EventProbeOut": {
+        "properties": {
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "offered": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Offered"
+          },
+          "topics": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Topics"
+          },
+          "all_topics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "All Topics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "offered",
+          "topics",
+          "all_topics"
+        ],
+        "title": "EventProbeOut"
+      },
       "EventWindow": {
         "properties": {
           "id": {
@@ -9938,6 +10177,87 @@
           "now"
         ],
         "title": "EventWindowsOut"
+      },
+      "EventsApplyIn": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "kinds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "motion",
+                    "tamper",
+                    "digital_input"
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kinds"
+          },
+          "store_other": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Store Other"
+          },
+          "camera_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Camera Ids"
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
+          "include_subgroups": {
+            "type": "boolean",
+            "title": "Include Subgroups",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "EventsApplyIn",
+        "description": "Switch camera events for many cameras: listed ones, a group (optionally with sub-groups), or both."
+      },
+      "EventsApplyOut": {
+        "properties": {
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "updated"
+        ],
+        "title": "EventsApplyOut"
       },
       "ExportCreate": {
         "properties": {
@@ -10987,6 +11307,14 @@
             },
             "type": "array",
             "title": "Onvif",
+            "default": []
+          },
+          "onvif_events": {
+            "items": {
+              "$ref": "#/components/schemas/OnvifEventsStatusIn"
+            },
+            "type": "array",
+            "title": "Onvif Events",
             "default": []
           },
           "onvif_server": {
@@ -12187,6 +12515,89 @@
           "host"
         ],
         "title": "OnvifCameraCreate"
+      },
+      "OnvifEventsStatusIn": {
+        "properties": {
+          "camera_id": {
+            "type": "integer",
+            "title": "Camera Id"
+          },
+          "state": {
+            "type": "string",
+            "maxLength": 32,
+            "title": "State"
+          },
+          "topics": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topics"
+          },
+          "offered": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offered"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "last_event_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Event At"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          }
+        },
+        "type": "object",
+        "required": [
+          "camera_id",
+          "state"
+        ],
+        "title": "OnvifEventsStatusIn"
       },
       "OnvifHealthIn": {
         "properties": {
