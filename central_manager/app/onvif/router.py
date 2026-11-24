@@ -21,7 +21,8 @@ from app.onvif.schemas import (ClockOut, DeviceIn, DeviceStateOut, DiscoveredOut
                                EventsApplyIn, EventsApplyOut, MessageOut, NtpIn, OnvifCameraCreate, ProbeOut,
                                SnapshotIn)
 from tortoise.expressions import Q
-from app.onvif.services import cameras_by_host, default_name, device_fields, device_target, find_existing, pick_streams
+from app.onvif.services import (cameras_by_address, default_name, device_fields, device_target, find_existing,
+                                match_existing, pick_streams)
 from settings.settings import settings
 from utilities.common import utcnow
 
@@ -45,7 +46,7 @@ async def discover(body: DiscoverIn):
           for n in nodes), return_exceptions=True)
     if all(isinstance(r, Exception) for r in results):
         raise results[0]  # type: ignore[misc]
-    existing = await cameras_by_host()
+    existing = await cameras_by_address()
     seen: dict[str, dict] = {}
     for node, found in zip(nodes, results):
         if isinstance(found, Exception):
@@ -53,7 +54,7 @@ async def discover(body: DiscoverIn):
         for d in found:
             if d["endpoint"] in seen:
                 continue
-            cam = existing.get(d["host"].lower())
+            cam = match_existing(existing, d["host"], d.get("port"))
             seen[d["endpoint"]] = {**d, "node_id": node.id, "node_name": node.name,
                                    "camera_id": cam.id if cam else None, "camera_name": cam.name if cam else None}
     return list(seen.values())
@@ -63,7 +64,7 @@ async def discover(body: DiscoverIn):
 async def probe(body: DeviceIn):
     node = await pick_node(body.node_id)
     result = await call_node(node, "/api/v1/onvif/probe", _device_body(body), timeout=PROBE_TIMEOUT)
-    cam = await find_existing(body.host, (result.get("info") or {}).get("serialnumber"))
+    cam = await find_existing(body.host, body.port, (result.get("info") or {}).get("serialnumber"))
     return {**result, "node_id": node.id, "camera_id": cam.id if cam else None}
 
 
@@ -84,7 +85,7 @@ async def add_camera(body: OnvifCameraCreate):
     result = await call_node(node, "/api/v1/onvif/probe", _device_body(body), timeout=PROBE_TIMEOUT)
     info = result.get("info") or {}
     if not body.allow_duplicate:
-        cam = await find_existing(body.host, info.get("serialnumber"))
+        cam = await find_existing(body.host, body.port, info.get("serialnumber"))
         if cam:
             raise HTTPException(409, {"code": "already_added", "message": f"Already added as '{cam.name}'",
                                       "camera_id": cam.id})

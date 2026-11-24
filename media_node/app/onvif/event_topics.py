@@ -2,7 +2,10 @@
 message stream into edges (start / end / moment). Pure functions, no I/O (docs/ONVIF_EVENTS_PLAN.md §3-§4).
 
 Rules from the lab on 38 real cameras (docs/ONVIF_EVENTS_LAB.md):
-- several topics report the same motion: use ONE per kind, in priority order (D5);
+- several topics report the same motion, and a camera may list a topic it never sends (ISIN-B05M031-N lists
+  RuleEngine/CellMotionDetector/Motion but, unfiltered, sends only VideoSource/MotionAlarm; shah-ho-1 2026-11-24):
+  listen to every offered motion topic and merge them: motion is on while any is on. Tamper and inputs keep one
+  topic per kind (D5, revised);
 - the first `Initialized` message only sets the starting state (its time can be weeks old: Q6); later ones count
   like `Changed` (the Illustra Flex4K reports every motion change as `Initialized`);
 - Pro3/Pro4 resend unchanged values every 8-64 s: only changes count (Q7);
@@ -46,8 +49,13 @@ _WSTOP_TOPIC = f"{{{NS['wstop']}}}topic"
 _MESSAGE_DESCRIPTION = f"{{{NS['tt']}}}MessageDescription"
 
 KINDS = ("motion", "tamper", "digital_input")
+# Kinds whose offered topics are all listened to and merged into one on/off state (one camera = one picture).
+# Tamper keeps ONE topic: the ISIN-B05M031-N copies its motion state into VideoSource/GlobalSceneChange, so merging
+# would log a fake tamper with every motion. Inputs are one topic, tracked per input token.
+MERGED = ("motion",)
 
-# One topic per kind: the first one the camera offers wins (lab §5.3).
+# Known topics per kind, best first. Every one the camera offers is listened to (kind_topics); the first is the one
+# shown as "the" topic (pick_topics, lab §5.3).
 PRIORITY: dict[str, tuple[str, ...]] = {
     "motion": ("tns1:RuleEngine/CellMotionDetector/Motion",
                "tnsaxis:CameraApplicationPlatform/VMD/Camera1ProfileANY",
@@ -143,18 +151,41 @@ def pick_topics(offered: list[TopicInfo], kinds=KINDS) -> dict[str, str]:
     return chosen
 
 
+def kind_topics(offered: list[TopicInfo], kinds=KINDS) -> dict[str, list[str]]:
+    """{kind: offered topics}: for a merged kind every offered one (known ones in priority order, else the fallback
+    matches); for the others only the first, as pick_topics."""
+    by_plain = {plain(t.path): t.path for t in offered}
+    out: dict[str, list[str]] = {}
+    for kind in kinds:
+        paths = [by_plain[plain(w)] for w in PRIORITY.get(kind, ()) if plain(w) in by_plain]
+        if not paths and (rx := FALLBACK.get(kind)):
+            paths = [t.path for t in offered if re.search(rx, plain(t.path)) and not NEVER.search(plain(t.path))]
+        if paths:
+            out[kind] = list(dict.fromkeys(paths)) if kind in MERGED else paths[:1]
+    return out
+
+
+def topics_text(topics: dict[str, list[str]]) -> dict[str, str]:
+    """For the status / UI: {kind: "topic a, topic b"}."""
+    return {k: ", ".join(v) for k, v in topics.items()}
+
+
+def _paths(chosen: dict[str, str | list[str]]) -> list[str]:
+    return [p for v in chosen.values() for p in ([v] if isinstance(v, str) else v)]
+
+
 def offered_kinds(offered: list[TopicInfo]) -> list[str]:
     return list(pick_topics(offered, KINDS))
 
 
-def topic_filter(chosen: dict[str, str], offered: list[TopicInfo]) -> str | None:
+def topic_filter(chosen: dict[str, str | list[str]], offered: list[TopicInfo]) -> str | None:
     """A ConcreteSet TopicExpression element for the chosen topics (cameras that honour it send less; we filter on
     our side anyway: lab Q5)."""
     if not chosen:
         return None
     uris = {t.path: t.uri for t in offered}
     decl: dict[str, str] = {}
-    for path in chosen.values():
+    for path in _paths(chosen):
         prefix = path.split(":", 1)[0]
         uri = uris.get(path) or next((u for u, p in PREFIXES.items() if p == prefix), None)
         if not uri:
@@ -163,7 +194,7 @@ def topic_filter(chosen: dict[str, str], offered: list[TopicInfo]) -> str | None
     xmlns = " ".join(f'xmlns:{p}="{u}"' for p, u in sorted(decl.items()))
     return (f'<wsnt:TopicExpression xmlns:wsnt="{NS["wsnt"]}" {xmlns} '
             f'Dialect="http://www.onvif.org/ver10/tev/topicExpression/ConcreteSet">'
-            f'{"|".join(sorted(set(chosen.values())))}</wsnt:TopicExpression>')
+            f'{"|".join(sorted(set(_paths(chosen))))}</wsnt:TopicExpression>')
 
 
 # ---------------------------------------------------------------- notifications (PullMessages)
@@ -252,7 +283,7 @@ def parse_notifications(body: etree._Element) -> list[Notification]:
 @dataclass
 class Edge:
     kind: str  # motion | tamper | digital_input | onvif
-    key: str  # one per (topic, source): an input token, a video source...
+    key: str  # "motion" / "tamper" (all their topics merged), else one per (topic, source): an input token...
     action: str  # start | end | moment
     label: str | None
     data: dict
@@ -269,13 +300,22 @@ def _label(kind: str, topic: str, source: dict) -> str | None:
 
 
 class EdgeTracker:
-    """Turns notifications into edges. Kept across resubscribes so a state seen before a reconnect still counts."""
+    """Turns notifications into edges. Kept across resubscribes so a state seen before a reconnect still counts.
 
-    def __init__(self, chosen: dict[str, str], store_other: bool = False):
-        self.kind_of = {plain(path): kind for kind, path in chosen.items()}
+    `chosen` is {kind: topic} or {kind: [topics]}. The topics of a merged kind (motion) form one state, on while any
+    is on, so a camera that reports one motion on two topics gives one event, and one that lists a topic it never
+    sends still works."""
+
+    def __init__(self, chosen: dict[str, str | list[str]], store_other: bool = False):
+        self.kind_of: dict[str, str] = {}
+        for kind, paths in chosen.items():
+            for path in [paths] if isinstance(paths, str) else paths:
+                self.kind_of.setdefault(plain(path), kind)
         self.families = [re.compile(FALLBACK[k]) for k in chosen if k in FALLBACK]
         self.store_other = store_other
-        self.last: dict[str, bool] = {}
+        self.last: dict[str, bool] = {}  # per (topic, source)
+        self.group_of: dict[str, str] = {}  # (topic, source) -> its merged state
+        self.on: dict[str, bool] = {}  # per merged state: what was last reported
 
     def kind(self, topic: str) -> str | None:
         p = plain(topic)
@@ -290,28 +330,31 @@ class EdgeTracker:
         if kind is None:
             return None
         key = n.topic + "|" + "|".join(f"{k}={v}" for k, v in sorted(n.source.items()))
+        group = kind if kind in MERGED else key
         label = _label(kind, n.topic, n.source)
         info = {"topic": n.topic, "source": n.source, "data": n.data}
 
         def edge(action: str) -> Edge:
-            return Edge(kind, key, action, label, info, n.utc_time)
+            return Edge(kind, group, action, label, info, n.utc_time)
 
         if n.state is None:  # no on/off value: a pulse (or a changed generic value) is a moment
             if n.operation is None or (kind == "onvif" and n.operation == "Changed"):
                 return edge("moment")
             return None
         before = self.last.get(key)
+        self.group_of[key] = group
         if n.operation == "Deleted":
             self.last.pop(key, None)
-            return edge("end") if before else None
-        self.last[key] = n.state
+        else:
+            self.last[key] = n.state
+        now = any(v for k, v in self.last.items() if self.group_of.get(k) == group)
+        was = self.on.get(group)
+        self.on[group] = now
         if before is None and n.operation == "Initialized":
             # the first state we hear of is only the starting state (its time can be weeks old: lab Q6)
             return None
         # After that, Initialized counts like Changed: the Illustra Flex4K (SS004.01.03) sends every motion change
         # as Initialized (seen on jk-1, 2026-11-23). An old camera time is replaced by our receive time (D8).
-        if before == n.state:
-            return None  # repeat without change (Q7)
-        if n.state:
-            return edge("start")
-        return edge("end") if before else None
+        if bool(was) == now:
+            return None  # repeat without change (Q7), or another topic of the same state
+        return edge("start" if now else "end")
