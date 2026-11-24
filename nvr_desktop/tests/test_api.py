@@ -172,3 +172,27 @@ def test_apply_with_event_settings_and_camera_event_fields():
 def api_camera_defaults():
     from app.core.api.models import Camera
     return Camera.model_validate(CAMERA)  # an older central without recording fields
+
+
+@respx.mock
+def test_camera_events_fields_probe_and_apply():
+    respx.get(f"{BASE}/api/v1/cameras/1").mock(return_value=httpx.Response(200, json={
+        **CAMERA, "onvif_events_enabled": True, "onvif_event_kinds": ["motion"],
+        "onvif_events_status": {"state": "ok", "offered": ["motion", "tamper"]}}))
+    cam = CentralApi(BASE).camera(1)
+    assert cam.onvif_events_enabled and cam.onvif_event_kinds == ["motion"] and cam.onvif_events_status["state"] == "ok"
+    old = CentralApi(BASE)  # an older central without the fields still parses
+    respx.get(f"{BASE}/api/v1/cameras/2").mock(return_value=httpx.Response(200, json={**CAMERA, "id": 2}))
+    assert old.camera(2).onvif_events_enabled is False and old.camera(2).onvif_event_kinds is None
+
+    respx.post(f"{BASE}/api/v1/onvif/cameras/1/events/probe").mock(return_value=httpx.Response(200, json={
+        "camera_id": 1, "offered": ["motion"], "topics": {"motion": "tns1:VideoSource/MotionAlarm"},
+        "all_topics": ["tns1:VideoSource/MotionAlarm", "tns1:Device/Trigger/DigitalInput"]}))
+    probe = CentralApi(BASE).probe_camera_events(1)
+    assert probe.offered == ["motion"] and len(probe.all_topics) == 2
+
+    route = respx.post(f"{BASE}/api/v1/onvif/events/apply").mock(return_value=httpx.Response(200, json={"updated": 5}))
+    body = {"enabled": True, "kinds": None, "group_id": 3, "include_subgroups": True}
+    assert CentralApi(BASE).apply_camera_events(body) == 5
+    import json
+    assert json.loads(route.calls.last.request.content) == body

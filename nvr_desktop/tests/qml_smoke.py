@@ -312,6 +312,16 @@ Item {
             assert "Cameras in this group" in texts() and "Bijbehara" in texts() and "Gate" in texts(), texts()
             assert window.findChild(QObject, "manageGroupTree") is not None
             assert window.grabWindow().save(str(output / "groups.png"))
+            # Camera events… dialog for the group (docs/DESKTOP_ONVIF_EVENTS_PLAN.md)
+            from PySide6.QtCore import Q_ARG as _Q_ARG
+            events_dialog = window.findChild(QObject, "applyCameraEventsDialog")
+            assert events_dialog is not None
+            QMetaObject.invokeMethod(events_dialog, "openForGroup", _Q_ARG("QVariant", 7), _Q_ARG("QVariant", "Anantnag"))
+            settle()
+            assert "Include sub-groups" in texts() and "Digital inputs" in texts(), texts()
+            assert window.grabWindow().save(str(output / "groups-camera-events.png"))
+            QTest.keyClick(window, Qt.Key.Key_Escape)
+            settle()
 
             router.go("live")
             stores["Live"].place(1, 0)
@@ -338,6 +348,31 @@ Item {
             for tab in ("overview", "recordings", "assignment", "device"):
                 page.setProperty("tab", tab)
                 settle()
+
+            # Camera events tab (docs/DESKTOP_ONVIF_EVENTS_PLAN.md): status line, kinds, topics, all topics.
+            page.setProperty("tab", "events")
+            detail._apply_camera(1, {**camera, "onvif_host": "192.168.1.241", "onvif_events_enabled": True,
+                                     "onvif_event_kinds": ["motion", "tamper"], "onvif_events_store_other": False,
+                                     "onvif_events_status": {"state": "ok", "offered": ["motion", "digital_input"],
+                                                             "topics": {"motion": "tns1:VideoSource/MotionAlarm"},
+                                                             "since": "2026-11-24T10:00:00Z"}})
+            detail._events_all_topics = ["tns1:Device/Trigger/DigitalInput", "tns1:VideoSource/MotionAlarm"]
+            detail.eventsChanged.emit()
+            settle()
+            assert "Receiving events; none yet. Tamper not offered by the camera." in texts(), texts()
+            assert "Not offered by this camera" in texts() and "tns1:VideoSource/MotionAlarm" in texts(), texts()
+            save_events = window.findChild(QObject, "saveCameraEvents")
+            assert save_events is not None and not save_events.property("enabled")
+            detail.setEventKind("digital_input", True)
+            settle()
+            assert save_events.property("enabled")
+            assert window.grabWindow().save(str(output / "camera-events.png"))
+            detail._apply_camera(1, {**camera, "onvif_host": None})
+            settle()
+            assert any("has no ONVIF address yet" in t for t in texts()), texts()
+            detail._apply_camera(1, camera)
+            page.setProperty("tab", "device")
+            settle()
 
             # Real Video tab, fake API: exercise field bindings, alternative H265
             # options, review dialog and stream navigation without touching a camera.

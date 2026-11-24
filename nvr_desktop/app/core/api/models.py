@@ -137,6 +137,11 @@ class Camera(ApiModel):
     event_pre_seconds: int = 10
     event_post_seconds: int = 30
     event_marking: bool = True
+    # camera events from ONVIF (docs/ONVIF_EVENTS_PLAN.md); defaults = an older central without them
+    onvif_events_enabled: bool = False
+    onvif_event_kinds: list[str] | None = None  # None = all kinds
+    onvif_events_store_other: bool = False
+    onvif_events_status: dict | None = None  # state, offered, topics, last_event_at, since, detail (from the node)
 
 
 class ScheduleBlock(ApiModel):
@@ -200,6 +205,15 @@ class OnvifDiscovered(ApiModel):
     node_name: str
     camera_id: int | None = None
     camera_name: str | None = None
+
+
+class CameraEventsProbe(ApiModel):
+    """POST /api/v1/onvif/cameras/{id}/events/probe: what the camera offers (central also saves it in the status)."""
+
+    camera_id: int | None = None
+    offered: list[str] = []
+    topics: dict[str, str] = {}
+    all_topics: list[str] = []
 
 
 class OnvifClock(ApiModel):

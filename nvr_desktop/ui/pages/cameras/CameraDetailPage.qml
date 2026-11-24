@@ -7,7 +7,7 @@ import "../../video"
 import "../assignments"
 
 // Port of nvr_client/src/features/cameras/CameraDetailPage.tsx:
-// tabs Overview / Device (ONVIF) / Video / Recordings / Assignment.
+// tabs Overview / Device (ONVIF) / Camera events / Video / Recordings / Backfill / Assignment.
 PageScroll {
     id: root
     objectName: "cameraDetail"
@@ -70,9 +70,11 @@ PageScroll {
 
     AppTabs {
         visible: root.ready
-        // each tab needs a permission (device 20, video/encoder 21, recordings 2, backfill 25, assignment 24 or 20)
+        // each tab needs a permission (device / camera events 20, video/encoder 21, recordings 2, backfill 25,
+        // assignment 24 or 20)
         options: [{ value: "overview", label: "Overview", ok: true },
                   { value: "device", label: "Device", ok: Auth.allowed["20"] === true },
+                  { value: "events", label: "Camera events", ok: Auth.allowed["20"] === true },
                   { value: "video", label: "Video", ok: Auth.allowed["21"] === true },
                   { value: "recordings", label: "Recordings", ok: Auth.allowed["2"] === true },
                   { value: "backfill", label: "Backfill", ok: Auth.allowed["25"] === true },
@@ -279,6 +281,13 @@ PageScroll {
         Layout.fillWidth: true
         camera: root.c
         active: visible
+    }
+
+    // ================================================================= camera events (ONVIF)
+    CameraEventsTab {
+        visible: root.ready && root.tab === "events"
+        Layout.fillWidth: true
+        camera: root.c
     }
 
     // ================================================================= H2 video settings

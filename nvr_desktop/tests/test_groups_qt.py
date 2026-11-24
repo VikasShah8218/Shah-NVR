@@ -384,3 +384,19 @@ def test_api_group_params(monkeypatch):
 
 def test_tree_store_subclasses_have_distinct_settings():
     assert LiveGroupsStore.__mro__[1] is GroupTreeStore and ManageGroupsStore.__mro__[1] is GroupTreeStore
+
+
+def test_camera_events_apply_for_a_group_or_selected_cameras(sync):
+    """Groups page "Camera events…" (docs/DESKTOP_ONVIF_EVENTS_PLAN.md): one POST /onvif/events/apply."""
+    api, ctx = sync
+    bodies = []
+    api.apply_camera_events = lambda body: bodies.append(body) or 4
+    g = GroupsStore(ctx)
+    done = []
+    g.cameraEventsApplied.connect(lambda: done.append(1))
+    g.applyCameraEvents(True, ["motion", "tamper", "digital_input"], [], 3, False)
+    g.applyCameraEvents(False, ["tamper"], [11, 12], 0, True)
+    g.applyCameraEvents(True, ["motion"], [], 0, True)  # nothing picked: no call
+    assert bodies == [{"enabled": True, "kinds": None, "group_id": 3, "include_subgroups": False},
+                      {"enabled": False, "kinds": ["tamper"], "camera_ids": [11, 12], "include_subgroups": False}]
+    assert done == [1, 1]

@@ -38,7 +38,11 @@ def build_node_alerts(nodes: list[dict]) -> list[dict]:
 
 
 def camera_alert(a: dict, key: int) -> dict:
-    """A central camera alert as a dashboard row; ONVIF and clock alerts open the camera's Device tab."""
+    """A central camera alert as a dashboard row; ONVIF and clock alerts open the camera's Device tab, camera-event
+    alerts (login failed, no topics, unsupported) its Camera events tab."""
     detail = f"{a['detail']} {time_ago(a['since'])}" if a.get("since") else a["detail"]
     return {"key": key, "level": a["level"], "title": a["title"], "detail": detail, "page": "camera",
-            "id": a["camera_id"], "tab": "device" if a["kind"] in ("onvif", "clock") else ""}
+            "id": a["camera_id"], "tab": _ALERT_TABS.get(a["kind"], "")}
+
+
+_ALERT_TABS = {"onvif": "device", "clock": "device", "camera_events": "events"}
