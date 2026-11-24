@@ -94,7 +94,8 @@ def serve():
 
 
 def call(req):
-    with socket.create_connection(("127.0.0.1", PORT), timeout=900) as s:
+    # wait as long as the remote command may run (plus a margin), never less than 15 min
+    with socket.create_connection(("127.0.0.1", PORT), timeout=max(900, req.get("timeout", 0) + 120)) as s:
         _send(s, req)
         return _recv(s)
 

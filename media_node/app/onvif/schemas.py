@@ -127,3 +127,11 @@ class ProfileGProbeOut(BaseModel):
     earliest: datetime | None = None
     latest: datetime | None = None
     recordings: list[ProfileGRecordingOut]
+
+
+class EventProbeOut(BaseModel):
+    """What camera events a device offers (docs/ONVIF_EVENTS_PLAN.md §5.5)."""
+
+    offered: list[str]  # kinds: motion | tamper | digital_input
+    topics: dict[str, str]  # kind -> the topic camera events would use
+    all_topics: list[str]  # every topic the camera lists

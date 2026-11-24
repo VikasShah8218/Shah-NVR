@@ -215,6 +215,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/onvif/events/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Camera events the device offers */
+        post: operations["events_probe_api_v1_onvif_events_probe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/onvif/profile-g/probe": {
         parameters: {
             query?: never;
@@ -774,6 +791,20 @@ export interface components {
             rate_control?: ("CBR" | "VBR") | null;
             /** Codec Profile */
             codec_profile?: string | null;
+        };
+        /**
+         * EventProbeOut
+         * @description What camera events a device offers (docs/ONVIF_EVENTS_PLAN.md §5.5).
+         */
+        EventProbeOut: {
+            /** Offered */
+            offered: string[];
+            /** Topics */
+            topics: {
+                [key: string]: string;
+            };
+            /** All Topics */
+            all_topics: string[];
         };
         /** EventWindowIn */
         EventWindowIn: {
@@ -1641,6 +1672,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProbeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    events_probe_api_v1_onvif_events_probe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventProbeOut"];
                 };
             };
             /** @description Validation Error */

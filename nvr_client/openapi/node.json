@@ -574,6 +574,47 @@
         }
       }
     },
+    "/api/v1/onvif/events/probe": {
+      "post": {
+        "tags": [
+          "ONVIF"
+        ],
+        "summary": "Camera events the device offers",
+        "operationId": "events_probe_api_v1_onvif_events_probe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventProbeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/onvif/profile-g/probe": {
       "post": {
         "tags": [
@@ -2084,6 +2125,39 @@
         "additionalProperties": false,
         "type": "object",
         "title": "EncoderValues"
+      },
+      "EventProbeOut": {
+        "properties": {
+          "offered": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Offered"
+          },
+          "topics": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Topics"
+          },
+          "all_topics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "All Topics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "offered",
+          "topics",
+          "all_topics"
+        ],
+        "title": "EventProbeOut",
+        "description": "What camera events a device offers (docs/ONVIF_EVENTS_PLAN.md \u00a75.5)."
       },
       "EventWindowIn": {
         "properties": {

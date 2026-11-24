@@ -131,6 +131,8 @@ POLICY: dict[tuple[str, str], Rule] = {
     ("POST", "/api/v1/onvif/cameras/{camera_id}/time-sync"): any_of(P.CAMERAS_MANAGE),
     ("POST", "/api/v1/onvif/cameras/{camera_id}/ntp"): any_of(P.CAMERAS_MANAGE),
     ("POST", "/api/v1/onvif/cameras/{camera_id}/reboot"): any_of(P.CAMERAS_MANAGE),
+    ("POST", "/api/v1/onvif/cameras/{camera_id}/events/probe"): any_of(P.CAMERAS_MANAGE),
+    ("POST", "/api/v1/onvif/events/apply"): any_of(P.CAMERAS_MANAGE),
     ("GET", "/api/v1/cameras/{camera_id}/streams/{profile}/encoder"): any_of(P.ENCODER),
     ("PUT", "/api/v1/cameras/{camera_id}/streams/{profile}/encoder"): any_of(P.ENCODER),
     ("PUT", "/api/v1/cameras/{camera_id}/streams/{profile}/encoder/mapping"): any_of(P.ENCODER),

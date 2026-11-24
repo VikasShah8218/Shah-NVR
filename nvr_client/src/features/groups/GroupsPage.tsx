@@ -8,6 +8,7 @@ import {
   Loader2,
   MoreHorizontal,
   MoveRight,
+  Zap,
   Pencil,
   Plus,
   Search,
@@ -41,6 +42,7 @@ import { Perm } from "@/lib/auth/permissions"
 import { useAuth } from "@/lib/auth/useAuth"
 import { cn } from "@/lib/utils"
 import { ApplyRecordingDialog } from "../schedules/ApplyRecordingDialog"
+import { ApplyCameraEventsDialog } from "../cameras/ApplyCameraEventsDialog"
 import { AddCamerasDialog, DeleteGroupDialog, GroupFormDialog, MoveGroupDialog } from "./GroupDialogs"
 import { GroupTree } from "./GroupTree"
 import { useTreeExpanded } from "./useTreeExpanded"
@@ -61,6 +63,7 @@ type Dialogs =
   | { kind: "delete"; group: CameraGroup }
   | { kind: "add"; group: CameraGroup }
   | { kind: "recording"; group: CameraGroup }
+  | { kind: "events"; group: CameraGroup }
   | null
 
 export function GroupsPage() {
@@ -145,6 +148,9 @@ export function GroupsPage() {
       {dialog?.kind === "recording" && (
         <ApplyRecordingDialog target={{ kind: "group", id: dialog.group.id, name: dialog.group.name }} onOpenChange={close} />
       )}
+      {dialog?.kind === "events" && (
+        <ApplyCameraEventsDialog target={{ kind: "group", id: dialog.group.id, name: dialog.group.name }} onOpenChange={close} />
+      )}
     </div>
   )
 }
@@ -170,6 +176,9 @@ function GroupMenu({ group, onDialog }: { group: CameraGroup; onDialog: (d: Dial
         <DropdownMenuItem onSelect={() => onDialog({ kind: "move", group })}><MoveRight /> Move…</DropdownMenuItem>
         {canRecording && (
           <DropdownMenuItem onSelect={() => onDialog({ kind: "recording", group })}><CalendarClock /> Recording schedule…</DropdownMenuItem>
+        )}
+        {canRecording && (
+          <DropdownMenuItem onSelect={() => onDialog({ kind: "events", group })}><Zap /> Camera events…</DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onSelect={() => onDialog({ kind: "delete", group })}><Trash2 /> Delete</DropdownMenuItem>
@@ -242,6 +251,9 @@ function GroupPanel({ groupId, onSelect, onDialog }: { groupId: number; onSelect
             <Button size="sm" variant="outline" onClick={() => onDialog({ kind: "move", group: g })}><MoveRight className="size-4" /> Move</Button>
             {canRecording && (
               <Button size="sm" variant="outline" onClick={() => onDialog({ kind: "recording", group: g })}><CalendarClock className="size-4" /> Recording</Button>
+            )}
+            {canRecording && (
+              <Button size="sm" variant="outline" onClick={() => onDialog({ kind: "events", group: g })}><Zap className="size-4" /> Camera events</Button>
             )}
             <Button size="sm" variant="outline" className="text-danger" onClick={() => onDialog({ kind: "delete", group: g })}><Trash2 className="size-4" /> Delete</Button>
           </div>
@@ -336,6 +348,7 @@ function CamerasTable({ scope, groupId, empty }: { scope: CameraScope; groupId: 
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [moveOpen, setMoveOpen] = useState(false)
   const [recordingOpen, setRecordingOpen] = useState(false)
+  const [eventsOpen, setEventsOpen] = useState(false)
   const canRecording = useAuth().can(Perm.CAMERAS_MANAGE)
   const assign = useAssignCameras()
   const rows = q.data?.items ?? []
@@ -384,6 +397,9 @@ function CamerasTable({ scope, groupId, empty }: { scope: CameraScope; groupId: 
             {canRecording && (
               <Button size="sm" variant="outline" onClick={() => setRecordingOpen(true)}><CalendarClock className="size-4" /> Recording…</Button>
             )}
+            {canRecording && (
+              <Button size="sm" variant="outline" onClick={() => setEventsOpen(true)}><Zap className="size-4" /> Camera events…</Button>
+            )}
             {assign.isPending && <Loader2 className="size-4 animate-spin" />}
             <button type="button" className="text-xs text-muted-foreground underline" onClick={() => setSelected(new Set())}>clear</button>
           </div>
@@ -429,6 +445,10 @@ function CamerasTable({ scope, groupId, empty }: { scope: CameraScope; groupId: 
       )}
       {recordingOpen && (
         <ApplyRecordingDialog target={{ kind: "cameras", ids: [...selected].slice(0, 10000) }} onOpenChange={setRecordingOpen}
+          onDone={() => setSelected(new Set())} />
+      )}
+      {eventsOpen && (
+        <ApplyCameraEventsDialog target={{ kind: "cameras", ids: [...selected].slice(0, 10000) }} onOpenChange={setEventsOpen}
           onDone={() => setSelected(new Set())} />
       )}
       {q.data && <Pager page={paged.page} pageSize={paged.pageSize} total={q.data.total} onPage={paged.setPage} onPageSize={paged.setPageSize} />}

@@ -7,6 +7,8 @@ import type { Paged } from "@/lib/pager"
 import { useSettings } from "@/lib/settings"
 import { ApiError, cancelExport, centralClient, createExport, listExports, nodeClient, nodeGet, unwrap } from "./client"
 import type {
+  CameraEventsApply,
+  CameraEventsProbe,
   Assignment,
   AssignmentHistory,
   BackfillConfig,
@@ -979,4 +981,20 @@ export const useApplySchedule = () =>
   useCentralMutation(
     (api, body: ScheduleApply) => unwrap<{ updated: number }>(api.POST("/api/v1/schedules/apply", { body })),
     { invalidate: SCHEDULE_KEYS, success: (r) => `Recording updated for ${r.updated} camera${r.updated === 1 ? "" : "s"}` },
+  )
+
+// ---------------------------------------------------------------- camera events from ONVIF (docs/ONVIF_EVENTS_PLAN.md)
+
+export const useProbeCameraEvents = () =>
+  useCentralMutation(
+    (api, cameraId: number) => unwrap<CameraEventsProbe>(api.POST("/api/v1/onvif/cameras/{camera_id}/events/probe", {
+      params: { path: { camera_id: cameraId } },
+    })),
+    { success: "Camera events detected", invalidate: ["cameras"], errorText: onvifErrorText },
+  )
+
+export const useApplyCameraEvents = () =>
+  useCentralMutation(
+    (api, body: CameraEventsApply) => unwrap<{ updated: number }>(api.POST("/api/v1/onvif/events/apply", { body })),
+    { invalidate: ["cameras"], success: (r, v) => `Camera events ${v.enabled ? "on" : "off"} for ${r.updated} camera${r.updated === 1 ? "" : "s"}` },
   )

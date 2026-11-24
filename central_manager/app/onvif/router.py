@@ -15,9 +15,14 @@ from app.cameras.services import create_camera_with_streams
 from app.groups.services import check_group_id
 from app.cameras.utils import camera_to_out
 from app.nodes.client import call_node, online_nodes, pick_node
-from app.onvif.schemas import (ClockOut, DeviceIn, DeviceStateOut, DiscoveredOut, DiscoverIn, MessageOut, NtpIn,
-                               OnvifCameraCreate, ProbeOut, SnapshotIn)
-from app.onvif.services import cameras_by_host, default_name, device_fields, device_target, find_existing, pick_streams
+from app.auth import scope as access
+from app.groups.services import camera_scope
+from app.onvif.schemas import (ClockOut, DeviceIn, DeviceStateOut, DiscoveredOut, DiscoverIn, EventProbeOut,
+                               EventsApplyIn, EventsApplyOut, MessageOut, NtpIn, OnvifCameraCreate, ProbeOut,
+                               SnapshotIn)
+from tortoise.expressions import Q
+from app.onvif.services import (cameras_by_address, default_name, device_fields, device_target, find_existing,
+                                match_existing, pick_streams)
 from settings.settings import settings
 from utilities.common import utcnow
 
@@ -41,7 +46,7 @@ async def discover(body: DiscoverIn):
           for n in nodes), return_exceptions=True)
     if all(isinstance(r, Exception) for r in results):
         raise results[0]  # type: ignore[misc]
-    existing = await cameras_by_host()
+    existing = await cameras_by_address()
     seen: dict[str, dict] = {}
     for node, found in zip(nodes, results):
         if isinstance(found, Exception):
@@ -49,7 +54,7 @@ async def discover(body: DiscoverIn):
         for d in found:
             if d["endpoint"] in seen:
                 continue
-            cam = existing.get(d["host"].lower())
+            cam = match_existing(existing, d["host"], d.get("port"))
             seen[d["endpoint"]] = {**d, "node_id": node.id, "node_name": node.name,
                                    "camera_id": cam.id if cam else None, "camera_name": cam.name if cam else None}
     return list(seen.values())
@@ -59,7 +64,7 @@ async def discover(body: DiscoverIn):
 async def probe(body: DeviceIn):
     node = await pick_node(body.node_id)
     result = await call_node(node, "/api/v1/onvif/probe", _device_body(body), timeout=PROBE_TIMEOUT)
-    cam = await find_existing(body.host, (result.get("info") or {}).get("serialnumber"))
+    cam = await find_existing(body.host, body.port, (result.get("info") or {}).get("serialnumber"))
     return {**result, "node_id": node.id, "camera_id": cam.id if cam else None}
 
 
@@ -80,7 +85,7 @@ async def add_camera(body: OnvifCameraCreate):
     result = await call_node(node, "/api/v1/onvif/probe", _device_body(body), timeout=PROBE_TIMEOUT)
     info = result.get("info") or {}
     if not body.allow_duplicate:
-        cam = await find_existing(body.host, info.get("serialnumber"))
+        cam = await find_existing(body.host, body.port, info.get("serialnumber"))
         if cam:
             raise HTTPException(409, {"code": "already_added", "message": f"Already added as '{cam.name}'",
                                       "camera_id": cam.id})
@@ -164,3 +169,37 @@ async def camera_reboot(camera_id: int):
     camera = await _camera(camera_id)
     _, result = await _camera_call(camera, "/api/v1/onvif/device/reboot")
     return result
+
+
+# ------------------------------------------------------------------ camera events (docs/ONVIF_EVENTS_PLAN.md §6)
+@router.post("/cameras/{camera_id}/events/probe", response_model=EventProbeOut,
+             summary="Detect which camera events (motion, tamper, inputs) the camera offers")
+async def camera_events_probe(camera_id: int):
+    camera = await _camera(camera_id)
+    _node, result = await _camera_call(camera, "/api/v1/onvif/events/probe")
+    status_ = dict(camera.onvif_events_status or {})
+    status_.update(topics=result.get("topics") or {}, offered=result.get("offered") or [],
+                   detected_at=utcnow().isoformat())
+    status_.setdefault("state", "detected")
+    await Camera.filter(id=camera.id).update(onvif_events_status=status_)
+    return {**result, "camera_id": camera.id}
+
+
+@router.post("/events/apply", response_model=EventsApplyOut,
+             summary="Switch camera events on/off for cameras and/or a group (with sub-groups); only visible cameras")
+async def camera_events_apply(body: EventsApplyIn):
+    target = Q(id__in=list(set(body.camera_ids))) if body.camera_ids else None
+    if body.group_id is not None:
+        group_q = await camera_scope(body.group_id, False, body.include_subgroups)
+        target = group_q if target is None else (target | group_q)
+    qs = Camera.filter(target)
+    if (visible := await access.camera_q()) is not None:
+        qs = qs.filter(visible)
+    fields: dict = {"onvif_events_enabled": body.enabled}
+    if body.enabled:
+        fields["onvif_event_kinds"] = body.kinds
+        if body.store_other is not None:
+            fields["onvif_events_store_other"] = body.store_other
+    else:
+        fields["onvif_events_status"] = None
+    return EventsApplyOut(updated=await qs.update(**fields))

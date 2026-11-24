@@ -84,6 +84,7 @@ def disk_info() -> dict:
 
 
 async def heartbeat_tick() -> None:
+    from app.onvif.event_watch import ack_status, take_status
     from app.onvif.health import ack_reports, take_reports
     from app.recordings.models import LocalSegment
     from app.recordings.services import recordings_used_bytes
@@ -109,12 +110,14 @@ async def heartbeat_tick() -> None:
         "drives": await asyncio.to_thread(local_drives),
         "volumes": storage.reports(),
         "onvif": (onvif_reports := take_reports()),
+        "onvif_events": (event_reports := take_status()),
         "onvif_server": onvif_server.status(),
     }
     try:
         data = await central.heartbeat(runtime.node_id, payload)
         runtime.last_central_contact = utcnow()
         ack_reports(onvif_reports)
+        ack_status(event_reports)
         await storage.apply_config(data.get("volumes"), data.get("storage_quota_bytes"))
         hosts = desired_webrtc_hosts(data)
         if hosts != runtime.webrtc_additional_hosts:

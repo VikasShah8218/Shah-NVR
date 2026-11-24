@@ -67,12 +67,18 @@ export const EVENT_COLORS: Record<string, string> = {
   api: "#8b5cf6",
   video_loss: "#ef4444",
   motion: "#f59e0b",
+  tamper: "#f97316",
+  digital_input: "#14b8a6",
+  onvif: "#94a3b8",
 }
 export const EVENT_LABELS: Record<string, string> = {
   manual: "Marked",
   api: "External",
   video_loss: "Video loss",
   motion: "Motion",
+  tamper: "Tamper",
+  digital_input: "Input",
+  onvif: "Camera event",
 }
 export const eventColor = (type: string) => EVENT_COLORS[type] ?? "#94a3b8"
 export const eventTypeLabel = (type: string) => EVENT_LABELS[type] ?? type.replace(/[_.:-]+/g, " ").replace(/^\w/, (c) => c.toUpperCase())

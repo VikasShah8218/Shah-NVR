@@ -87,6 +87,11 @@ class Settings(BaseSettings):
     EVENT_INTERVAL_SECONDS: int = 5
     DELETION_INTERVAL_SECONDS: int = 60
     ONVIF_CHECK_INTERVAL_SECONDS: float = 300  # camera reachable + clock offset (no login, see app/onvif/health.py)
+    # Camera events from ONVIF PullPoint (docs/ONVIF_EVENTS_PLAN.md §5): node-wide switch, start-up pacing, timing
+    ONVIF_EVENTS_ENABLED: bool = True
+    ONVIF_EVENTS_CONCURRENCY: int = 20
+    ONVIF_EVENTS_PULL_SECONDS: int = 10
+    ONVIF_EVENTS_RENEW_SECONDS: int = 30
     BACKFILL_INTERVAL_SECONDS: float = 5
     EXPORT_INTERVAL_SECONDS: float = 3
     EXPORT_FILE_TTL_HOURS: int = 24

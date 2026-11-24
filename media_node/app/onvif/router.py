@@ -12,7 +12,9 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, HTTPException, Response
 
 from app.onvif.discovery import discover
-from app.onvif.schemas import (ClockOut, DeviceIn, DeviceStateOut, DiscoveredDevice, DiscoverIn, NtpIn, ProbeOut,
+from app.onvif.event_topics import kind_topics, offered_kinds, topics_text
+from app.onvif.events import EventClient
+from app.onvif.schemas import (ClockOut, DeviceIn, DeviceStateOut, DiscoveredDevice, DiscoverIn, EventProbeOut, NtpIn, ProbeOut,
                                ProfileGProbeOut, RebootOut, SnapshotIn)
 from app.onvif.profile_g import ProfileGClient
 from app.onvif.services import OnvifDevice
@@ -46,6 +48,15 @@ async def onvif_discover(body: DiscoverIn | None = None):
 async def onvif_probe(body: DeviceIn):
     async with device(body) as dev:
         return await dev.probe()
+
+
+@router.post("/events/probe", response_model=EventProbeOut, summary="Camera events the device offers")
+async def events_probe(body: DeviceIn):
+    async with device(body) as dev:
+        await dev.clock()
+        offered = await EventClient(dev).properties()
+        return EventProbeOut(offered=offered_kinds(offered), topics=topics_text(kind_topics(offered)),
+                             all_topics=sorted(t.path for t in offered))
 
 
 @router.post("/profile-g/probe", response_model=ProfileGProbeOut,

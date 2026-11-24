@@ -18,6 +18,7 @@
     "test:watchdog": "node --experimental-strip-types --test tests/watchdog.test.ts",
     "test:auth": "node --experimental-strip-types --test tests/auth.test.ts",
     "test:schedule": "node --experimental-strip-types --test tests/schedule.test.ts",
+    "test:camera-events": "node --experimental-strip-types --test tests/cameraEvents.test.ts",
     "preview": "vite preview",
     "gen:api": "openapi-typescript openapi/central.json -o src/api/central.d.ts && openapi-typescript openapi/node.json -o src/api/node.d.ts"
   },

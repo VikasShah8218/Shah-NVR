@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class DiscoverIn(BaseModel):
@@ -152,3 +153,32 @@ class NtpIn(BaseModel):
 
 class MessageOut(BaseModel):
     message: str
+
+
+# ------------------------------------------------------------------ camera events (docs/ONVIF_EVENTS_PLAN.md)
+class EventProbeOut(BaseModel):
+    camera_id: int
+    offered: list[str]  # kinds the camera offers: motion | tamper | digital_input
+    topics: dict[str, str]  # kind -> the topic camera events use
+    all_topics: list[str]  # every topic the camera lists
+
+
+class EventsApplyIn(BaseModel):
+    """Switch camera events for many cameras: listed ones, a group (optionally with sub-groups), or both."""
+
+    enabled: bool
+    kinds: list[Literal["motion", "tamper", "digital_input"]] | None = None  # null = all kinds
+    store_other: bool | None = None  # leave out = unchanged
+    camera_ids: list[int] = Field(default_factory=list, max_length=10000)
+    group_id: int | None = None
+    include_subgroups: bool = True
+
+    @model_validator(mode="after")
+    def check(self):
+        if not self.camera_ids and self.group_id is None:
+            raise ValueError("give camera_ids or group_id")
+        return self
+
+
+class EventsApplyOut(BaseModel):
+    updated: int

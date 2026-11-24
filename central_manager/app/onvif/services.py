@@ -10,26 +10,44 @@ from app.cameras.models import Camera, CameraStream
 from utilities.common import utcnow
 
 
-async def cameras_by_host() -> dict[str, Camera]:
-    """host -> camera, from the ONVIF address and from every stream URL (manually added cameras count too)."""
-    out: dict[str, Camera] = {}
+def _address(host: str, port: int | None) -> tuple[str, int]:
+    return host.lower(), int(port or 80)
+
+
+async def cameras_by_address() -> tuple[dict[tuple[str, int], Camera], dict[str, Camera]]:
+    """(host, ONVIF port) -> camera, and host -> camera for cameras added without ONVIF (from their stream URLs).
+
+    The port matters: one IP can serve several cameras on different ports (a virtual camera server, an encoder, a
+    port-mapping box), so a camera on 192.168.1.8:8004 does not make 192.168.1.8:8005 "already added"."""
+    by_address: dict[tuple[str, int], Camera] = {}
+    by_host: dict[str, Camera] = {}
     cameras = {c.id: c for c in await Camera.all()}
     for c in cameras.values():
         if c.onvif_host:
-            out.setdefault(c.onvif_host.lower(), c)
+            by_address.setdefault(_address(c.onvif_host, c.onvif_port), c)
     for s in await CameraStream.all():
+        cam = cameras.get(s.camera_id)  # type: ignore[attr-defined]
         host = urlsplit(s.source_url).hostname
-        if host and s.camera_id in cameras:  # type: ignore[attr-defined]
-            out.setdefault(host.lower(), cameras[s.camera_id])  # type: ignore[attr-defined]
-    return out
+        if host and cam and not cam.onvif_host:  # manual camera: only its IP is known
+            by_host.setdefault(host.lower(), cam)
+    return by_address, by_host
 
 
-async def find_existing(host: str, serial: str | None = None) -> Camera | None:
+def match_existing(known: tuple[dict[tuple[str, int], Camera], dict[str, Camera]], host: str,
+                   port: int | None) -> Camera | None:
+    by_address, by_host = known
+    return by_address.get(_address(host, port)) or by_host.get(host.lower())
+
+
+async def find_existing(host: str, port: int | None, serial: str | None = None) -> Camera | None:
     if serial:
-        cam = await Camera.filter(serial=serial).first()
-        if cam:
-            return cam
-    return (await cameras_by_host()).get(host.lower())
+        for cam in await Camera.filter(serial=serial):
+            # The same serial on the same IP but another port is a different camera of one box (virtual cameras
+            # and encoders may repeat the serial); anywhere else it is this camera, maybe at a new address.
+            if not (cam.onvif_host and cam.onvif_host.lower() == host.lower()
+                    and int(cam.onvif_port or 80) != int(port or 80)):
+                return cam
+    return match_existing(await cameras_by_address(), host, port)
 
 
 def default_name(info: dict, host: str) -> str:
@@ -83,6 +101,30 @@ def device_fields(host: str, port: int, info: dict | None = None, services: list
     if has_ptz is not None:  # only when the device refresh could actually determine it (preserves manual override)
         out["has_ptz"] = has_ptz
     return out
+
+
+EVENT_KINDS = ("motion", "tamper", "digital_input")
+
+
+def onvif_events_setting(camera: Camera) -> dict | None:
+    """What the node needs to subscribe to the camera's events (docs/ONVIF_EVENTS_PLAN.md D3), or None."""
+    if not camera.onvif_events_enabled or not camera.onvif_host:
+        return None
+    return {"kinds": list(camera.onvif_event_kinds or EVENT_KINDS), "store_other": camera.onvif_events_store_other,
+            "username": camera.username or "", "password": camera.password or ""}
+
+
+async def apply_onvif_events_status(node_id: int, reports: list) -> None:
+    """Heartbeat: the event subscription state of cameras this node owns (and that still have events on)."""
+    if not reports:
+        return
+    from app.assignments.models import CameraAssignment
+
+    owned = set(await CameraAssignment.filter(node_id=node_id).values_list("camera_id", flat=True))
+    for r in reports:
+        if r.camera_id in owned:
+            await Camera.filter(id=r.camera_id, onvif_events_enabled=True).update(
+                onvif_events_status=r.model_dump(mode="json", exclude={"camera_id"}))
 
 
 def device_target(camera: Camera) -> tuple[str, int]:
