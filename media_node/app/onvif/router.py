@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, HTTPException, Response
 
 from app.onvif.discovery import discover
-from app.onvif.event_topics import offered_kinds, pick_topics
+from app.onvif.event_topics import kind_topics, offered_kinds, topics_text
 from app.onvif.events import EventClient
 from app.onvif.schemas import (ClockOut, DeviceIn, DeviceStateOut, DiscoveredDevice, DiscoverIn, EventProbeOut, NtpIn, ProbeOut,
                                ProfileGProbeOut, RebootOut, SnapshotIn)
@@ -55,7 +55,7 @@ async def events_probe(body: DeviceIn):
     async with device(body) as dev:
         await dev.clock()
         offered = await EventClient(dev).properties()
-        return EventProbeOut(offered=offered_kinds(offered), topics=pick_topics(offered),
+        return EventProbeOut(offered=offered_kinds(offered), topics=topics_text(kind_topics(offered)),
                              all_topics=sorted(t.path for t in offered))
 
 

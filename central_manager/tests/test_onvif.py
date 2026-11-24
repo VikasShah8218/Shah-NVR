@@ -215,3 +215,29 @@ def test_heartbeat_health_only_for_own_cameras():
         assert mine.onvif_reachable is False and mine.clock_offset_seconds == -563  # last known offset kept
 
     run(go)
+
+
+def test_one_ip_many_ports_are_different_cameras(fake_node, monkeypatch):
+    """A virtual camera server (VCX, 2026-11-24) serves cameras on 192.168.1.8:8004/8005/8006, all with the same
+    serial (the fake probe always answers SN1). Each port is its own camera; the same port again is a duplicate."""
+    async def go():
+        node = await _node()
+        a = await onvif.add_camera(OnvifCameraCreate(node_id=node.id, host="192.168.1.8", port=8004))
+        b = await onvif.add_camera(OnvifCameraCreate(node_id=node.id, host="192.168.1.8", port=8005))
+        assert a.id != b.id and (b.onvif_host, b.onvif_port) == ("192.168.1.8", 8005)
+        with pytest.raises(HTTPException) as e:
+            await onvif.add_camera(OnvifCameraCreate(node_id=node.id, host="192.168.1.8", port=8005))
+        assert e.value.status_code == 409 and e.value.detail["camera_id"] == b.id
+        # same serial at another IP: still the same camera (it moved)
+        with pytest.raises(HTTPException):
+            await onvif.add_camera(OnvifCameraCreate(node_id=node.id, host="192.168.1.99"))
+
+        async def discover(node, path, json=None, *, timeout=30.0, raw=False):
+            return [{"endpoint": f"urn:uuid:{p}", "host": "192.168.1.8", "port": p, "xaddr": f"http://192.168.1.8:{p}/onvif",
+                     "name": None, "hardware": None, "location": None, "mac": None, "profiles": [],
+                     "interface_ip": "192.168.1.3"} for p in (8004, 8005, 8006)]
+        monkeypatch.setattr(onvif, "call_node", discover)
+        marks = {d["port"]: d["camera_id"] for d in await onvif.discover(DiscoverIn())}
+        assert marks == {8004: a.id, 8005: b.id, 8006: None}
+
+    run(go)
