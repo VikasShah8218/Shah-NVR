@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from app.events.models import EventWindow
 from app.events.services import add_event, end_event
 from app.node.utils import runtime
-from app.onvif.event_topics import KINDS, Edge, EdgeTracker, offered_kinds, pick_topics, topic_filter
+from app.onvif.event_topics import KINDS, Edge, EdgeTracker, kind_topics, offered_kinds, topic_filter, topics_text
 from app.onvif.events import EventClient, InvalidFilter, Subscription
 from app.onvif.services import OnvifDevice
 from app.onvif.soap import NotAuthorized, NotSupported, OnvifError, Unreachable
@@ -234,8 +234,8 @@ class CameraWatch:
         await dev.clock()  # Q1: offset for the login and the event times
         client = EventClient(dev)
         offered = await client.properties()
-        chosen = pick_topics(offered, cfg.kinds)
-        info = {"topics": chosen, "offered": offered_kinds(offered)}
+        chosen = kind_topics(offered, cfg.kinds)  # every offered motion topic (an ISIN lists one it never sends)
+        info = {"topics": topics_text(chosen), "offered": offered_kinds(offered)}
         if not chosen and not cfg.store_other:
             set_status(cfg.camera_id, "no_topics", detail="the camera offers none of the chosen event kinds", **info)
             raise _NoTopics
