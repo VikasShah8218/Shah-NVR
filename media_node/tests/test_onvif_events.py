@@ -9,8 +9,8 @@ import httpx
 import pytest
 from lxml import etree
 
-from app.onvif.event_topics import (EdgeTracker, Notification, parse_notifications, parse_topic_set, pick_topics,
-                                    topic_filter)
+from app.onvif.event_topics import (EdgeTracker, Notification, kind_topics, parse_notifications, parse_topic_set,
+                                    pick_topics, topic_filter, topics_text)
 from app.onvif.events import EventClient, InvalidFilter, parse_subscription, wsa_headers
 from app.onvif.services import OnvifDevice
 from app.onvif.soap import NotSupported
@@ -65,6 +65,18 @@ def test_topic_filter_declares_every_prefix():
     assert f.nsmap["tnsaxis"] == "http://www.axis.com/2009/event/topics"
     assert f.nsmap["tns1"] == "http://www.onvif.org/ver10/topics"
     assert topic_filter({}, []) is None
+
+
+def test_every_offered_topic_of_a_kind_is_listened_to():
+    k = kind_topics(topics("isin"))
+    assert k["motion"][0] == "tns1:RuleEngine/CellMotionDetector/Motion"
+    assert "tns1:VideoSource/MotionAlarm" in k["motion"] and "tns1:RuleEngine/MotionDetector/Motion" in k["motion"]
+    assert k["digital_input"] == ["tns1:Device/Trigger/DigitalInput"]
+    # tamper keeps one topic: the ISIN copies motion into GlobalSceneChange (fake tamper)
+    assert k["tamper"] == ["tns1:RuleEngine/TamperDetector/Tamper"]
+    assert topics_text({"motion": ["a", "b"]}) == {"motion": "a, b"}
+    f = etree.fromstring(topic_filter(k, topics("isin")))
+    assert "tns1:VideoSource/MotionAlarm" in f.text.split("|")
 
 
 # ---------------------------------------------------------------- notifications
@@ -185,6 +197,31 @@ def test_other_topics_only_with_the_switch_and_never_noise():
     assert t.feed(n("tns1:Monitoring/ProcessorUsage", "Changed", None)) is None  # Q7
     # a second motion topic would mark the same motion twice (D5)
     assert t.feed(n("tns1:RuleEngine/MotionDetector/Motion", "Changed", True)) is None
+
+
+def test_isin_lists_cell_motion_but_sends_only_motion_alarm():
+    """ISIN-B05M031-N V2.0.0.20210812 on shah-ho-1 (2026-11-24): CellMotionDetector is in the TopicSet but never sent;
+    motion comes on VideoSource/MotionAlarm while RuleEngine/MotionDetector/Motion stays false."""
+    t = EdgeTracker(kind_topics(topics("isin")))
+    cell, alarm, rule = ("tns1:RuleEngine/CellMotionDetector/Motion", "tns1:VideoSource/MotionAlarm",
+                         "tns1:RuleEngine/MotionDetector/Motion")
+    src = {"Source": "VideoSource"}
+    assert actions(t, [
+        n(alarm, "Initialized", True, src),
+        n(rule, "Initialized", False, {"Rule": "MyMotionDetectorRule"}),
+        n(alarm, "Changed", False, src),
+        n(alarm, "Changed", True, src),
+        n(alarm, "Changed", False, src),
+    ]) == [None, None, ("motion", "end"), ("motion", "start"), ("motion", "end")]
+    assert t.kind(cell) == "motion"
+
+
+def test_two_topics_of_one_motion_give_one_event():
+    t = EdgeTracker({"motion": ["tns1:RuleEngine/CellMotionDetector/Motion", "tns1:VideoSource/MotionAlarm"]})
+    cell, alarm = "tns1:RuleEngine/CellMotionDetector/Motion", "tns1:VideoSource/MotionAlarm"
+    out = [t.feed(i) for i in [n(cell, "Changed", True), n(alarm, "Changed", True), n(cell, "Changed", False),
+                               n(alarm, "Changed", False)]]
+    assert [(e.action, e.key) if e else None for e in out] == [("start", "motion"), None, None, ("end", "motion")]
 
 
 # ---------------------------------------------------------------- PullPoint client
