@@ -200,6 +200,5 @@ async def camera_events_apply(body: EventsApplyIn):
         fields["onvif_event_kinds"] = body.kinds
         if body.store_other is not None:
             fields["onvif_events_store_other"] = body.store_other
-    else:
-        fields["onvif_events_status"] = None
+    # off keeps the last status (see cameras/router.py update_camera)
     return EventsApplyOut(updated=await qs.update(**fields))
