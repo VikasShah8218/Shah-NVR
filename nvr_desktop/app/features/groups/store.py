@@ -15,6 +15,7 @@ from app.core.context import AppContext
 from app.core.paged_store import PagedStore
 from app.core.poller import Poller
 from app.core.store import BaseStore
+from app.features.cameras.camera_events import apply_body
 from app.features.groups.tree import count_label
 
 GROUP_ROLES = ["id", "name", "description", "parent_id", "depth", "path", "path_label", "child_groups",
@@ -155,6 +156,7 @@ class GroupsStore(BaseStore):
     saved = Signal(int)  # group id after a successful create / edit / move (closes dialogs)
     deleted = Signal(int)  # parent id (0 = top level) after a delete
     failed = Signal()  # an action failed (the toast shows why): dialogs re-enable their buttons
+    cameraEventsApplied = Signal()  # camera events applied (closes the Camera events… dialog)
 
     def __init__(self, ctx: AppContext, trees: list = (), parent=None):
         super().__init__(ctx, parent)
@@ -309,6 +311,24 @@ class GroupsStore(BaseStore):
 
         self.act(lambda: self.api.assign_cameras(ids, target),
                  success=lambda n: f"{n} camera{'' if n == 1 else 's'} added", after=after, on_error=lambda _e: self.failed.emit())
+
+    @Slot(bool, "QVariantList", "QVariantList", int, bool)
+    def applyCameraEvents(self, enabled: bool, kinds, camera_ids, group_id: int, include_subgroups: bool) -> None:
+        """Camera events (ONVIF) on/off for a group (group_id > 0) or the given cameras (Camera events… dialog)."""
+        if not self.allowed(20):
+            return
+        body = apply_body(enabled, [str(k) for k in kinds or []], [int(i) for i in camera_ids or []],
+                          _gid(group_id), include_subgroups)
+        if not body.get("group_id") and not body["camera_ids"]:
+            return
+
+        def after(_n):
+            self.cameraEventsApplied.emit()
+            self._changed()
+
+        self.act(lambda: self.api.apply_camera_events(body),
+                 success=lambda n: f"Camera events {'on' if enabled else 'off'} for {n} camera{'' if n == 1 else 's'}",
+                 after=after, on_error=lambda _e: self.failed.emit())
 
     # ------------------------------------------------------------------ properties
     kind = Property(str, lambda self: self._kind, notify=changed)

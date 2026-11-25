@@ -29,10 +29,27 @@ manage the complete estate through one web or native desktop application.
 > **The central idea:** centralize coordination and metadata, distribute the
 > bandwidth-heavy video work.
 
-Shah-NVR is under active development. Its distributed recording, playback,
-ONVIF, PTZ, audio, storage, failover, and edge-storage recovery foundations are
-implemented. Production security hardening, formal scale certification, and
-long-duration soak testing remain planned milestones.
+Shah-NVR is under active development and runs in pilot deployments today. Already in place:
+- **Recording and playback:** distributed recording and playback, failover, storage management, exports, and
+  edge-storage recovery.
+- **Scheduling and events:** weekly recording schedules, event recording with a pre-buffer, and camera events from
+  ONVIF (motion, tamper, digital inputs).
+- **Camera control:** ONVIF discovery, encoder control, PTZ and audio.
+- **Organisation and access:** camera groups, single sign-on, role-based and per-camera permissions, and an audit log.
+
+Still planned: media-URL protection, managed TLS, formal scale certification and long-duration soak testing.
+
+### At a glance
+
+| | |
+|---|---|
+| **Scale target** | 1,000 cameras at 1080p30, designed to grow to 10,000+ |
+| **Video path** | Camera → media node → viewer. The central server never carries video |
+| **Recording** | Always, weekly schedule, or event-only (N s before to N s after each event) |
+| **Events** | Camera motion / tamper / digital inputs (ONVIF), video loss, operator marks, external API |
+| **Clients** | Web (React) and native Windows desktop (PySide6 + libmpv), feature-identical |
+| **Camera standard** | ONVIF: discovery, device, encoder, PTZ, audio, events, Profile G, virtual NVR |
+| **Access** | OAuth 2.1 / OIDC sign-in, roles, per-group and per-camera grants, audit log |
 
 ---
 
@@ -102,6 +119,15 @@ need a flexible alternative to fixed-channel proprietary appliances.
   readback, recovery, restore, and controlled bulk changes.
 - ONVIF PTZ with pan, tilt, zoom, speed, presets, and supported home actions.
 
+### Camera groups
+
+- Nested group tree (site › area › zone) of any depth, for thousands of cameras.
+- Drag cameras between groups, select many at once, and see online/total counts per group.
+- "Play group" fills the live grid. A group also sets permissions, and its recording and event settings apply to all
+  its cameras, with or without sub-groups.
+- Several cameras behind one IP address on different ports (encoders, port-mapping boxes, virtual camera servers)
+  are told apart by IP + port.
+
 ### Live monitoring
 
 - WebRTC and low-latency HLS for browser clients.
@@ -117,6 +143,8 @@ need a flexible alternative to fixed-channel proprietary appliances.
 - Adjustable LL-HLS safety buffer (2–10 s) for smooth video over slow or
   unstable links.
 - LAN/public route selection per client without changing other users.
+- Grids of 1 to 16 tiles with grid pages, drag-and-drop of cameras or whole groups, and a "no picture" watchdog
+  with automatic reconnect.
 
 ### Continuous recording and playback
 
@@ -128,6 +156,43 @@ need a flexible alternative to fixed-channel proprietary appliances.
 - Recorded audio with synchronized native or browser-compatible playback paths.
 - Direct MP4 segment downloads.
 - Retention by camera plus local emergency overwrite protection.
+
+### Recording schedules and event recording
+
+- Per camera or per group: record **Always**, on a **Schedule**, only around **Events**, or **Never**.
+- Weekly timetables painted on a 7×24 grid in 15-minute steps, with templates. Each block can be Record, Event or
+  Off (for example "record by day, events only at night").
+- Schedules run on the media node in site time, so they keep working while central is unreachable.
+- **Event mode** keeps a pre-buffer on the node and saves only the video from N seconds before to N seconds after
+  each event (default 10 s / 30 s). Repeated events merge, and very long ones are split.
+- Event sources:
+  - the camera's own **motion**, **tamper** and **digital inputs** (ONVIF);
+  - automatic **video loss**;
+  - operator **Mark event** in live or playback;
+  - external systems through the API.
+
+### Camera events from ONVIF
+
+- Per camera or per group: switch camera events on, and choose motion, tamper and/or digital inputs.
+- **Detect** asks the camera what it offers and shows the exact topics. Nothing is changed on the camera.
+- The media node keeps one ONVIF PullPoint subscription per camera:
+  - it receives each event in under a second and turns the stream of messages into clean start/end edges;
+  - it merges duplicate topics and ignores PTZ and health noise;
+  - it corrects the camera's clock offset.
+- Vendor quirks found on real cameras are handled, for example cameras that report every change as `Initialized`,
+  or that list one motion topic but send another.
+- Status and alerts per camera: receiving, login failed (no lockout: the node never retries a wrong password),
+  nothing offered, not answering.
+- Events start event recording and appear on the playback timeline in their own colour.
+
+### Investigation
+
+- Day timeline with zoom (24 h to 10 min), hover thumbnails, coverage, an exact wall-clock overlay, frame
+  stepping, reverse play and speed control.
+- **Bookmarks** (a point or a range, with note, label and colour), searchable for one camera or all cameras.
+- **Event marks** on the timeline; a click plays from just before the event. An **Events** page lists every
+  event, filtered by type and camera.
+- **Exports** of up to four hours: an original lossless remux, or compressed H.264/H.265 on CPU or GPU.
 
 ### Resilience and recovery
 
@@ -141,6 +206,17 @@ need a flexible alternative to fixed-channel proprietary appliances.
   a compatible camera's SD card.
 - Backfilled footage enters the normal retention and playback pipeline and is
   visibly identified as camera-SD media.
+
+### Access control and audit
+
+- Sign-in through the organisation's own Auth Server: OAuth 2.1 / OIDC single sign-on (PKCE in the browser, the
+  system browser for the desktop app).
+- Roles built from permission numbers: live, playback, export, bookmarks, PTZ, audio, cameras, groups, nodes,
+  assignments, backfill, access, audit and dashboard.
+- Per-camera access: grant a role or a user whole groups or single cameras. Pages, buttons and data the user may
+  not see are hidden in both clients.
+- **Audit log** of sign-ins, video access, exports, PTZ, configuration changes and refused requests, kept for one
+  year.
 
 ### External interoperability
 
@@ -183,6 +259,8 @@ Measured on real deployments and development hardware, not estimated:
 | Seeking in recordings | parts of **~6 s** even when the camera GOP does not align |
 | ONVIF calls | **12–40 ms** per call with the built-in SOAP client |
 | Failover after a node is hard-killed | recording resumes on another node in **~43 s** |
+| ONVIF camera events, 38 lab cameras (Tyco/Illustra, AXIS) | every camera supports PullPoint; events arrive in **< 0.5 s** |
+| Camera events on 26 production cameras, 30-minute run | event time error **0.3 s median, < 1 s max**; dropped subscriptions recover by themselves |
 
 The underlying rule throughout the platform: never decode, copy, or move video
 unless a viewer actually needs it.
@@ -255,6 +333,8 @@ It owns:
 - cross-node playback timeline queries and HLS VOD manifest generation;
 - retention decisions and deletion work;
 - encoder-operation history and recovery state;
+- recording schedules, event settings and the event catalog;
+- camera groups, users' permissions and the audit log;
 - Profile G backfill policy and durable jobs; and
 - the public API consumed by web and desktop applications.
 
@@ -276,6 +356,8 @@ work:
 - queues metadata locally and uploads it idempotently to Central Manager;
 - enforces storage-volume, quota, retention, and disk-protection rules;
 - performs PTZ and encoder operations on the owning node;
+- runs recording schedules on site time, and keeps the event pre-buffer;
+- subscribes to each camera's ONVIF events and turns them into recording events;
 - imports compatible camera-SD footage for backfill; and
 - optionally exposes assigned cameras as a virtual ONVIF NVR.
 
@@ -315,7 +397,7 @@ coordination layer:
 | **Scheduler and health loops** | Places cameras, detects node loss, and coordinates failover |
 | **Playback manifest service** | Finds recording segments and creates cross-node HLS playlists |
 | **Web application** | Serves the browser UI, normally behind a reverse proxy |
-| **Operational entry point** | Future TLS, authentication, authorization, auditing, and monitoring boundary |
+| **Operational entry point** | Sign-in through the Auth Server, permissions and auditing today; TLS and monitoring next |
 
 The VPS does **not** normally ingest, record, transcode, or relay all camera
 video. After receiving authorized URLs or a playback manifest, clients fetch
@@ -465,6 +547,31 @@ frame-rate, audio, and CPU/GPU controls. Jobs expose progress and cancellation,
 and completed MP4 files are downloaded directly from the processing node and
 automatically expire after the configured retention period.
 
+## Camera event lifecycle
+
+```mermaid
+sequenceDiagram
+    participant C as Camera (ONVIF)
+    participant M as Media Node
+    participant X as Central Manager
+    participant U as Web/Desktop client
+
+    X->>M: Assignment + event settings (kinds, credentials)
+    M->>C: GetEventProperties, CreatePullPointSubscription
+    loop every 10 s (long poll), renew every 30 s
+        M->>C: PullMessages
+        C-->>M: Motion / tamper / input changes
+    end
+    M->>M: Edges (start / end), merge, clock correction
+    M->>M: Event mode: keep pre-buffer + post seconds of video
+    M->>X: Event + status (heartbeat / upload)
+    U->>X: Timeline / Events page
+    X-->>U: Event marks, click plays from before the event
+```
+
+The node pulls events (no inbound connection to the node is needed). A wrong password stops the subscription for 30
+minutes instead of retrying, so cameras never lock the account.
+
 ## Failover model
 
 - Nodes report health and capacity through heartbeats.
@@ -498,6 +605,7 @@ local-network operations.
 | Device management | Information, services, clock, time sync, NTP, reboot |
 | Video configuration | Media2 preferred with Media1 fallback; safe encoder workflow |
 | PTZ | Sessions, continuous movement, Stop, presets, supported home actions |
+| Events | PullPoint subscriptions: motion, tamper, digital inputs, other topics on request |
 | Audio | Advertised/observed capability, codec metadata, recording and listening |
 | Profile G client | Recording search, replay URI, bounded SD-card backfill |
 | Virtual ONVIF NVR | Discovery, Device/Media/Recording/Search slices, authenticated live RTSP |
@@ -615,6 +723,9 @@ run:
 aerich upgrade
 ```
 
+Sign-in is off by default (`AUTH_ENABLED=false`: an open API for development). To use the Auth Server, set
+`AUTH_ENABLED=true` and `AUTH_PROVIDER=oidc` with its issuer and client IDs in `.env`.
+
 Start Central Manager:
 
 ```bash
@@ -656,7 +767,7 @@ Manager, advertises its usable address, and begins heartbeat/reconcile loops.
 ```bash
 cd nvr_client
 npm install
-npm run dev
+npm run dev        # http://localhost:5180
 ```
 
 ### 4. Run the Windows desktop client
@@ -671,6 +782,25 @@ py main.py
 
 Detailed desktop setup is available in
 [nvr_desktop/README.md](nvr_desktop/README.md).
+
+### 5. No cameras at hand? Use the simulators
+
+```bash
+py tools/camera_simulator.py --count 2   # RTSP test cameras: rtsp://127.0.0.1:8654/sim-1, sim-2
+py tools/onvif_simulator.py --count 2    # ONVIF for them (discovery, profiles, PTZ, events): 127.0.0.2/.3:8655, admin/admin
+```
+
+The ONVIF simulator also fires camera events on request
+(`GET http://127.0.0.2:8655/sim/motion/on`, `.../tamper/...`, `.../input/...`).
+
+### Tests
+
+| Part | Command | Tests |
+|---|---|---|
+| Central Manager | `cd central_manager && python -m pytest` | about 165 |
+| Media node | `cd media_node && python -m pytest` | about 250 |
+| Desktop | `cd nvr_desktop && python -m pytest` (includes a headless QML smoke run) | about 280 |
+| Web | `cd nvr_client && npm run test:markers` (one script per area: `test:*` in `package.json`), `npm run lint`, `npm run build` | unit tests |
 
 ---
 
@@ -687,7 +817,9 @@ The clients expose:
 - agent and MediaMTX logs;
 - recording coverage and gaps;
 - backfill capability, progress, provenance, and failure details; and
-- ONVIF service, clock, encoder, PTZ, and audio state.
+- ONVIF service, clock, encoder, PTZ, audio, and camera-event state;
+- dashboard alerts: node unreachable, disk or quota full, storage offline, camera unassigned or not recording,
+  clock drift, and camera-event login or topic problems.
 
 The production roadmap adds structured incident history, alert delivery,
 Prometheus-compatible metrics, sanitized support bundles, and deeper auditing.
@@ -696,9 +828,16 @@ Prometheus-compatible metrics, sanitized support bundles, and deeper auditing.
 
 ## Security and production-readiness status
 
-Shah-NVR currently assumes a trusted network. The external authentication
-service, role-based authorization, full API/media protection, managed TLS, and
-camera-credential encryption are not yet integrated.
+**In place:**
+- sign-in through the Auth Server (OAuth 2.1 / OIDC, switched by `AUTH_ENABLED`);
+- roles, per-group and per-camera permissions enforced by Central Manager;
+- an audit log;
+- camera passwords never returned by the API and never placed in media URLs.
+
+**Not yet integrated:**
+- signed media tickets for node video URLs and a node key for node-to-central calls;
+- managed TLS;
+- camera-credential encryption at rest.
 
 Until that work is complete:
 
@@ -714,7 +853,7 @@ Until that work is complete:
 Before a commercial production release, the project plans to complete:
 
 1. sustained failure-oriented soak testing;
-2. authentication, RBAC, encrypted credentials, and TLS;
+2. media-URL tickets, node keys, encrypted credentials, and TLS (sign-in and RBAC are done);
 3. managed Ubuntu services, release packaging, backup, restore, and rollback;
 4. alerting, auditability, structured diagnostics, and external metrics;
 5. PostgreSQL recording-table partitioning and large-estate query validation;
@@ -733,7 +872,7 @@ Shah-NVR's architecture creates a foundation for more than recording cameras.
 The same distributed platform can support:
 
 - centrally managed multi-tenant and multi-site deployments;
-- event and motion search;
+- camera analytics as first-class events (line crossing, intrusion, people, faces) and search over them;
 - health and SLA reporting for integrators;
 - secure remote access without replacing on-site recording;
 - storage tiers and cloud archive policies;

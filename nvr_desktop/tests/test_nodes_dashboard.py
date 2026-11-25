@@ -71,6 +71,9 @@ def test_camera_alert_rows_from_central():
                            "detail": "timeout", "since": None, "camera_id": 1, "camera_name": "Gate"}, 3)
     assert stream == {"key": 3, "level": "danger", "title": "Gate (main) is not recording", "detail": "timeout",
                       "page": "camera", "id": 1, "tab": ""}
+    base = {"level": "warning", "title": "t", "detail": "d", "since": None, "camera_id": 1, "camera_name": "Gate"}
+    assert camera_alert({**base, "kind": "onvif"}, 0)["tab"] == "device"
+    assert camera_alert({**base, "kind": "camera_events"}, 0)["tab"] == "events"  # login failed / no topics
 
 
 

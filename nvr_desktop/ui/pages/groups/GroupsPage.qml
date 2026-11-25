@@ -5,6 +5,7 @@ import App
 import "../../theme"
 import "../../components"
 import "../schedules"
+import "../cameras"
 
 // Port of nvr_client/src/features/groups/GroupsPage.tsx: the camera-group tree on the left (lazy: ManageGroups),
 // the selection on the right: all groups (top level), ungrouped cameras, or one group with its breadcrumb,
@@ -238,6 +239,12 @@ Item {
                             text: "Recording"; iconName: "calendar-clock"; size: "sm"; variant: "outline"
                             onClicked: recordingDialog.openForGroup(root.detail.id, root.detail.name)
                         }
+                        AppButton {
+                            objectName: "groupCameraEventsButton"
+                            visible: Auth.allowed["20"] === true
+                            text: "Camera events"; iconName: "zap"; size: "sm"; variant: "outline"
+                            onClicked: eventsDialog.openForGroup(root.detail.id, root.detail.name)
+                        }
                         AppButton { text: "Delete"; iconName: "trash-2"; size: "sm"; variant: "outline"; onClicked: deleteDialog.openFor(root.ref(root.detail)) }
                     }
                 }
@@ -390,6 +397,15 @@ Item {
                                 variant: "outline"
                                 onClicked: recordingDialog.openForCameras(root.cams.pickedIds())
                             }
+                            AppButton {
+                                visible: Auth.allowed["20"] === true
+                                objectName: "bulkCameraEvents"
+                                text: "Camera events…"
+                                iconName: "zap"
+                                size: "sm"
+                                variant: "outline"
+                                onClicked: eventsDialog.openForCameras(root.cams.pickedIds())
+                            }
                             LinkText { text: "clear"; variant: "small"; onActivated: root.cams.clearSelection() }
                         }
                     }
@@ -502,6 +518,12 @@ Item {
             text: "Recording schedule…"; iconName: "calendar-clock"
             onTriggered: recordingDialog.openForGroup(groupMenu.group.id, groupMenu.group.name)
         }
+        AppMenuItem {
+            visible: Auth.allowed["20"] === true
+            height: visible ? implicitHeight : 0
+            text: "Camera events…"; iconName: "zap"
+            onTriggered: eventsDialog.openForGroup(groupMenu.group.id, groupMenu.group.name)
+        }
         MenuSeparator {}
         AppMenuItem { text: "Delete"; iconName: "trash-2"; danger: true; onTriggered: deleteDialog.openFor(groupMenu.group) }
     }
@@ -511,6 +533,10 @@ Item {
     AddCamerasDialog { id: addDialog }
     ApplyRecordingDialog {
         id: recordingDialog
+        onDone: if (cameraIds.length > 0) root.cams.clearSelection()
+    }
+    ApplyCameraEventsDialog {
+        id: eventsDialog
         onDone: if (cameraIds.length > 0) root.cams.clearSelection()
     }
 

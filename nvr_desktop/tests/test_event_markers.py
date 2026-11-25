@@ -58,3 +58,10 @@ def test_event_settings():
         {"pre": 5, "post": 60, "marking": False}
     assert es.body({"pre": 5, "post": 60, "marking": False}) == \
         {"event_pre_seconds": 5, "event_post_seconds": 60, "event_marking": False}
+
+
+def test_camera_event_types_have_web_colours_and_labels():
+    for t, color, label in (("motion", "#f59e0b", "Motion"), ("tamper", "#f97316", "Tamper"),
+                            ("digital_input", "#14b8a6", "Input"), ("onvif", "#94a3b8", "Camera event")):
+        mk = m.event_marker(ev(type=t), T0)
+        assert (mk["color"], m.event_type_label(t)) == (color, label)

@@ -45,8 +45,11 @@ def bookmark_marker(b: dict) -> dict:
 
 
 # Colours of event types (same as nvr_client markers.ts); unknown types are grey.
-EVENT_COLORS = {"manual": "#3b82f6", "api": "#8b5cf6", "video_loss": "#ef4444", "motion": "#f59e0b"}
-EVENT_LABELS = {"manual": "Marked", "api": "External", "video_loss": "Video loss", "motion": "Motion"}
+# same values as nvr_client/src/features/playback/markers.ts; camera events (ONVIF): motion, tamper, input, other
+EVENT_COLORS = {"manual": "#3b82f6", "api": "#8b5cf6", "video_loss": "#ef4444", "motion": "#f59e0b",
+                "tamper": "#f97316", "digital_input": "#14b8a6", "onvif": "#94a3b8"}
+EVENT_LABELS = {"manual": "Marked", "api": "External", "video_loss": "Video loss", "motion": "Motion",
+                "tamper": "Tamper", "digital_input": "Input", "onvif": "Camera event"}
 UNKNOWN_COLOR = "#94a3b8"
 
 

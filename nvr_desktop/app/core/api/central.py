@@ -25,6 +25,7 @@ from app.core.api.models import (
     ExportJob,
     GroupDetail,
     Camera,
+    CameraEventsProbe,
     CameraAlert,
     CameraGroup,
     CameraOption,
@@ -427,6 +428,15 @@ class CentralApi:
 
     def onvif_reboot(self, camera_id: int) -> dict:
         return self._request("POST", f"/api/v1/onvif/cameras/{camera_id}/reboot", timeout=60)
+
+    def probe_camera_events(self, camera_id: int) -> CameraEventsProbe:
+        return CameraEventsProbe.model_validate(
+            self._request("POST", f"/api/v1/onvif/cameras/{camera_id}/events/probe", timeout=60)
+        )
+
+    def apply_camera_events(self, body: dict) -> int:
+        """Body from camera_events.apply_body; returns how many cameras changed."""
+        return int(self._request("POST", "/api/v1/onvif/events/apply", json=body).get("updated", 0))
 
     # ------------------------------------------------------------------ nodes
     def nodes(self) -> list[MediaNode]:

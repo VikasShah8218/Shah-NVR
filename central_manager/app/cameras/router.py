@@ -149,8 +149,8 @@ async def update_camera(camera_id: int, body: CameraUpdate):
                 "onvif_events_store_other"):
         if key in data and data[key] is None:
             data.pop(key)  # null = unchanged
-    if data.get("onvif_events_enabled") is False:
-        data["onvif_events_status"] = None  # the node stops; an old status would only mislead
+    # Switching camera events off keeps the last status: the UI and alerts ignore it while off, and the node reports
+    # only changes, so after a quick off -> on that it never noticed nothing would refill a cleared status.
     if "recording_mode" in data or "recording_schedule_id" in data:
         mode = data.get("recording_mode", camera.recording_mode)
         schedule_id = data.get("recording_schedule_id", camera.recording_schedule_id)

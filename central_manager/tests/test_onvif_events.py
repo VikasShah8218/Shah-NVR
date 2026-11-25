@@ -91,11 +91,17 @@ def test_heartbeat_status_alert_and_switch_off():
              "offered": ["motion"]}]})
         assert not [a for a in c.get("/api/v1/cluster/alerts").json()["items"] if a["kind"] == "camera_events"]
 
+        c.post(f"/internal/v1/nodes/{node}/heartbeat", json={"onvif_events": [
+            {"camera_id": cam["id"], "state": "auth_failed", "detail": "x"}]})
         r = c.patch(f"/api/v1/cameras/{cam['id']}", json={"onvif_events_enabled": False})
-        assert r.json()["onvif_events_status"] is None
-        # a late report from the node does not bring it back
+        # off keeps the last status (the node reports only changes: a quick off -> on must not leave it empty),
+        # but an off camera never raises an alert and a late node report does not change it
+        assert r.json()["onvif_events_status"]["state"] == "auth_failed"
+        assert not [a for a in c.get("/api/v1/cluster/alerts").json()["items"] if a["kind"] == "camera_events"]
         c.post(f"/internal/v1/nodes/{node}/heartbeat", json={"onvif_events": [{"camera_id": cam["id"], "state": "ok"}]})
-        assert c.get(f"/api/v1/cameras/{cam['id']}").json()["onvif_events_status"] is None
+        assert c.get(f"/api/v1/cameras/{cam['id']}").json()["onvif_events_status"]["state"] == "auth_failed"
+        r = c.patch(f"/api/v1/cameras/{cam['id']}", json={"onvif_events_enabled": True})
+        assert r.json()["onvif_events_status"]["state"] == "auth_failed"  # until the node reports again
 
 
 def test_group_apply():

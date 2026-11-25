@@ -13,7 +13,9 @@ from PySide6.QtCore import Property, Signal, Slot
 from app.core.context import AppContext
 from app.core.poller import Poller
 from app.core.store import BaseStore
+from app.core.format import time_ago
 from app.core.tasks import run_task
+from app.features.cameras import camera_events as ce
 from app.features.live.sources import pick_sources, streams_by_profile
 from app.features.onvif.helpers import format_offset, onvif_error_text, service_names
 from app.features.playback.timeline import DAY, merge_ranges, ticks
@@ -29,6 +31,7 @@ class CameraDetailStore(BaseStore):
     historyChanged = Signal()
     recordingsChanged = Signal()
     deviceChanged = Signal()
+    eventsChanged = Signal()
     ntpSaved = Signal()
 
     def __init__(self, ctx: AppContext, nodes: NodesStore | None = None, parent=None):
@@ -47,6 +50,7 @@ class CameraDetailStore(BaseStore):
         self._device_error = ""
         self._device_busy = False
         self._device_generation = 0
+        self._reset_events()
         self._poller = Poller(self.refresh, ctx.prefs.pollSeconds, self)
         self._slow_poller = Poller(self._refresh_slow, 60, self)
         ctx.centralChanged.connect(self._reset_server)
@@ -69,11 +73,13 @@ class CameraDetailStore(BaseStore):
         self._history_page, self._history_total = 1, 0
         self._recordings_profile, self._live_error = "", ""
         self._device, self._device_error, self._device_busy = {}, "", False
+        self._reset_events()
         self._set_loading(True)
         self._set_error("")
         self.cameraIdChanged.emit()
         self.cameraChanged.emit()
         self.deviceChanged.emit()
+        self.eventsChanged.emit()
         self.liveChanged.emit()
         self.historyChanged.emit()
         self.recordingsChanged.emit()
@@ -139,7 +145,11 @@ class CameraDetailStore(BaseStore):
             record = next((s for s in camera["streams"] if s["record"]), None)
             self._recordings_profile = (record or (camera["streams"] or [{"profile": "main"}])[0])["profile"]
             self.loadRecordings(self._recordings_profile)
+        key = ce.form_key(camera)
+        if key != self._events_key:  # first load, a save, or another client's change: the draft starts again
+            self._events_key, self._events_form = key, ce.form_from_camera(camera)
         self.cameraChanged.emit()
+        self.eventsChanged.emit()  # the status line follows every poll
 
     def _apply_live(self, cid: int, live: dict, error: str) -> None:
         if cid == self._camera_id:
@@ -270,6 +280,100 @@ class CameraDetailStore(BaseStore):
             self._device_action(lambda: api.onvif_reboot(cid),
                                 lambda result: f'Camera: {result.get("message", "reboot requested")}', refresh=False)
 
+    # ------------------------------------------------------------------ camera events (ONVIF)
+    # The Camera events tab (docs/DESKTOP_ONVIF_EVENTS_PLAN.md): a draft of the switches, Save, Detect, status line.
+    def _reset_events(self) -> None:
+        self._events_key = None
+        self._events_form = {"enabled": False, "kinds": list(ce.KINDS), "storeOther": False}
+        self._events_saving = False
+        self._events_detecting = False
+        self._events_all_topics: list[str] = []
+
+    def _events_view(self) -> dict:
+        cam, form = self._camera, self._events_form
+        status = cam.get("onvif_events_status") or {}
+        offered = status.get("offered")
+        line = ce.status_line(bool(cam.get("onvif_events_enabled")), form["kinds"], status, time_ago)
+        return {
+            **form,
+            "hasHost": bool(cam.get("onvif_host")),
+            "canSave": bool(cam) and ce.can_save(form, cam) and not self._events_saving,
+            "saving": self._events_saving,
+            "detecting": self._events_detecting,
+            "tone": line["tone"],
+            "text": line["text"],
+            "rows": [{"kind": k, "title": ce.LABELS[k]["title"], "on": k in form["kinds"],
+                      "hint": "Not offered by this camera" if offered is not None and k not in offered
+                      else ce.LABELS[k]["hint"]} for k in ce.KINDS],
+            "offeredText": (", ".join(ce.kind_title(k) for k in offered) or "None of these events")
+            if offered is not None else "Not detected yet",
+            "topics": [{"kind": k, "title": ce.kind_title(k), "topic": t}
+                       for k, t in (status.get("topics") or {}).items()],
+            "since": time_ago(status["since"]) if status.get("since") and cam.get("onvif_events_enabled") else "",
+            "allTopics": self._events_all_topics,
+        }
+
+    def _edit_events(self, **change) -> None:
+        self._events_form = {**self._events_form, **change}
+        self.eventsChanged.emit()
+
+    @Slot(bool)
+    def setEventsEnabled(self, on: bool) -> None:
+        self._edit_events(enabled=on)
+
+    @Slot(str, bool)
+    def setEventKind(self, kind: str, on: bool) -> None:
+        self._edit_events(kinds=ce.with_kind(self._events_form["kinds"], kind, on))
+
+    @Slot(bool)
+    def setEventsStoreOther(self, on: bool) -> None:
+        self._edit_events(storeOther=on)
+
+    @Slot()
+    def saveEvents(self) -> None:
+        cid, cam = self._camera_id, self._camera
+        if not cid or self._events_saving or not self.allowed(20) or not ce.can_save(self._events_form, cam):
+            return
+        body = ce.body_from_form(self._events_form)
+        api = self.api
+        self._events_saving = True
+        self.eventsChanged.emit()
+
+        def done(camera: dict | None) -> None:
+            self._events_saving = False
+            if camera is not None:
+                self._apply_camera(cid, camera)
+            self.eventsChanged.emit()
+
+        self.act(lambda: api.update_camera(cid, body).to_qml(), success="Camera events saved",
+                 after=done, on_error=lambda _e: done(None))
+
+    @Slot()
+    def detectEvents(self) -> None:
+        cid = self._camera_id
+        if not cid or self._events_detecting or not self.allowed(20):
+            return
+        api = self.api
+        self._events_detecting = True
+        self.eventsChanged.emit()
+
+        def ok(probe: dict) -> None:
+            if cid != self._camera_id:
+                return
+            self._events_detecting = False
+            self._events_all_topics = sorted(probe.get("all_topics") or [])
+            self.eventsChanged.emit()
+            self.refresh()  # central saved what the camera offers into the status
+
+        def err(exc: Exception) -> None:
+            if cid != self._camera_id:
+                return
+            self._events_detecting = False
+            self.ctx.toasts.error(onvif_error_text(exc))
+            self.eventsChanged.emit()
+
+        run_task(lambda: api.probe_camera_events(cid).to_qml(), ok, err)
+
     # ------------------------------------------------------------------ actions
     @Slot(int)
     def moveTo(self, node_id: int) -> None:
@@ -291,3 +395,4 @@ class CameraDetailStore(BaseStore):
     device = Property("QVariant", lambda self: self._device, notify=deviceChanged)
     deviceError = Property(str, lambda self: self._device_error, notify=deviceChanged)
     deviceBusy = Property(bool, lambda self: self._device_busy, notify=deviceChanged)
+    events = Property("QVariant", lambda self: self._events_view(), notify=eventsChanged)

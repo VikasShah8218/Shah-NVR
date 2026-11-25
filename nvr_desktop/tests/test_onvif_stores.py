@@ -238,3 +238,60 @@ def test_retention_validation_does_not_send_request(setup):
     store.addReady("admin", "test-password")
     ctx.central.create_onvif_camera.assert_not_called()
     assert "Retention" in store.addRows[0]["error"]
+
+
+def _cam(**kw):
+    return {"id": 1, "name": "Gate", "streams": [], "onvif_host": "192.168.1.168", "onvif_events_enabled": False,
+            "onvif_event_kinds": None, "onvif_events_store_other": False,
+            "onvif_events_status": {"offered": ["motion", "digital_input"]}, **kw}
+
+
+def _loads(ctx, camera):
+    ctx.central.camera.return_value = Mock(to_qml=lambda: camera)
+    ctx.central.timeline.return_value = Mock(to_qml=lambda: {"segments": []})  # a camera load also loads its day
+
+
+def test_camera_events_tab_draft_save_and_detect(setup):
+    """Camera events tab (docs/DESKTOP_ONVIF_EVENTS_PLAN.md): draft, Save body, reset after save, Detect."""
+    _, ctx, _, _ = setup
+    _loads(ctx, _cam())
+    detail = CameraDetailStore(ctx)
+    detail.cameraId = 1
+    detail.refresh()
+    ev = detail.events
+    assert ev["hasHost"] and not ev["enabled"] and not ev["canSave"]
+    assert ev["text"] == "Off. The camera offers: Motion, Digital inputs." and ev["tone"] == "muted"
+    assert [r["hint"] for r in ev["rows"]][1] == "Not offered by this camera"
+
+    detail.setEventsEnabled(True)
+    detail.setEventKind("tamper", False)
+    assert detail.events["canSave"] and detail.events["kinds"] == ["motion", "digital_input"]
+    saved = _cam(onvif_events_enabled=True, onvif_event_kinds=["motion", "digital_input"],
+                 onvif_events_status={"state": "ok", "offered": ["motion", "digital_input"]})
+    ctx.central.update_camera.return_value = Mock(to_qml=lambda: saved)
+    detail.saveEvents()
+    ctx.central.update_camera.assert_called_with(1, {"onvif_events_enabled": True,
+                                                     "onvif_event_kinds": ["motion", "digital_input"],
+                                                     "onvif_events_store_other": False})
+    ev = detail.events
+    assert not ev["canSave"] and not ev["saving"] and ev["text"] == "Receiving events; none yet."
+
+    detail.setEventKind("motion", False)
+    detail.setEventKind("digital_input", False)
+    assert not detail.events["canSave"]  # on with nothing chosen
+
+    ctx.central.probe_camera_events.return_value = Mock(to_qml=lambda: {"all_topics": ["b", "a"]})
+    detail.detectEvents()
+    assert detail.events["allTopics"] == ["a", "b"] and not detail.events["detecting"]
+    ctx.central.probe_camera_events.side_effect = ApiError(401, "denied", code="not_authorized")
+    detail.detectEvents()
+    assert "Wrong username" in ctx.toasts.error.call_args[0][0] and not detail.events["detecting"]
+
+
+def test_camera_events_without_onvif_host(setup):
+    _, ctx, _, _ = setup
+    _loads(ctx, _cam(onvif_host=None))
+    detail = CameraDetailStore(ctx)
+    detail.cameraId = 1
+    detail.refresh()
+    assert detail.events["hasHost"] is False
