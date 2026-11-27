@@ -1326,6 +1326,60 @@
   },
   "components": {
     "schemas": {
+      "AnalyticsKindOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Topics"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsRuleOut"
+            },
+            "type": "array",
+            "title": "Rules",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "topics"
+        ],
+        "title": "AnalyticsKindOut",
+        "description": "One analytics kind the camera offers (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A7); rules = the configured ones that\nreport it (read-only: set up in the camera's web page)."
+      },
+      "AnalyticsRuleOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "AnalyticsRuleOut"
+      },
       "ClockOut": {
         "properties": {
           "offset_seconds": {
@@ -2148,6 +2202,14 @@
             },
             "type": "array",
             "title": "All Topics"
+          },
+          "analytics": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsKindOut"
+            },
+            "type": "array",
+            "title": "Analytics",
+            "default": []
           }
         },
         "type": "object",

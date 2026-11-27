@@ -10,7 +10,7 @@ export function EventsPage() {
     navigate(`/playback?camera=${e.camera_id}&t=${new Date(Date.parse(e.start_time) - e.pre_seconds * 1000).toISOString()}`)
   return (
     <div className="space-y-4">
-      <PageHeader title="Events" description="Marked events, other systems' events and video loss, newest first. Click one to play it." />
+      <PageHeader title="Events" description="Camera events (motion, analytics…), marked events and video loss, newest first. Click one to play it." />
       <EventsPanel allCameras onOpen={open} />
     </div>
   )

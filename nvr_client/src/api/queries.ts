@@ -451,6 +451,10 @@ export interface EventQuery {
   cameraId?: number | null
   /** one type or several, comma separated */
   type?: string
+  /** a type group: camera | analytics | operator (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A9) */
+  group?: "camera" | "analytics" | "operator"
+  /** label contains (rule name, object…) */
+  q?: string
   start?: Date
   end?: Date
   order?: "asc" | "desc"
@@ -466,6 +470,8 @@ export function useEvents(params: EventQuery, enabled = true) {
   const query = {
     camera_id: params.cameraId ?? undefined,
     type: params.type || undefined,
+    group: params.group || undefined,
+    q: params.q || undefined,
     start: params.start?.toISOString(),
     end: params.end?.toISOString(),
     order: params.order,

@@ -23,6 +23,8 @@ from datetime import datetime, timezone
 
 from lxml import etree
 
+from app.onvif.event_analytics import ANALYTICS_KINDS, analytics_topics, classify, label as analytics_label
+
 NS = {
     "tt": "http://www.onvif.org/ver10/schema",
     "tev": "http://www.onvif.org/ver10/events/wsdl",
@@ -48,7 +50,8 @@ PREFIXES = {
 _WSTOP_TOPIC = f"{{{NS['wstop']}}}topic"
 _MESSAGE_DESCRIPTION = f"{{{NS['tt']}}}MessageDescription"
 
-KINDS = ("motion", "tamper", "digital_input")
+KINDS = ("motion", "tamper", "digital_input")  # the basic kinds: what "all kinds" (null) means (analytics plan A5)
+ALL_KINDS = KINDS + ANALYTICS_KINDS  # + the camera's own analytics, opt-in per kind (event_analytics.py)
 # Kinds whose offered topics are all listened to and merged into one on/off state (one camera = one picture).
 # Tamper keeps ONE topic: the ISIN-B05M031-N copies its motion state into VideoSource/GlobalSceneChange, so merging
 # would log a fake tamper with every motion. Inputs are one topic, tracked per input token.
@@ -156,7 +159,12 @@ def kind_topics(offered: list[TopicInfo], kinds=KINDS) -> dict[str, list[str]]:
     matches); for the others only the first, as pick_topics."""
     by_plain = {plain(t.path): t.path for t in offered}
     out: dict[str, list[str]] = {}
+    analytics = analytics_topics([t.path for t in offered], [k for k in kinds if k in ANALYTICS_KINDS])
     for kind in kinds:
+        if kind in ANALYTICS_KINDS:
+            if kind in analytics:
+                out[kind] = analytics[kind]
+            continue
         paths = [by_plain[plain(w)] for w in PRIORITY.get(kind, ()) if plain(w) in by_plain]
         if not paths and (rx := FALLBACK.get(kind)):
             paths = [t.path for t in offered if re.search(rx, plain(t.path)) and not NEVER.search(plain(t.path))]
@@ -175,7 +183,8 @@ def _paths(chosen: dict[str, str | list[str]]) -> list[str]:
 
 
 def offered_kinds(offered: list[TopicInfo]) -> list[str]:
-    return list(pick_topics(offered, KINDS))
+    """Basic kinds first, then the analytics kinds the camera offers."""
+    return list(pick_topics(offered, KINDS)) + list(analytics_topics([t.path for t in offered]))
 
 
 def topic_filter(chosen: dict[str, str | list[str]], offered: list[TopicInfo]) -> str | None:
@@ -282,8 +291,8 @@ def parse_notifications(body: etree._Element) -> list[Notification]:
 
 @dataclass
 class Edge:
-    kind: str  # motion | tamper | digital_input | onvif
-    key: str  # "motion" / "tamper" (all their topics merged), else one per (topic, source): an input token...
+    kind: str  # motion | tamper | digital_input | an analytics kind | onvif
+    key: str  # "motion" (all its topics merged); analytics: kind + rule; else one per (topic, source): an input...
     action: str  # start | end | moment
     label: str | None
     data: dict
@@ -304,18 +313,29 @@ class EdgeTracker:
 
     `chosen` is {kind: topic} or {kind: [topics]}. The topics of a merged kind (motion) form one state, on while any
     is on, so a camera that reports one motion on two topics gives one event, and one that lists a topic it never
-    sends still works."""
+    sends still works.
+
+    Analytics kinds (event_analytics.py) are read through `classify()`: the kind may come from the message (Pro4
+    RuleType), one event per kind + rule (A6), ranges merge the objects of one rule, moments come from a rising
+    state, a pulse, or a changed value (an ObjectId, the people counts)."""
 
     def __init__(self, chosen: dict[str, str | list[str]], store_other: bool = False):
         self.kind_of: dict[str, str] = {}
+        self.analytics: set[str] = {k for k in chosen if k in ANALYTICS_KINDS}
+        self.analytic_topics: set[str] = set()
         for kind, paths in chosen.items():
             for path in [paths] if isinstance(paths, str) else paths:
-                self.kind_of.setdefault(plain(path), kind)
+                if kind in ANALYTICS_KINDS:
+                    self.analytic_topics.add(plain(path))
+                else:
+                    self.kind_of.setdefault(plain(path), kind)
+        self.signature = tuple(sorted((k, tuple(sorted([v] if isinstance(v, str) else v))) for k, v in chosen.items()))
         self.families = [re.compile(FALLBACK[k]) for k in chosen if k in FALLBACK]
         self.store_other = store_other
         self.last: dict[str, bool] = {}  # per (topic, source)
         self.group_of: dict[str, str] = {}  # (topic, source) -> its merged state
         self.on: dict[str, bool] = {}  # per merged state: what was last reported
+        self.values: dict[str, str | None] = {}  # analytics value-read: last value per kind + rule
 
     def kind(self, topic: str) -> str | None:
         p = plain(topic)
@@ -326,6 +346,12 @@ class EdgeTracker:
         return "onvif"
 
     def feed(self, n: Notification) -> Edge | None:
+        if plain(n.topic) not in self.kind_of:
+            a = classify(n.topic, n.source, n.data)
+            if a is not None and a.kind in self.analytics:
+                return self._analytic(n, a)
+            if a is not None and a.kind is not None and plain(n.topic) in self.analytic_topics:
+                return None  # a rule of a kind that is off (Pro4: one topic, many kinds); unknown RuleType: below
         kind = self.kind(n.topic)
         if kind is None:
             return None
@@ -341,16 +367,20 @@ class EdgeTracker:
             if n.operation is None or (kind == "onvif" and n.operation == "Changed"):
                 return edge("moment")
             return None
-        before = self.last.get(key)
-        self.group_of[key] = group
-        if n.operation == "Deleted":
-            self.last.pop(key, None)
+        return self._state(key, group, n.state, n.operation, edge)
+
+    def _state(self, member: str, group: str, state: bool, operation: str | None, edge) -> Edge | None:
+        """One on/off report of `member`; the group is on while any member is on. Returns the start / end edge."""
+        before = self.last.get(member)
+        self.group_of[member] = group
+        if operation == "Deleted":
+            self.last.pop(member, None)
         else:
-            self.last[key] = n.state
+            self.last[member] = state
         now = any(v for k, v in self.last.items() if self.group_of.get(k) == group)
         was = self.on.get(group)
         self.on[group] = now
-        if before is None and n.operation == "Initialized":
+        if before is None and operation == "Initialized":
             # the first state we hear of is only the starting state (its time can be weeks old: lab Q6)
             return None
         # After that, Initialized counts like Changed: the Illustra Flex4K (SS004.01.03) sends every motion change
@@ -358,3 +388,27 @@ class EdgeTracker:
         if bool(was) == now:
             return None  # repeat without change (Q7), or another topic of the same state
         return edge("start" if now else "end")
+
+    def _analytic(self, n: Notification, a) -> Edge | None:
+        kind = a.kind
+        group = f"{kind}|{a.rule or plain(n.topic)}"
+        data = {"topic": n.topic, **a.data}
+
+        def edge(action: str) -> Edge:
+            return Edge(kind, group, action, analytics_label(kind, data), data, n.utc_time)
+
+        if a.read == "value":  # a moment whenever the value changes (the first Initialized only sets it)
+            first = group not in self.values
+            old = self.values.get(group)
+            self.values[group] = a.value
+            if (first and n.operation == "Initialized") or a.value is None or a.value == old:
+                return None
+            return edge("moment")
+        if a.state is None:  # a pulse without a state item
+            return edge("moment") if n.operation in (None, "Changed") else None
+        if a.is_range:  # objects of one rule (Pro4 TrackingId) merge into one range
+            return self._state(f"{group}|{a.track or ''}", group, a.state, n.operation, edge)
+        if n.operation is None:  # a pulse: each "on" is one detection
+            return edge("moment") if a.state else None
+        e = self._state(group, group, a.state, n.operation, edge)  # a property: its rising edge is the moment
+        return edge("moment") if e is not None and e.action == "start" else None

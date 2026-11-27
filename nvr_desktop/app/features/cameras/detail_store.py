@@ -288,12 +288,23 @@ class CameraDetailStore(BaseStore):
         self._events_saving = False
         self._events_detecting = False
         self._events_all_topics: list[str] = []
+        self._events_analytics: list[dict] | None = None  # from the last Detect (else the saved status)
 
     def _events_view(self) -> dict:
         cam, form = self._camera, self._events_form
         status = cam.get("onvif_events_status") or {}
         offered = status.get("offered")
         line = ce.status_line(bool(cam.get("onvif_events_enabled")), form["kinds"], status, time_ago)
+        analytics = self._events_analytics if self._events_analytics is not None else (status.get("analytics") or [])
+
+        def row(k: str) -> dict:
+            rules = next((a.get("rules") or [] for a in analytics if a.get("kind") == k), [])
+            return {"kind": k, "title": ce.LABELS[k]["title"], "on": k in form["kinds"],
+                    "hint": "Not offered by this camera" if offered is not None and k not in offered
+                    else ce.LABELS[k]["hint"],
+                    "rules": ("Rules: " + ", ".join(str(r.get("name"))[:64] for r in rules[:12])) if rules else ""}
+
+        shown = [k for k in ce.ANALYTICS_KINDS if (offered is not None and k in offered) or k in form["kinds"]]
         return {
             **form,
             "hasHost": bool(cam.get("onvif_host")),
@@ -302,9 +313,12 @@ class CameraDetailStore(BaseStore):
             "detecting": self._events_detecting,
             "tone": line["tone"],
             "text": line["text"],
-            "rows": [{"kind": k, "title": ce.LABELS[k]["title"], "on": k in form["kinds"],
-                      "hint": "Not offered by this camera" if offered is not None and k not in offered
-                      else ce.LABELS[k]["hint"]} for k in ce.KINDS],
+            "rows": [row(k) for k in ce.KINDS],
+            "analyticsRows": [row(k) for k in shown],
+            "otherAnalyticsRows": [row(k) for k in ce.ANALYTICS_KINDS if k not in shown],
+            "otherAnalyticsTitle": "Not offered by this camera" if offered is not None else "All analytics kinds",
+            "analyticsNote": "" if shown else ("This camera offers no analytics." if offered is not None
+                                               else "Press Detect to see which analytics the camera offers."),
             "offeredText": (", ".join(ce.kind_title(k) for k in offered) or "None of these events")
             if offered is not None else "Not detected yet",
             "topics": [{"kind": k, "title": ce.kind_title(k), "topic": t}
@@ -362,6 +376,7 @@ class CameraDetailStore(BaseStore):
                 return
             self._events_detecting = False
             self._events_all_topics = sorted(probe.get("all_topics") or [])
+            self._events_analytics = probe.get("analytics") or []
             self.eventsChanged.emit()
             self.refresh()  # central saved what the camera offers into the status
 

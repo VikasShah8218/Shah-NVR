@@ -69,3 +69,18 @@ test("event markers: moment, range, ongoing; click plays from the pre-event seco
   assert.ok(open.label?.endsWith("(ongoing)"))
   assert.equal(eventTypeLabel("onvif_line.crossing"), "Onvif line crossing")
 })
+
+test("analytics events: colours, titles, no doubled title, groups", async () => {
+  const { eventMarker, eventText, eventColor, EVENT_TYPE_GROUPS } = await import("../src/features/playback/markers.ts")
+  assert.equal(eventColor("line_crossing"), "#d946ef")
+  assert.equal(eventText({ type: "line_crossing", label: "Line crossing · Gate line ×3" }), "Line crossing · Gate line ×3")
+  assert.equal(eventText({ type: "digital_input", label: "Input DI1" }), "Input DI1")  // was "Input: Input DI1"
+  assert.equal(eventText({ type: "manual", label: "Gate open" }), "Marked: Gate open")
+  assert.equal(eventText({ type: "intrusion", label: null }), "Intrusion")
+  const m = eventMarker({ id: 1, type: "intrusion", start_time: "2026-11-26T10:00:00Z", end_time: "2026-11-26T10:00:05Z",
+    label: "Intrusion · Parking", pre_seconds: 10 })
+  assert.equal(m.label, "Intrusion · Parking")
+  assert.equal(m.color, "#e11d48")
+  const analytics = EVENT_TYPE_GROUPS.find((g) => g.group === "analytics")!
+  assert.equal(analytics.types.length, 8)
+})

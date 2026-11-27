@@ -8,7 +8,10 @@ Rules:
 - a wrong login stops the camera's task until its settings change or 30 min pass (D4: accounts lock);
 - a start within `post` seconds of the last end of the same thing reopens that event (D7: flapping motion);
 - an event still on after `max` seconds is closed and a new one opened at once (D7: busy scenes keep recording);
-- event time = camera time minus its clock offset, or our receive time if that is more than 5 s off (D8).
+- event time = camera time minus its clock offset, or our receive time if that is more than 5 s off (D8);
+- analytics (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A4): moments of one kind + rule within `post` seconds join one event
+  ("Line crossing ×12"); above ONVIF_ANALYTICS_PER_MINUTE new events per kind a minute, events are counted, not
+  stored, and the status detail says "busy".
 """
 
 from __future__ import annotations
@@ -16,13 +19,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from app.events.models import EventWindow
 from app.events.services import add_event, end_event
 from app.node.utils import runtime
-from app.onvif.event_topics import KINDS, Edge, EdgeTracker, kind_topics, offered_kinds, topic_filter, topics_text
+from app.onvif.event_analytics import ANALYTICS_KINDS, label as analytics_label
+from app.onvif.event_topics import ALL_KINDS, KINDS, Edge, EdgeTracker, kind_topics, offered_kinds, topic_filter, topics_text
 from app.onvif.events import EventClient, InvalidFilter, Subscription
 from app.onvif.services import OnvifDevice
 from app.onvif.soap import NotAuthorized, NotSupported, OnvifError, Unreachable
@@ -32,7 +37,7 @@ from utilities.common import utcnow
 
 logger = logging.getLogger("node.onvif.events")
 
-NODE_TYPES = KINDS + ("onvif",)
+NODE_TYPES = ALL_KINDS + ("onvif",)
 TERMINATION_SECONDS = 60
 AUTH_RETRY_SECONDS = 1800
 NO_TOPICS_RETRY_SECONDS = 600
@@ -54,7 +59,7 @@ def config_of(camera_id: int, cam: dict) -> WatchConfig | None:
     ev = cam.get("onvif_events")
     if not ev or not cam.get("onvif_host"):
         return None
-    kinds = tuple(k for k in (ev.get("kinds") or KINDS) if k in KINDS)
+    kinds = tuple(k for k in (ev.get("kinds") or KINDS) if k in ALL_KINDS)  # null = the basic kinds (A5)
     if not kinds and not ev.get("store_other"):
         return None
     return WatchConfig(camera_id, cam["onvif_host"], int(cam.get("onvif_port") or 80), ev.get("username") or "",
@@ -103,6 +108,9 @@ class EventState:
 
     open: dict[str, EventWindow] = field(default_factory=dict)
     closed: dict[str, EventWindow] = field(default_factory=dict)
+    recent: dict[str, deque] = field(default_factory=dict)  # analytics: times of new events per kind (A4 cap)
+    dropped: int = 0  # analytics events not stored in the last minute (over the cap)
+    dropped_at: float = 0.0
 
 
 def event_time(camera_time: datetime | None, offset: float, now: datetime) -> datetime:
@@ -110,6 +118,41 @@ def event_time(camera_time: datetime | None, offset: float, now: datetime) -> da
         return now
     t = camera_time - timedelta(seconds=offset)
     return t if abs(t - now) <= TIME_TOLERANCE else now
+
+
+def over_cap(camera_id: int, kind: str, st: EventState, mono: float | None = None) -> bool:
+    """A new analytics event: True if this kind already made ONVIF_ANALYTICS_PER_MINUTE in the last minute (A4)."""
+    mono = time.monotonic() if mono is None else mono
+    if st.dropped and mono - st.dropped_at > 60:  # a quiet minute: not busy any more
+        st.dropped = 0
+        _set_detail(camera_id, None)
+    if kind not in ANALYTICS_KINDS:
+        return False
+    q = st.recent.setdefault(kind, deque())
+    while q and mono - q[0] > 60:
+        q.popleft()
+    if len(q) >= settings.ONVIF_ANALYTICS_PER_MINUTE:
+        st.dropped += 1
+        st.dropped_at = mono
+        _set_detail(camera_id, f"busy: {st.dropped} analytics event(s) not stored (over "
+                               f"{settings.ONVIF_ANALYTICS_PER_MINUTE} a minute)")
+        return True
+    q.append(mono)
+    return False
+
+
+def _set_detail(camera_id: int, detail: str | None) -> None:
+    cur = _status.get(camera_id)
+    if cur is not None and cur.get("state") == "ok" and cur.get("detail") != detail:
+        set_status(camera_id, "ok", detail=detail)
+
+
+def _merge_moment(w: EventWindow, edge: Edge) -> None:
+    """Another moment of the same kind + rule within post: count it on the event, newest details win (A4)."""
+    count = int((w.data or {}).get("count") or 1) + 1
+    w.data = {**(w.data or {}), **edge.data, "count": count}
+    if edge.kind in ANALYTICS_KINDS:
+        w.label = analytics_label(edge.kind, w.data, count)
 
 
 async def apply_edge(camera_id: int, edge: Edge, at: datetime, st: EventState) -> None:
@@ -127,7 +170,11 @@ async def apply_edge(camera_id: int, edge: Edge, at: datetime, st: EventState) -
             await reopen_event(last)
             st.open[edge.key] = st.closed.pop(edge.key)
         else:
+            if edge.kind in ANALYTICS_KINDS:
+                _merge_moment(last, edge)
             await end_event(_reopened(last), at)
+        return
+    if over_cap(camera_id, edge.kind, st):
         return
     w = await add_event(camera_id, edge.kind, at, at if edge.action == "moment" else None, edge.label, edge.data)
     _status.get(camera_id, {}).update(last_event_at=at.isoformat(), sent=False)
@@ -239,7 +286,7 @@ class CameraWatch:
         if not chosen and not cfg.store_other:
             set_status(cfg.camera_id, "no_topics", detail="the camera offers none of the chosen event kinds", **info)
             raise _NoTopics
-        if tracker is None or tracker.kind_of != EdgeTracker(chosen).kind_of:
+        if tracker is None or tracker.signature != EdgeTracker(chosen).signature:
             tracker = EdgeTracker(chosen, cfg.store_other)
         filt = None if cfg.store_other else topic_filter(chosen, offered)
         try:

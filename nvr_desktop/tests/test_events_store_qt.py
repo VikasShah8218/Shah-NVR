@@ -98,13 +98,40 @@ def test_markers_follow_camera_day_and_view(make):
 def test_list_scope_type_and_paging(make):
     s, api, _p, _t, _b = make()
     s.refreshList()
-    assert api.calls[-1] == {"camera_id": 1, "types": None, "order": "desc", "limit": es.PANEL_LIMIT, "offset": 0}
+    assert api.calls[-1] == {"camera_id": 1, "q": None, "order": "desc", "limit": es.PANEL_LIMIT, "offset": 0}
     assert s.total == 2 and s.rows[0]["title"] == "Marked" and s.rows[1]["duration"] == "ongoing"
     s.setScope("all")
     assert api.calls[-1]["camera_id"] is None
     s.setType("video_loss")
     assert api.calls[-1]["types"] == ["video_loss"]
-    assert s.typeOptions[0] == {"value": "", "label": "All types"} and {"value": "video_loss", "label": "Video loss"} in s.typeOptions
+    assert s.typeOptions[0] == {"value": "", "label": "All types"}
+    assert {"value": "video_loss", "label": "    Video loss"} in s.typeOptions
+
+
+def test_analytics_group_and_search(make):
+    """docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A9: "All analytics" sends group=analytics; the search box sends q."""
+    s, api, _p, _t, _b = make()
+    s.setType("group:analytics")
+    assert api.calls[-1]["group"] == "analytics" and "types" not in api.calls[-1]
+    assert {"value": "group:analytics", "label": "All analytics"} in s.typeOptions
+    assert {"value": "line_crossing", "label": "    Line crossing"} in s.typeOptions
+    s.setSearch("  Gate line ")
+    assert s.search == "  Gate line "
+    s._apply_search()  # the 300 ms debounce, now
+    assert api.calls[-1]["q"] == "Gate line" and api.calls[-1]["group"] == "analytics"
+    n = len(api.calls)
+    s._apply_search()  # unchanged: no new request
+    assert len(api.calls) == n
+
+
+def test_analytics_rows_and_bookmark_note():
+    row = es.event_row({"id": 5, "camera_id": 1, "type": "line_crossing", "label": "Line crossing · Gate line ×3",
+                        "start_time": "2026-11-26T10:00:00Z", "end_time": "2026-11-26T10:00:05Z", "pre_seconds": 10,
+                        "data": {"direction": "LeftToRight", "count": 3}})
+    assert row["title"] == "Line crossing · Gate line ×3" and row["color"] == "#d946ef"
+    assert row["details"] == "Direction: LeftToRight"
+    assert es.bookmark_body(row)["note"] == "Line crossing · Gate line ×3"
+    assert es.event_row({**row, "type": "manual", "label": "Gate", "data": None})["title"] == "Marked: Gate"
 
 
 def test_no_reads_without_playback_permission(make):

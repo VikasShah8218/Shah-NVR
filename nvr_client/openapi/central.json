@@ -2753,6 +2753,48 @@
             }
           },
           {
+            "name": "group",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "camera",
+                    "analytics",
+                    "operator"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A type group",
+              "title": "Group"
+            },
+            "description": "A type group"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Label contains (case-insensitive): rule, object",
+              "title": "Q"
+            },
+            "description": "Label contains (case-insensitive): rule, object"
+          },
+          {
             "name": "order",
             "in": "query",
             "required": false,
@@ -6367,6 +6409,60 @@
         ],
         "title": "AlertPage"
       },
+      "AnalyticsKindOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Topics",
+            "default": []
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsRuleOut"
+            },
+            "type": "array",
+            "title": "Rules",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "AnalyticsKindOut",
+        "description": "docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A7: an analytics kind the camera offers and its configured rules."
+      },
+      "AnalyticsRuleOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "AnalyticsRuleOut"
+      },
       "ApplyIn": {
         "properties": {
           "mode": {
@@ -7930,7 +8026,15 @@
                   "enum": [
                     "motion",
                     "tamper",
-                    "digital_input"
+                    "digital_input",
+                    "line_crossing",
+                    "intrusion",
+                    "loitering",
+                    "object_left",
+                    "person",
+                    "face",
+                    "counting",
+                    "audio_alarm"
                   ]
                 },
                 "type": "array"
@@ -8583,7 +8687,15 @@
                   "enum": [
                     "motion",
                     "tamper",
-                    "digital_input"
+                    "digital_input",
+                    "line_crossing",
+                    "intrusion",
+                    "loitering",
+                    "object_left",
+                    "person",
+                    "face",
+                    "counting",
+                    "audio_alarm"
                   ]
                 },
                 "type": "array"
@@ -10096,6 +10208,14 @@
             },
             "type": "array",
             "title": "All Topics"
+          },
+          "analytics": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsKindOut"
+            },
+            "type": "array",
+            "title": "Analytics",
+            "default": []
           }
         },
         "type": "object",
@@ -10192,7 +10312,15 @@
                   "enum": [
                     "motion",
                     "tamper",
-                    "digital_input"
+                    "digital_input",
+                    "line_crossing",
+                    "intrusion",
+                    "loitering",
+                    "object_left",
+                    "person",
+                    "face",
+                    "counting",
+                    "audio_alarm"
                   ]
                 },
                 "type": "array"

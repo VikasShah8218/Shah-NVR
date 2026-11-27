@@ -336,7 +336,7 @@ class CentralApi:
     # ------------------------------------------------------------------ events
     def events(self, *, camera_id: int | None = None, types: list[str] | None = None, start: datetime | None = None,
                end: datetime | None = None, order: str = "desc", limit: int = 200,
-               offset: int = 0) -> tuple[list[NvrEvent], int]:
+               offset: int = 0, group: str | None = None, q: str | None = None) -> tuple[list[NvrEvent], int]:
         """Events overlapping [start, end) (open ones too), newest first by default. Returns (events, total)."""
         params: dict = {"order": order, "limit": limit}
         if offset:
@@ -345,6 +345,10 @@ class CentralApi:
             params["camera_id"] = camera_id
         if types:
             params["type"] = ",".join(types)
+        if group:
+            params["group"] = group  # camera | analytics | operator
+        if q:
+            params["q"] = q[:64]  # label contains (rule, object)
         if start is not None:
             params["start"] = start.isoformat()
         if end is not None:

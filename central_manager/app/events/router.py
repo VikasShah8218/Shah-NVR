@@ -17,6 +17,14 @@ from utilities.common import utcnow
 from utilities.pagination import Page
 
 router = APIRouter(prefix="/api/v1", tags=["Events"])
+
+# Type groups for the Events page filter (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A9)
+TYPE_GROUPS = {
+    "camera": ("motion", "tamper", "digital_input", "video_loss", "video_restored", "onvif"),
+    "analytics": ("line_crossing", "intrusion", "loitering", "object_left", "person", "face", "counting",
+                  "audio_alarm"),
+    "operator": ("manual", "api"),
+}
 internal_router = APIRouter(prefix="/internal/v1/nodes", tags=["Internal (media nodes)"])
 
 
@@ -45,6 +53,8 @@ async def list_events(
     type: str | None = Query(default=None, description="One type or several, comma separated"),
     start: datetime | None = Query(default=None, description="Only events overlapping [start, end)"),
     end: datetime | None = None,
+    group: Literal["camera", "analytics", "operator"] | None = Query(default=None, description="A type group"),
+    q: str | None = Query(default=None, max_length=64, description="Label contains (case-insensitive): rule, object"),
     order: Literal["asc", "desc"] = Query(default="desc", description="By start time; desc = newest first"),
     limit: int = Query(default=200, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
@@ -57,6 +67,10 @@ async def list_events(
     if type:
         types = [t.strip() for t in type.split(",") if t.strip()]
         qs = qs.filter(type__in=types)
+    if group:
+        qs = qs.filter(type__in=list(TYPE_GROUPS[group]))
+    if q and q.strip():
+        qs = qs.filter(label__icontains=q.strip())
     start, end = _utc(start), _utc(end)
     if start is not None and end is not None and end <= start:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "end must be after start")

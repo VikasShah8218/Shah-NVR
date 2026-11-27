@@ -5,7 +5,8 @@ import "../../theme"
 import "../../components"
 
 // Camera events from ONVIF (port of nvr_client/src/features/cameras/CameraEventsTab.tsx;
-// docs/DESKTOP_ONVIF_EVENTS_PLAN.md): switch, kinds, "store other", Save, Detect, status line.
+// docs/DESKTOP_ONVIF_EVENTS_PLAN.md, docs/ONVIF_ANALYTICS_EVENTS_PLAN.md §8): switch, kinds, analytics (opt-in, with the
+// camera's rules after Detect), "store other", Save, Detect, status line.
 // The draft and the status live in CameraDetail.events.
 ColumnLayout {
     id: root
@@ -18,6 +19,7 @@ ColumnLayout {
         id: row
         property string title: ""
         property string hint: ""
+        property string rules: ""
         property bool checked: false
         property bool active: true
         property string name: ""
@@ -40,6 +42,7 @@ ColumnLayout {
                 spacing: 2
                 AppText { text: row.title; Layout.fillWidth: true }
                 AppText { visible: row.hint !== ""; text: row.hint; variant: "small"; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                AppText { visible: row.rules !== ""; text: row.rules; variant: "small"; elide: Text.ElideRight; Layout.fillWidth: true }
             }
             AppSwitch {
                 objectName: row.name
@@ -106,10 +109,64 @@ ColumnLayout {
                         onToggled: on => CameraDetail.setEventKind(modelData.kind, on)
                     }
                 }
+                AppText { text: "ANALYTICS"; variant: "small"; font.weight: Font.DemiBold; Layout.topMargin: 6 }
+                AppText {
+                    visible: (root.ev.analyticsNote ?? "") !== ""
+                    text: root.ev.analyticsNote ?? ""
+                    variant: "small"
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+                Repeater {
+                    model: root.ev.analyticsRows ?? []
+                    delegate: SwitchRow {
+                        required property var modelData
+                        name: "cameraEventKind_" + modelData.kind
+                        title: modelData.title
+                        hint: modelData.hint
+                        rules: modelData.rules
+                        checked: modelData.on
+                        active: root.ev.enabled
+                        onToggled: on => CameraDetail.setEventKind(modelData.kind, on)
+                    }
+                }
+                ColumnLayout {
+                    id: otherAnalytics
+                    property bool open: false
+                    visible: (root.ev.otherAnalyticsRows ?? []).length > 0
+                    Layout.fillWidth: true
+                    spacing: 8
+                    Row {
+                        objectName: "otherAnalyticsToggle"
+                        spacing: 4
+                        Icon { name: otherAnalytics.open ? "chevron-down" : "chevron-right"; size: 14; color: Theme.mutedForeground; anchors.verticalCenter: parent.verticalCenter }
+                        AppText { text: (root.ev.otherAnalyticsTitle ?? "") + " (" + (root.ev.otherAnalyticsRows ?? []).length + ")"; variant: "small" }
+                        HoverHandler { cursorShape: Qt.PointingHandCursor }
+                        TapHandler { onTapped: otherAnalytics.open = !otherAnalytics.open }
+                    }
+                    Repeater {
+                        model: otherAnalytics.open ? root.ev.otherAnalyticsRows : []
+                        delegate: SwitchRow {
+                            required property var modelData
+                            name: "cameraEventKind_" + modelData.kind
+                            title: modelData.title
+                            hint: modelData.hint
+                            checked: modelData.on
+                            active: root.ev.enabled
+                            onToggled: on => CameraDetail.setEventKind(modelData.kind, on)
+                        }
+                    }
+                }
+                AppText {
+                    text: "Analytics are off until you switch them on. Set up lines and zones in the camera's own web page."
+                    variant: "small"
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
                 SwitchRow {
                     name: "cameraEventsStoreOther"
                     title: "Also store other camera events"
-                    hint: "Any other event the camera sends (analytics…), as a grey \"Camera event\" mark. PTZ and health messages are never stored."
+                    hint: "Any other event the camera sends, as a grey \"Camera event\" mark. PTZ and health messages are never stored."
                     checked: root.ev.storeOther
                     active: root.ev.enabled
                     onToggled: on => CameraDetail.setEventsStoreOther(on)

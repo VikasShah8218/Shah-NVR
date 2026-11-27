@@ -1666,6 +1666,31 @@ export interface components {
             counts: components["schemas"]["AlertCounts"];
         };
         /**
+         * AnalyticsKindOut
+         * @description docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A7: an analytics kind the camera offers and its configured rules.
+         */
+        AnalyticsKindOut: {
+            /** Kind */
+            kind: string;
+            /**
+             * Topics
+             * @default []
+             */
+            topics: string[];
+            /**
+             * Rules
+             * @default []
+             */
+            rules: components["schemas"]["AnalyticsRuleOut"][];
+        };
+        /** AnalyticsRuleOut */
+        AnalyticsRuleOut: {
+            /** Name */
+            name: string;
+            /** Type */
+            type?: string | null;
+        };
+        /**
          * ApplyIn
          * @description Set the recording mode of many cameras: listed ones, a group (optionally with its sub-groups), or both.
          */
@@ -2149,7 +2174,7 @@ export interface components {
              */
             onvif_events_enabled: boolean;
             /** Onvif Event Kinds */
-            onvif_event_kinds?: ("motion" | "tamper" | "digital_input")[] | null;
+            onvif_event_kinds?: ("motion" | "tamper" | "digital_input" | "line_crossing" | "intrusion" | "loitering" | "object_left" | "person" | "face" | "counting" | "audio_alarm")[] | null;
             /**
              * Onvif Events Store Other
              * @default false
@@ -2327,7 +2352,7 @@ export interface components {
             /** Onvif Events Enabled */
             onvif_events_enabled?: boolean | null;
             /** Onvif Event Kinds */
-            onvif_event_kinds?: ("motion" | "tamper" | "digital_input")[] | null;
+            onvif_event_kinds?: ("motion" | "tamper" | "digital_input" | "line_crossing" | "intrusion" | "loitering" | "object_left" | "person" | "face" | "counting" | "audio_alarm")[] | null;
             /** Onvif Events Store Other */
             onvif_events_store_other?: boolean | null;
         };
@@ -2848,6 +2873,11 @@ export interface components {
             };
             /** All Topics */
             all_topics: string[];
+            /**
+             * Analytics
+             * @default []
+             */
+            analytics: components["schemas"]["AnalyticsKindOut"][];
         };
         /**
          * EventWindow
@@ -2891,7 +2921,7 @@ export interface components {
             /** Enabled */
             enabled: boolean;
             /** Kinds */
-            kinds?: ("motion" | "tamper" | "digital_input")[] | null;
+            kinds?: ("motion" | "tamper" | "digital_input" | "line_crossing" | "intrusion" | "loitering" | "object_left" | "person" | "face" | "counting" | "audio_alarm")[] | null;
             /** Store Other */
             store_other?: boolean | null;
             /** Camera Ids */
@@ -6225,6 +6255,10 @@ export interface operations {
                 /** @description Only events overlapping [start, end) */
                 start?: string | null;
                 end?: string | null;
+                /** @description A type group */
+                group?: ("camera" | "analytics" | "operator") | null;
+                /** @description Label contains (case-insensitive): rule, object */
+                q?: string | null;
                 /** @description By start time; desc = newest first */
                 order?: "asc" | "desc";
                 limit?: number;

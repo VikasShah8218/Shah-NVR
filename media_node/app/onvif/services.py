@@ -289,6 +289,22 @@ class OnvifDevice:
                     p[k] = rehost(p[k], self.host)
         return profiles
 
+    async def analytics_rules(self) -> list[dict]:
+        """The rules of the camera's analytics configurations ([{"name", "type"}], read-only; Media1
+        GetVideoAnalyticsConfigurations). [] when the camera has none or refuses (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A7)."""
+        url = (await self.services()).get(NS["trt"]) or self.device_url
+        try:
+            reply = await self.soap.call(url, "<trt:GetVideoAnalyticsConfigurations/>")
+        except (NotSupported, Fault):
+            return []
+        out, seen = [], set()
+        for el in reply.iter(f"{{{NS['tt']}}}Rule"):
+            name, type_ = (el.get("Name") or "")[:64], (el.get("Type") or "")[:64]
+            if name and (name, type_) not in seen:
+                seen.add((name, type_))
+                out.append({"name": name, "type": type_})
+        return out[:64]
+
     async def _uri(self, url: str, body: str) -> str | None:
         try:
             return parse_uri(await self.soap.call(url, body))

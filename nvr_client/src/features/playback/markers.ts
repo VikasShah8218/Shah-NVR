@@ -70,6 +70,15 @@ export const EVENT_COLORS: Record<string, string> = {
   tamper: "#f97316",
   digital_input: "#14b8a6",
   onvif: "#94a3b8",
+  // camera analytics (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md §1)
+  line_crossing: "#d946ef",
+  intrusion: "#e11d48",
+  loitering: "#0ea5e9",
+  object_left: "#84cc16",
+  person: "#22c55e",
+  face: "#ec4899",
+  counting: "#64748b",
+  audio_alarm: "#eab308",
 }
 export const EVENT_LABELS: Record<string, string> = {
   manual: "Marked",
@@ -79,6 +88,27 @@ export const EVENT_LABELS: Record<string, string> = {
   tamper: "Tamper",
   digital_input: "Input",
   onvif: "Camera event",
+  line_crossing: "Line crossing",
+  intrusion: "Intrusion",
+  loitering: "Loitering",
+  object_left: "Object left",
+  person: "Person",
+  face: "Face",
+  counting: "People counting",
+  audio_alarm: "Audio alarm",
+}
+/** Groups of the Events page type filter (central `group=`). */
+export const EVENT_TYPE_GROUPS: { group: "camera" | "analytics" | "operator"; title: string; types: string[] }[] = [
+  { group: "camera", title: "Camera", types: ["motion", "tamper", "digital_input", "video_loss", "onvif"] },
+  { group: "analytics", title: "Analytics", types: ["line_crossing", "intrusion", "loitering", "object_left", "person", "face", "counting", "audio_alarm"] },
+  { group: "operator", title: "Operator", types: ["manual", "api"] },
+]
+
+/** "Line crossing: Gate line" text for an event; analytics labels already start with their type title. */
+export function eventText(e: { type: string; label?: string | null }): string {
+  const title = eventTypeLabel(e.type)
+  if (!e.label) return title
+  return e.label.startsWith(title) ? e.label : `${title}: ${e.label}`
 }
 export const eventColor = (type: string) => EVENT_COLORS[type] ?? "#94a3b8"
 export const eventTypeLabel = (type: string) => EVENT_LABELS[type] ?? type.replace(/[_.:-]+/g, " ").replace(/^\w/, (c) => c.toUpperCase())
@@ -95,7 +125,7 @@ export function eventMarker(
     t,
     endT: end > t ? end : null,
     kind: "event",
-    label: `${eventTypeLabel(e.type)}${e.label ? `: ${e.label}` : ""}${e.end_time ? "" : " (ongoing)"}`,
+    label: `${eventText(e)}${e.end_time ? "" : " (ongoing)"}`,
     color: eventColor(e.type),
     seekT: t - e.pre_seconds * 1000,
   }

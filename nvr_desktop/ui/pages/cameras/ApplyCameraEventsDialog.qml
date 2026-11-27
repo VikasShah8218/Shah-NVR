@@ -14,6 +14,15 @@ AppDialog {
         { kind: "motion", title: "Motion", hint: "The camera's own motion detection" },
         { kind: "tamper", title: "Tamper", hint: "Lens covered, blurred or camera turned" },
         { kind: "digital_input", title: "Digital inputs", hint: "Door contacts, alarm panels, buttons wired to the camera" }]
+    // the camera's own analytics: off by default (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md §11)
+    readonly property var analyticsKinds: [
+        { kind: "line_crossing", title: "Line crossing" }, { kind: "intrusion", title: "Intrusion" },
+        { kind: "loitering", title: "Loitering" }, { kind: "object_left", title: "Object left" },
+        { kind: "person", title: "Person" }, { kind: "face", title: "Face" },
+        { kind: "counting", title: "People counting" }, { kind: "audio_alarm", title: "Audio alarm" }]
+    readonly property var everyKind: allKinds.concat(analyticsKinds).map(k => k.kind)
+    readonly property int analyticsOn: kinds.filter(k => analyticsKinds.some(a => a.kind === k)).length
+    property bool analyticsOpen: false
     property int groupId: 0
     property string groupName: ""
     property var cameraIds: []
@@ -38,12 +47,13 @@ AppDialog {
     function reset() {
         enabledOn = true
         kinds = allKinds.map(k => k.kind)
+        analyticsOpen = false
         includeSubgroups = true
         pending = false
         open()
     }
     function setKind(kind, on) {
-        kinds = allKinds.map(k => k.kind).filter(k => k === kind ? on : kinds.indexOf(k) >= 0)
+        kinds = everyKind.filter(k => k === kind ? on : kinds.indexOf(k) >= 0)
     }
 
     width: Math.min(520, parent ? parent.width - 40 : 520)
@@ -113,6 +123,32 @@ AppDialog {
             hint: modelData.hint
             checked: dialog.kinds.indexOf(modelData.kind) >= 0
             onToggled: on => dialog.setKind(modelData.kind, on)
+        }
+    }
+    Row {
+        objectName: "applyAnalyticsToggle"
+        visible: dialog.enabledOn
+        spacing: 4
+        Icon { name: dialog.analyticsOpen ? "chevron-down" : "chevron-right"; size: 14; color: Theme.mutedForeground; anchors.verticalCenter: parent.verticalCenter }
+        AppText { text: "Analytics " + (dialog.analyticsOn > 0 ? "(" + dialog.analyticsOn + " on)" : "(off)") + " · only cameras that offer a kind send it"; variant: "small" }
+        HoverHandler { cursorShape: Qt.PointingHandCursor }
+        TapHandler { onTapped: dialog.analyticsOpen = !dialog.analyticsOpen }
+    }
+    GridLayout {
+        visible: dialog.enabledOn && dialog.analyticsOpen
+        Layout.fillWidth: true
+        columns: 2
+        columnSpacing: 8
+        rowSpacing: 8
+        Repeater {
+            model: dialog.analyticsKinds
+            delegate: SwitchRow {
+                required property var modelData
+                name: "applyEventKind_" + modelData.kind
+                title: modelData.title
+                checked: dialog.kinds.indexOf(modelData.kind) >= 0
+                onToggled: on => dialog.setKind(modelData.kind, on)
+            }
         }
     }
     SwitchRow {

@@ -1,4 +1,4 @@
-import { BookmarkPlus, Flag, Loader2, Square, Trash2 } from "lucide-react"
+import { BookmarkPlus, Flag, Loader2, Search, Square, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { useCreateBookmark, useCreateEvent, useDeleteEvent, useEndEvent, useEvents } from "@/api/queries"
 import type { NvrEvent } from "@/api/types"
@@ -6,17 +6,30 @@ import { ConfirmDialog, ErrorState } from "@/components/common"
 import { Pager } from "@/components/Pager"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useAuth } from "@/lib/auth/useAuth"
 import { Perm } from "@/lib/auth/permissions"
 import { fmtDateTime } from "@/lib/time"
 import { useClampPage, usePaged } from "@/lib/usePaged"
 import { cn } from "@/lib/utils"
-import { EVENT_LABELS, eventColor, eventTypeLabel } from "../playback/markers"
+import { EVENT_TYPE_GROUPS, eventColor, eventText, eventTypeLabel } from "../playback/markers"
 
 const PER_PAGE = 20
-const TYPES = ["", ...Object.keys(EVENT_LABELS)]
+type Group = (typeof EVENT_TYPE_GROUPS)[number]["group"]
+
+/** Filter value: "" (all), "group:analytics", or one type. */
+const filterParams = (v: string): { type?: string; group?: Group } =>
+  v.startsWith("group:") ? { group: v.slice(6) as Group } : v ? { type: v } : {}
+
+/** Analytics details the label does not show (direction). Camera strings: shown as text only. */
+export function eventDetails(e: NvrEvent): string | null {
+  const d = (e.data ?? {}) as Record<string, unknown>
+  return typeof d.direction === "string" ? `Direction: ${d.direction}` : null
+}
 
 const duration = (e: NvrEvent) => {
   if (!e.end_time) return "ongoing"
@@ -63,7 +76,8 @@ export function EventsPanel({ cameraId, onOpen, allCameras, className }: {
   const end = useEndEvent()
   const bookmark = useCreateBookmark()
   const list = useEvents(
-    { cameraId: scope === "camera" ? cameraId : undefined, type, order: "desc", limit: paged.limit, offset: paged.offset, refetch: 15_000 },
+    { cameraId: scope === "camera" ? cameraId : undefined, ...filterParams(type), q: paged.query, order: "desc",
+      limit: paged.limit, offset: paged.offset, refetch: 15_000 },
     scope === "all" || cameraId != null,
   )
   useClampPage(paged, list.data?.total)
@@ -74,7 +88,7 @@ export function EventsPanel({ cameraId, onOpen, allCameras, className }: {
       camera_id: e.camera_id,
       start_time: e.start_time,
       end_time: e.end_time && e.end_time !== e.start_time ? e.end_time : null,
-      note: e.label ? `${eventTypeLabel(e.type)}: ${e.label}` : eventTypeLabel(e.type),
+      note: eventText(e).slice(0, 500),
       label: "event",
       color: eventColor(e.type),
     })
@@ -87,10 +101,23 @@ export function EventsPanel({ cameraId, onOpen, allCameras, className }: {
           {list.isFetching && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
         </CardTitle>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input value={paged.search} onChange={(ev) => paged.setSearch(ev.target.value)} maxLength={64}
+              placeholder="Search rule, object…" aria-label="Search events" className="h-8 w-44 pl-7 text-sm" />
+          </div>
           <Select value={type || "all"} onValueChange={(v) => { setType(v === "all" ? "" : v); paged.setPage(1) }}>
-            <SelectTrigger size="sm" className="w-40" aria-label="Event type"><SelectValue /></SelectTrigger>
+            <SelectTrigger size="sm" className="w-44" aria-label="Event type"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {TYPES.map((t) => <SelectItem key={t || "all"} value={t || "all"}>{t ? eventTypeLabel(t) : "All types"}</SelectItem>)}
+              <SelectItem value="all">All types</SelectItem>
+              {EVENT_TYPE_GROUPS.map((g) => (
+                <SelectGroup key={g.group}>
+                  <SelectSeparator />
+                  <SelectLabel>{g.title}</SelectLabel>
+                  <SelectItem value={`group:${g.group}`}>All {g.title.toLowerCase()}</SelectItem>
+                  {g.types.map((t) => <SelectItem key={t} value={t}>{eventTypeLabel(t)}</SelectItem>)}
+                </SelectGroup>
+              ))}
             </SelectContent>
           </Select>
           {!allCameras && (
@@ -105,7 +132,7 @@ export function EventsPanel({ cameraId, onOpen, allCameras, className }: {
         {list.error && <ErrorState error={list.error} />}
         {!list.error && rows.length === 0 && (
           <p className="py-2 text-sm text-muted-foreground">
-            {type ? "No events of this type." : "No events yet. Use “Mark event”, or wait for a camera event (e.g. video loss)."}
+            {type || paged.query ? "No matching events." : "No events yet. Use “Mark event”, or wait for a camera event (e.g. video loss)."}
           </p>
         )}
         {rows.map((e) => (
@@ -120,9 +147,8 @@ export function EventsPanel({ cameraId, onOpen, allCameras, className }: {
                   {(scope === "all" || allCameras) && <span className="font-medium text-foreground/80">{e.camera_name}</span>}
                   <span className="truncate">{e.source}</span>
                 </span>
-                <span className="mt-0.5 block break-words text-sm">
-                  {eventTypeLabel(e.type)}{e.label ? `: ${e.label}` : ""}
-                </span>
+                <span className="mt-0.5 block break-words text-sm">{eventText(e)}</span>
+                {eventDetails(e) && <span className="block text-xs text-muted-foreground">{eventDetails(e)}</span>}
               </span>
             </button>
             <div className="flex shrink-0 gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100">

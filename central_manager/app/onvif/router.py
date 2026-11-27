@@ -179,7 +179,7 @@ async def camera_events_probe(camera_id: int):
     _node, result = await _camera_call(camera, "/api/v1/onvif/events/probe")
     status_ = dict(camera.onvif_events_status or {})
     status_.update(topics=result.get("topics") or {}, offered=result.get("offered") or [],
-                   detected_at=utcnow().isoformat())
+                   analytics=result.get("analytics") or [], detected_at=utcnow().isoformat())
     status_.setdefault("state", "detected")
     await Camera.filter(id=camera.id).update(onvif_events_status=status_)
     return {**result, "camera_id": camera.id}

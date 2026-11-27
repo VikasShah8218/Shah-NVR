@@ -526,6 +526,29 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AnalyticsKindOut
+         * @description One analytics kind the camera offers (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A7); rules = the configured ones that
+         *     report it (read-only: set up in the camera's web page).
+         */
+        AnalyticsKindOut: {
+            /** Kind */
+            kind: string;
+            /** Topics */
+            topics: string[];
+            /**
+             * Rules
+             * @default []
+             */
+            rules: components["schemas"]["AnalyticsRuleOut"][];
+        };
+        /** AnalyticsRuleOut */
+        AnalyticsRuleOut: {
+            /** Name */
+            name: string;
+            /** Type */
+            type?: string | null;
+        };
         /** ClockOut */
         ClockOut: {
             /** Offset Seconds */
@@ -805,6 +828,11 @@ export interface components {
             };
             /** All Topics */
             all_topics: string[];
+            /**
+             * Analytics
+             * @default []
+             */
+            analytics: components["schemas"]["AnalyticsKindOut"][];
         };
         /** EventWindowIn */
         EventWindowIn: {

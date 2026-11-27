@@ -144,3 +144,62 @@ def test_detect_asks_the_node_and_saves_what_the_camera_offers(monkeypatch):
                                                          "password": "pw"})]
         status = c.get(f"/api/v1/cameras/{cam['id']}").json()["onvif_events_status"]
         assert status["state"] == "detected" and status["offered"] == ["tamper", "digital_input"]
+
+
+# ---------------------------------------------------------------- analytics (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md)
+
+
+def test_analytics_kinds_are_opt_in_and_null_stays_basic():
+    with _client() as c:
+        cam = _camera(c, "Yard", onvif_events_enabled=True)
+        node = _node(c)
+        _assign(c, cam["id"], node)
+        _onvif_host(c, cam["id"])
+        assert _payload(c, node)[cam["id"]]["kinds"] == ["motion", "tamper", "digital_input"]  # null: no analytics (A5)
+        r = c.patch(f"/api/v1/cameras/{cam['id']}",
+                    json={"onvif_event_kinds": ["motion", "line_crossing", "intrusion", "audio_alarm"]})
+        assert r.status_code == 200, r.text
+        assert _payload(c, node)[cam["id"]]["kinds"] == ["motion", "line_crossing", "intrusion", "audio_alarm"]
+        assert c.patch(f"/api/v1/cameras/{cam['id']}", json={"onvif_event_kinds": ["vehicle"]}).status_code == 422
+        r = c.post("/api/v1/onvif/events/apply", json={"enabled": True, "kinds": ["loitering"], "camera_ids": [cam["id"]]})
+        assert r.json() == {"updated": 1}
+        assert c.get(f"/api/v1/cameras/{cam['id']}").json()["onvif_event_kinds"] == ["loitering"]
+
+
+def test_analytics_busy_status_is_a_warning():
+    with _client() as c:
+        cam = _camera(c, "Gate", onvif_events_enabled=True)
+        node = _node(c)
+        _assign(c, cam["id"], node)
+        _onvif_host(c, cam["id"])
+        c.post(f"/internal/v1/nodes/{node}/heartbeat", json={"onvif_events": [
+            {"camera_id": cam["id"], "state": "ok", "detail": "busy: 12 analytics event(s) not stored (over 30 a minute)"}]})
+        mine = [a for a in c.get("/api/v1/cluster/alerts").json()["items"] if a["kind"] == "camera_events"]
+        assert len(mine) == 1 and mine[0]["title"] == "Gate: camera analytics busy"
+        assert mine[0]["detail"].startswith("busy: 12")
+
+
+def test_detect_saves_the_analytics_and_rules(monkeypatch):
+    async def call_node(node, path, json=None, *, timeout=30.0, raw=False):
+        return {"offered": ["motion", "line_crossing", "intrusion"],
+                "topics": {"motion": "tns1:VideoSource/MotionAlarm",
+                           "line_crossing": "tns1:RuleEngine/LineDetector/Crossed"},
+                "all_topics": [],
+                "analytics": [{"kind": "line_crossing", "topics": ["tns1:RuleEngine/LineDetector/Crossed"],
+                               "rules": [{"name": "Gate line", "type": "tt:LineDetector"}]},
+                              {"kind": "intrusion", "topics": ["tns1:RuleEngine/FieldDetector/ObjectsInside"],
+                               "rules": []}]}
+
+    async def pick_node(**kw):
+        return MediaNode(id=1, name="n1", api_url="http://n1:7100", media_host="n1")
+
+    monkeypatch.setattr(onvif, "call_node", call_node)
+    monkeypatch.setattr(onvif, "pick_node", pick_node)
+    with _client() as c:
+        cam = _camera(c, "ISIN")
+        _onvif_host(c, cam["id"])
+        r = c.post(f"/api/v1/onvif/cameras/{cam['id']}/events/probe")
+        assert r.status_code == 200, r.text
+        assert r.json()["analytics"][0]["rules"] == [{"name": "Gate line", "type": "tt:LineDetector"}]
+        status = c.get(f"/api/v1/cameras/{cam['id']}").json()["onvif_events_status"]
+        assert [a["kind"] for a in status["analytics"]] == ["line_crossing", "intrusion"]

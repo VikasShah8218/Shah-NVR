@@ -15,7 +15,7 @@ PageScroll {
 
     PageHeader {
         title: "Events"
-        description: "Marked events, other systems' events and video loss, newest first. Click one to play it."
+        description: "Camera events (motion, analytics…), marked events and video loss, newest first. Click one to play it."
         AppButton { text: "Refresh"; variant: "outline"; iconName: "refresh-cw"; onClicked: Events.refreshList() }
     }
 

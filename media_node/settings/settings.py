@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     ONVIF_EVENTS_CONCURRENCY: int = 20
     ONVIF_EVENTS_PULL_SECONDS: int = 10
     ONVIF_EVENTS_RENEW_SECONDS: int = 30
+    # Camera analytics (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A4): new events per kind per minute per camera; above it
+    # they are counted, not stored, and the status says "busy"
+    ONVIF_ANALYTICS_PER_MINUTE: int = 30
     BACKFILL_INTERVAL_SECONDS: float = 5
     EXPORT_INTERVAL_SECONDS: float = 3
     EXPORT_FILE_TTL_HOURS: int = 24

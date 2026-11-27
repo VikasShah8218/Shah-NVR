@@ -14,15 +14,15 @@ from __future__ import annotations
 import time
 from datetime import datetime, timezone
 
-from PySide6.QtCore import Property, Signal, Slot
+from PySide6.QtCore import Property, QTimer, Signal, Slot
 
 from app.core.auth.permissions import Perm
 from app.core.context import AppContext
 from app.core.paging import clamp_page, offset_for
 from app.core.poller import Poller
 from app.core.store import BaseStore
-from app.features.playback.markers import (EVENT_LABELS, event_color, event_marker, event_type_label,
-                                           place_markers)
+from app.features.playback.markers import (EVENT_TYPE_GROUPS, event_color, event_marker, event_text,
+                                           event_type_label, place_markers)
 from app.features.playback.timeline import DAY
 
 PANEL_LIMIT = 25
@@ -51,19 +51,40 @@ def _ms(value) -> float:
     return to_ms(value)
 
 
+def event_details(e: dict) -> str:
+    """What the label does not show (analytics direction). Camera text: shown as plain text only."""
+    d = e.get("data") or {}
+    return f"Direction: {str(d['direction'])[:64]}" if isinstance(d, dict) and isinstance(d.get("direction"), str) else ""
+
+
+def type_options() -> list[dict]:
+    """The type filter: all, then per group "All <group>" and its types (value "group:<name>" or a type)."""
+    out = [{"value": "", "label": "All types"}]
+    for group, title, types in EVENT_TYPE_GROUPS:
+        out.append({"value": f"group:{group}", "label": f"All {title.lower()}"})
+        out += [{"value": t, "label": "    " + event_type_label(t)} for t in types]
+    return out
+
+
+def filter_params(value: str) -> dict:
+    """Filter value -> events() keywords."""
+    if value.startswith("group:"):
+        return {"group": value[6:]}
+    return {"types": [value]} if value else {}
+
+
 def event_row(e: dict, now_ms: float | None = None) -> dict:
     m = event_marker(e, now_ms if now_ms is not None else time.time() * 1000)
     return {**e, "startMs": m["t"], "seekMs": m["seek_t"], "color": m["color"], "typeLabel": event_type_label(e["type"]),
-            "title": event_type_label(e["type"]) + (f": {e['label']}" if e.get("label") else ""),
+            "title": event_text(e), "details": event_details(e),
             "duration": duration_text(e), "ongoing": not e.get("end_time")}
 
 
 def bookmark_body(e: dict) -> dict:
     """"Save as bookmark": the event's time and a note from its type and label (same as the web)."""
     start, end = e["start_time"], e.get("end_time")
-    type_label = event_type_label(e["type"])
     return {"camera_id": e["camera_id"], "start_time": start, "end_time": end if end and end != start else None,
-            "note": f"{type_label}: {e['label']}" if e.get("label") else type_label,
+            "note": event_text(e)[:500],
             "label": "event", "color": event_color(e["type"])}
 
 
@@ -80,6 +101,12 @@ class EventsStore(BaseStore):
         self._rows: list[dict] = []
         self._scope = "camera"  # camera | all
         self._type = ""
+        self._search = ""
+        self._query = ""  # the search, debounced
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(300)
+        self._search_timer.timeout.connect(self._apply_search)
         self._page = 1
         self._total = 0
         self._list_key = None
@@ -139,25 +166,25 @@ class EventsStore(BaseStore):
         if not self._may_read():
             self._set_loading(False)
             return
-        scope, type_, cid = self._scope, self._type, self._camera_id()
+        scope, type_, cid, query = self._scope, self._type, self._camera_id(), self._query
         if scope == "camera" and not cid:
             self._rows, self._total = [], 0
             self.rowsChanged.emit()
             self._set_loading(False)
             return
-        key = (scope, type_, cid)
+        key = (scope, type_, cid, query)
         if key != self._list_key:
             self._list_key, self._page = key, 1
         page = self._page
 
         def load():
-            rows, total = self.api.events(camera_id=cid if scope == "camera" else None,
-                                          types=[type_] if type_ else None, order="desc", limit=PANEL_LIMIT,
+            rows, total = self.api.events(camera_id=cid if scope == "camera" else None, **filter_params(type_),
+                                          q=query or None, order="desc", limit=PANEL_LIMIT,
                                           offset=offset_for(page, PANEL_LIMIT))
             return [event_row(e.to_qml()) for e in rows], total
 
         def apply(result):
-            if key != (self._scope, self._type, self._camera_id()) or page != self._page:
+            if key != (self._scope, self._type, self._camera_id(), self._query) or page != self._page:
                 self.refreshList()  # filter or page changed while loading
                 return
             self._rows, self._total = result
@@ -189,6 +216,19 @@ class EventsStore(BaseStore):
         if type_ != self._type:
             self._type = type_
             self.filterChanged.emit()
+            self.refreshList()
+
+    @Slot(str)
+    def setSearch(self, text: str) -> None:
+        """Search box (rule name, object…): applied 300 ms after the last key."""
+        if text != self._search:
+            self._search = text[:64]
+            self.filterChanged.emit()
+            self._search_timer.start()
+
+    def _apply_search(self) -> None:
+        if self._search.strip() != self._query:
+            self._query = self._search.strip()
             self.refreshList()
 
     # ------------------------------------------------------------------ actions
@@ -237,5 +277,5 @@ class EventsStore(BaseStore):
     pageSize = Property(int, lambda self: PANEL_LIMIT, constant=True)
     scope = Property(str, lambda self: self._scope, notify=filterChanged)
     type = Property(str, lambda self: self._type, notify=filterChanged)
-    typeOptions = Property("QVariantList", lambda self: [{"value": "", "label": "All types"}] + [
-        {"value": k, "label": v} for k, v in EVENT_LABELS.items()], constant=True)
+    search = Property(str, lambda self: self._search, notify=filterChanged)
+    typeOptions = Property("QVariantList", lambda self: type_options(), constant=True)

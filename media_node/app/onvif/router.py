@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, HTTPException, Response
 
 from app.onvif.discovery import discover
+from app.onvif.event_analytics import analytics_topics, rule_kind
 from app.onvif.event_topics import kind_topics, offered_kinds, topics_text
 from app.onvif.events import EventClient
 from app.onvif.schemas import (ClockOut, DeviceIn, DeviceStateOut, DiscoveredDevice, DiscoverIn, EventProbeOut, NtpIn, ProbeOut,
@@ -55,8 +56,14 @@ async def events_probe(body: DeviceIn):
     async with device(body) as dev:
         await dev.clock()
         offered = await EventClient(dev).properties()
-        return EventProbeOut(offered=offered_kinds(offered), topics=topics_text(kind_topics(offered)),
-                             all_topics=sorted(t.path for t in offered))
+        analytics = analytics_topics([t.path for t in offered])
+        rules = await dev.analytics_rules() if analytics else []
+        return EventProbeOut(
+            offered=offered_kinds(offered),
+            topics=topics_text({**kind_topics(offered), **analytics}),
+            all_topics=sorted(t.path for t in offered),
+            analytics=[{"kind": k, "topics": paths, "rules": [r for r in rules if rule_kind(r["type"] or r["name"]) == k]}
+                       for k, paths in analytics.items()])
 
 
 @router.post("/profile-g/probe", response_model=ProfileGProbeOut,

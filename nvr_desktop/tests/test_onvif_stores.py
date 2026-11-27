@@ -295,3 +295,41 @@ def test_camera_events_without_onvif_host(setup):
     detail.cameraId = 1
     detail.refresh()
     assert detail.events["hasHost"] is False
+
+
+def test_camera_events_tab_analytics_rows_and_rules(setup):
+    """docs/ONVIF_ANALYTICS_EVENTS_PLAN.md §8: offered analytics first with the camera's rules; the rest folded."""
+    _, ctx, _, _ = setup
+    status = {"offered": ["motion", "line_crossing", "intrusion"],
+              "analytics": [{"kind": "line_crossing", "rules": [{"name": "Gate line", "type": "tt:LineDetector"}]}]}
+    _loads(ctx, _cam(onvif_events_status=status))
+    detail = CameraDetailStore(ctx)
+    detail.cameraId = 1
+    detail.refresh()
+    ev = detail.events
+    assert [r["kind"] for r in ev["analyticsRows"]] == ["line_crossing", "intrusion"]
+    assert ev["analyticsRows"][0]["rules"] == "Rules: Gate line" and ev["analyticsRows"][1]["rules"] == ""
+    assert len(ev["otherAnalyticsRows"]) == 6 and ev["otherAnalyticsTitle"] == "Not offered by this camera"
+    assert ev["analyticsNote"] == "" and not any(r["on"] for r in ev["analyticsRows"])  # off until chosen
+    detail.setEventsEnabled(True)
+    detail.setEventKind("line_crossing", True)
+    ctx.central.update_camera.return_value = Mock(to_qml=lambda: _cam())
+    detail.saveEvents()
+    assert ctx.central.update_camera.call_args[0][1]["onvif_event_kinds"] == [
+        "motion", "tamper", "digital_input", "line_crossing"]
+    # a Detect's rules win over the saved status
+    ctx.central.probe_camera_events.return_value = Mock(to_qml=lambda: {
+        "all_topics": [], "analytics": [{"kind": "intrusion", "rules": [{"name": "Parking"}]}]})
+    detail.detectEvents()
+    assert detail.events["analyticsRows"][1]["rules"] == "Rules: Parking"
+
+
+def test_camera_events_tab_analytics_before_detect(setup):
+    _, ctx, _, _ = setup
+    _loads(ctx, _cam(onvif_events_status=None))
+    detail = CameraDetailStore(ctx)
+    detail.cameraId = 1
+    detail.refresh()
+    ev = detail.events
+    assert ev["analyticsRows"] == [] and ev["analyticsNote"].startswith("Press Detect")
+    assert ev["otherAnalyticsTitle"] == "All analytics kinds" and len(ev["otherAnalyticsRows"]) == 8

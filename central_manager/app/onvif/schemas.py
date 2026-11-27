@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
+from app.cameras.schemas import OnvifEventKind
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -156,18 +157,32 @@ class MessageOut(BaseModel):
 
 
 # ------------------------------------------------------------------ camera events (docs/ONVIF_EVENTS_PLAN.md)
+class AnalyticsRuleOut(BaseModel):
+    name: str
+    type: str | None = None
+
+
+class AnalyticsKindOut(BaseModel):
+    """docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A7: an analytics kind the camera offers and its configured rules."""
+
+    kind: str
+    topics: list[str] = []
+    rules: list[AnalyticsRuleOut] = []
+
+
 class EventProbeOut(BaseModel):
     camera_id: int
-    offered: list[str]  # kinds the camera offers: motion | tamper | digital_input
-    topics: dict[str, str]  # kind -> the topic camera events use
+    offered: list[str]  # kinds the camera offers: motion | tamper | digital_input, then analytics kinds
+    topics: dict[str, str]  # kind -> the topic(s) camera events use
     all_topics: list[str]  # every topic the camera lists
+    analytics: list[AnalyticsKindOut] = []  # analytics kinds offered + the camera's rules (read-only)
 
 
 class EventsApplyIn(BaseModel):
     """Switch camera events for many cameras: listed ones, a group (optionally with sub-groups), or both."""
 
     enabled: bool
-    kinds: list[Literal["motion", "tamper", "digital_input"]] | None = None  # null = all kinds
+    kinds: list[OnvifEventKind] | None = None  # null = the basic kinds (analytics are opt-in)
     store_other: bool | None = None  # leave out = unchanged
     camera_ids: list[int] = Field(default_factory=list, max_length=10000)
     group_id: int | None = None

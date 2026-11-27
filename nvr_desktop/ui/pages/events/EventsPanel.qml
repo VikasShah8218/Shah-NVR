@@ -28,9 +28,17 @@ Card {
         AppText { text: "Events"; font.weight: Font.Medium }
         Spinner { visible: Events.loading; size: 14 }
         Item { Layout.fillWidth: true }
+        AppInput {
+            objectName: "eventSearch"
+            implicitWidth: 180
+            placeholderText: "Search rule, object…"
+            maximumLength: 64
+            text: Events.search
+            onTextEdited: Events.setSearch(text)
+        }
         AppSelect {
             objectName: "eventTypeFilter"
-            implicitWidth: 160
+            implicitWidth: 180
             options: Events.typeOptions
             value: Events.type
             onPicked: v => Events.setType(v)
@@ -46,7 +54,7 @@ Card {
     ErrorState { text: Events.error }
     AppText {
         visible: Events.error === "" && Events.rows.length === 0
-        text: Events.type !== "" ? "No events of this type."
+        text: Events.type !== "" || Events.search !== "" ? "No matching events."
             : "No events yet. Use “Mark event”, or wait for a camera event (e.g. video loss)."
         variant: "muted"
     }
@@ -111,6 +119,7 @@ Card {
                         AppText { text: row.modelData.source; variant: "small"; elide: Text.ElideRight; Layout.maximumWidth: 200 }
                     }
                     AppText { text: row.modelData.title; wrapMode: Text.WordWrap; elide: Text.ElideNone; Layout.fillWidth: true }
+                    AppText { visible: (row.modelData.details ?? "") !== ""; text: row.modelData.details ?? ""; variant: "small"; Layout.fillWidth: true }
                 }
                 AppButton {
                     visible: Auth.allowed["4"] === true && row.modelData.ongoing

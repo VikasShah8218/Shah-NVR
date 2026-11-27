@@ -173,3 +173,30 @@ def test_event_standby_is_not_an_alert():
         assert c.get(f"/api/v1/cameras/{cam['id']}").json()["streams"][0]["status"] == "EVENT_STANDBY"
         alerts = c.get("/api/v1/cluster/alerts").json()
         assert not [a for a in alerts["items"] if a["camera_id"] == cam["id"]]
+
+
+def test_list_search_and_type_groups():
+    """docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A9: q = label contains (any case), group = camera / analytics / operator."""
+    with _client() as c:
+        cam = _camera(c, "Gate")
+        node = _node(c)
+        _assign(c, cam["id"], node)
+        t = "2026-11-26T10:00:00Z"
+        items = [{"key": f"k{i}", "camera_id": cam["id"], "type": typ, "start_time": t, "end_time": t, "label": label}
+                 for i, (typ, label) in enumerate([("line_crossing", "Line crossing · Gate line · person"),
+                                                   ("intrusion", "Intrusion · Parking · vehicle"),
+                                                   ("motion", None), ("line_crossing", "Line crossing · Back door")])]
+        assert c.post(f"/internal/v1/nodes/{node}/events", json={"items": items}).status_code == 200
+        c.post(f"/api/v1/cameras/{cam['id']}/events", json={"type": "manual", "label": "Guard saw a gate person"})
+
+        def labels(**params):
+            return sorted((e["type"], e["label"]) for e in c.get("/api/v1/events", params=params).json()["items"])
+
+        assert labels(q="GATE LINE") == [("line_crossing", "Line crossing · Gate line · person")]
+        assert [t for t, _ in labels(group="analytics")] == ["intrusion", "line_crossing", "line_crossing"]
+        assert labels(group="camera") == [("motion", None)]
+        assert labels(group="operator", q="gate") == [("manual", "Guard saw a gate person")]
+        assert labels(group="analytics", q="gate", type="line_crossing") == [
+            ("line_crossing", "Line crossing · Gate line · person")]
+        assert c.get("/api/v1/events", params={"q": "x" * 65}).status_code == 422
+        assert c.get("/api/v1/events", params={"group": "bogus"}).status_code == 422

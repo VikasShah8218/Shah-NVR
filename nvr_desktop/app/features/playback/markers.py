@@ -47,9 +47,22 @@ def bookmark_marker(b: dict) -> dict:
 # Colours of event types (same as nvr_client markers.ts); unknown types are grey.
 # same values as nvr_client/src/features/playback/markers.ts; camera events (ONVIF): motion, tamper, input, other
 EVENT_COLORS = {"manual": "#3b82f6", "api": "#8b5cf6", "video_loss": "#ef4444", "motion": "#f59e0b",
-                "tamper": "#f97316", "digital_input": "#14b8a6", "onvif": "#94a3b8"}
+                "tamper": "#f97316", "digital_input": "#14b8a6", "onvif": "#94a3b8",
+                # camera analytics (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md §1)
+                "line_crossing": "#d946ef", "intrusion": "#e11d48", "loitering": "#0ea5e9", "object_left": "#84cc16",
+                "person": "#22c55e", "face": "#ec4899", "counting": "#64748b", "audio_alarm": "#eab308"}
 EVENT_LABELS = {"manual": "Marked", "api": "External", "video_loss": "Video loss", "motion": "Motion",
-                "tamper": "Tamper", "digital_input": "Input", "onvif": "Camera event"}
+                "tamper": "Tamper", "digital_input": "Input", "onvif": "Camera event",
+                "line_crossing": "Line crossing", "intrusion": "Intrusion", "loitering": "Loitering",
+                "object_left": "Object left", "person": "Person", "face": "Face", "counting": "People counting",
+                "audio_alarm": "Audio alarm"}
+# Groups of the Events type filter (central `group=`), same as the web
+EVENT_TYPE_GROUPS = (
+    ("camera", "Camera", ("motion", "tamper", "digital_input", "video_loss", "onvif")),
+    ("analytics", "Analytics", ("line_crossing", "intrusion", "loitering", "object_left", "person", "face", "counting",
+                                "audio_alarm")),
+    ("operator", "Operator", ("manual", "api")),
+)
 UNKNOWN_COLOR = "#94a3b8"
 
 
@@ -64,12 +77,21 @@ def event_type_label(type_: str) -> str:
     return text[:1].upper() + text[1:]
 
 
+def event_text(e: dict) -> str:
+    """'Line crossing · Gate line ×3' (analytics labels already start with their type title), 'Marked: Gate open'."""
+    title = event_type_label(e["type"])
+    label = e.get("label")
+    if not label:
+        return title
+    return label if label.startswith(title) else f"{title}: {label}"
+
+
 def event_marker(e: dict, now_ms: float) -> dict:
     """Event (from the API) -> timeline marker: a moment is a pin, a range a band, an open event runs to now.
     A click plays from `seek_t` (the camera's pre-event seconds before the start)."""
     t = to_ms(e["start_time"])
     end = to_ms(e["end_time"]) if e.get("end_time") else now_ms
-    label = event_type_label(e["type"]) + (f": {e['label']}" if e.get("label") else "") + ("" if e.get("end_time") else " (ongoing)")
+    label = event_text(e) + ("" if e.get("end_time") else " (ongoing)")
     return {
         "id": f"event-{e['id']}",
         "t": t,

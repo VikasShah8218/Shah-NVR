@@ -16,6 +16,12 @@ Camera events (ONVIF PullPoint, docs/ONVIF_EVENTS_PLAN.md §9) copy the cameras 
     sim-3, 6, 9...  "isin"  tns1:RuleEngine/CellMotionDetector/Motion (IsMotion); refuses "//." filters (Q5)
 All have tamper and one digital input. Fire them from a browser or curl (GET on the camera's ONVIF address):
     http://127.0.0.2:8655/sim/motion/on   .../motion/off   .../tamper/on|off   .../input/on|off
+
+Camera analytics (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md §6) on "isin" (standard rule engine, rule names in the Source)
+and "tyco" (Pro4: one ObjectTrackingAlarm topic, the kind in RuleType; FaceAlarm, AudioAlert, PersonTrackingAlarm):
+    .../sim/line/on   (a crossing: a new ObjectId / a pulse)   .../intrusion/on|off   .../loiter/on|off
+    .../object/on|off   .../person/on|off   .../face/on   .../count/on   .../audio/on (tyco)
+    .../sim/line/burst?n=50   (50 crossings at once: the flood control)
 """
 
 import argparse
@@ -56,6 +62,24 @@ VENDORS = {
              "tamper": ("tns1:RuleEngine/TamperDetector/Tamper", "IsTamper", "true", "false"),
              "input": ("tns1:Device/Trigger/DigitalInput", "LogicalState", "true", "false")},
 }
+# analytics name -> (topic, item, rule name, read: state | value)  (ISIN-B05M031-N, shah-ho-1 2026-11-26)
+ISIN_ANALYTICS = {
+    "line": ("tns1:RuleEngine/LineDetector/Crossed", "ObjectId", "Gate line", "value"),
+    "intrusion": ("tns1:RuleEngine/FieldDetector/ObjectsInside", "IsInside", "Parking", "state"),
+    "loiter": ("tns1:RuleEngine/LoiteringDetector/Loitering", "IsLoitering", "Entrance", "state"),
+    "object": ("tns1:RuleEngine/ObjectDetector/Object", "IsLeft", "Lobby", "state"),
+    "person": ("tns1:RuleEngine/HumanDetector/Human", "IsHuman", "MyHumanDetectorRule", "state"),
+    "face": ("tns1:RuleEngine/FaceDetector/Face", "IsFace", "MyFaceDetectorRule", "state"),
+    "count": ("tns1:RuleEngine/CounterDetector/Counter", "IsCounter", "MyCounterDetectorRule", "state"),
+}
+# Pro4: ObjectTrackingAlarm RuleType per analytics name (the strings are a guess until a Pro4 capture)
+TYCO_TRACK = "tns1:VideoSource/ObjectTrackingAlarm"
+TYCO_RULES = {"line": ("LineCrossing", "Gate line"), "intrusion": ("Intrusion", "Parking"),
+              "loiter": ("Loitering", "Entrance"), "object": ("AbandonedObject", "Lobby"),
+              "person": ("PersonDetection", "Yard")}
+TYCO_OTHER = {"face": "tns1:VideoSource/FaceAlarm", "audio": "tns1:AudioSource/AudioAlert",
+              "count": "tns1:VideoSource/PersonTrackingAlarm"}
+ANALYTICS = {"isin": tuple(ISIN_ANALYTICS), "tyco": tuple(TYCO_RULES) + tuple(TYCO_OTHER)}
 NOISE = [("tns1:Monitoring/HealthMonitor", "Status", "OK"),  # resent unchanged (tyco: lab Q7)
          ("tns1:PTZController/PTZPosition", "Position", "0.1,0.2,0")]  # position stream (lab Q8)
 
@@ -89,6 +113,9 @@ class Camera:
         self.subs: dict[str, dict] = {}  # id -> {queue, expires, topics (filter) or None}
         self.cond = threading.Condition()
         self.next_sub = 0
+        self.analytics = {a: False for a in ANALYTICS.get(self.vendor, ())}
+        self.object_id = 0
+        self.counts = [0, 0]  # people in / out
 
     # ---------------------------------------------------------------- events
     def utc(self, ago: float = 0.0) -> str:
@@ -103,6 +130,52 @@ class Camera:
                 f'<tt:Source>{source}</tt:Source><tt:Data><tt:SimpleItem Name="{item}" Value="{value}"/></tt:Data>'
                 "</tt:Message></wsnt:Message></wsnt:NotificationMessage>")
 
+    def amessage(self, topic: str, op: str | None, source: dict, data: dict) -> str:
+        """A message with several items (analytics)."""
+        items = lambda d: "".join(f'<tt:SimpleItem Name="{k}" Value="{v}"/>' for k, v in d.items())  # noqa: E731
+        op_attr = f' PropertyOperation="{op}"' if op else ""
+        return (f'<wsnt:NotificationMessage><wsnt:Topic Dialect="http://www.onvif.org/ver10/tev/topicExpression/'
+                f'ConcreteSet">{topic}</wsnt:Topic><wsnt:Message><tt:Message UtcTime="{self.utc()}"{op_attr}>'
+                f'<tt:Source>{items(source)}</tt:Source><tt:Data>{items(data)}</tt:Data>'
+                "</tt:Message></wsnt:Message></wsnt:NotificationMessage>")
+
+    def isin_analytic(self, name: str, op: str) -> tuple[str, str]:
+        topic, item, rule, read = ISIN_ANALYTICS[name]
+        src = {"VideoSourceConfigurationToken": "VideoSource", "VideoAnalyticsConfigurationToken": "VideoAnalyticsToken",
+               "Rule": rule}
+        value = str(self.object_id) if read == "value" else ("true" if self.analytics[name] else "false")
+        return topic, self.amessage(topic, op, src, {item: value})
+
+    def trigger_analytic(self, name: str, on: bool) -> str:
+        """An analytics detection (on: for moments, one detection)."""
+        if self.vendor == "isin":
+            if ISIN_ANALYTICS[name][3] == "value":
+                if not on:
+                    return f"sim-{self.index}: {name} is a moment, use /on"
+                self.object_id += 1
+            else:
+                self.analytics[name] = on
+            self.push(*self.isin_analytic(name, "Changed"))
+        elif name in TYCO_RULES:
+            rule_type, rule = TYCO_RULES[name]
+            self.object_id += 1 if on else 0
+            self.push(TYCO_TRACK, self.amessage(TYCO_TRACK, None, {"Source": "VideoSource"}, {
+                "RuleType": rule_type, "RuleName": rule, "ObjectClass": "Person" if name != "object" else "Bag",
+                "Confidence": "0.87", "Direction": "LeftToRight", "State": "true" if on else "false",
+                "TrackingId": str(self.object_id), "BoundingBoxes": "0.10,0.20,0.30,0.60"}))
+        elif name == "count":
+            self.counts[0] += 1
+            topic = TYCO_OTHER["count"]
+            self.push(topic, self.amessage(topic, "Changed", {}, {"InCount": self.counts[0], "OutCount": self.counts[1],
+                                                                   "NetCount": self.counts[0] - self.counts[1]}))
+        else:
+            topic = TYCO_OTHER[name]
+            data = {"State": "true" if on else "false"}
+            if name == "audio":
+                data.update(RuleType="GlassBreak", RuleName="Window", Confidence="91")
+            self.push(topic, self.amessage(topic, None, {"Source": "VideoSource"}, data))
+        return f"sim-{self.index} ({self.vendor}): {name} {'on' if on else 'off'}, {len(self.subs)} subscription(s)"
+
     def push(self, topic: str, xml: str) -> None:
         with self.cond:
             for sub in self.subs.values():
@@ -112,8 +185,11 @@ class Camera:
 
     def initialized(self) -> list[str]:
         ago = 30 * 86400 if self.vendor == "axis" else 0  # AXIS: the time the state last changed (lab Q6)
-        return [self.message(t, "Initialized", item, on if self.state[k] else off, ago)
-                for k, (t, item, on, off) in VENDORS[self.vendor].items()]
+        out = [self.message(t, "Initialized", item, on if self.state[k] else off, ago)
+               for k, (t, item, on, off) in VENDORS[self.vendor].items()]
+        if self.vendor == "isin":  # every rule's state, like the real ISIN
+            out += [self.isin_analytic(a, "Initialized")[1] for a in ISIN_ANALYTICS]
+        return out
 
     def trigger(self, kind: str, on: bool) -> str:
         t, item, v_on, v_off = VENDORS[self.vendor][kind]
@@ -143,6 +219,10 @@ class Camera:
                 xml = f"<{prefix}:{p_}>{xml}</{prefix}:{p_}>"
             return xml
         topics = [(t, item) for t, item, *_ in VENDORS[self.vendor].values()] + [(t, i) for t, i, _ in NOISE]
+        if self.vendor == "isin":
+            topics += [(t, item) for t, item, *_ in ISIN_ANALYTICS.values()]
+        elif self.vendor == "tyco":
+            topics += [(TYCO_TRACK, "RuleType"), *[(t, "State") for t in TYCO_OTHER.values()]]
         return "".join(leaf(t, i) for t, i in topics)
 
     def events(self, action: str, req: ET.Element, path: str) -> bytes | None:
@@ -243,6 +323,12 @@ class Camera:
         if action == "GetSnapshotUri":
             return envelope(f"<trt:GetSnapshotUriResponse><trt:MediaUri><tt:Uri>http://{a.ip}:{a.args.http_port}/snapshot.jpg"
                             "</tt:Uri></trt:MediaUri></trt:GetSnapshotUriResponse>")
+        if action == "GetVideoAnalyticsConfigurations" and a.vendor == "isin":  # the configured rules (analytics A7)
+            rules = "".join(f'<tt:Rule Name="{rule}" Type="tt:{t.split("/")[1]}"/>' for t, _i, rule, _r in ISIN_ANALYTICS.values())
+            return envelope('<trt:GetVideoAnalyticsConfigurationsResponse><trt:Configurations token="VideoAnalyticsToken">'
+                            "<tt:Name>VideoAnalyticsName</tt:Name><tt:RuleEngineConfiguration>"
+                            f"{rules}</tt:RuleEngineConfiguration></trt:Configurations>"
+                            "</trt:GetVideoAnalyticsConfigurationsResponse>")
         if action == "GetNTP":
             manual = "".join(f"<tt:NTPManual><tt:Type>DNS</tt:Type><tt:DNSname>{s}</tt:DNSname></tt:NTPManual>" for s in a.ntp_servers)
             return envelope(f"<tds:GetNTPResponse><tds:NTPInformation><tt:FromDHCP>{str(a.ntp_dhcp).lower()}</tt:FromDHCP>"
@@ -307,6 +393,18 @@ def make_handler(cam: Camera):
             parts = self.path.strip("/").split("/")
             if len(parts) == 3 and parts[0] == "sim" and parts[1] in cam.state and parts[2] in ("on", "off"):
                 text = cam.trigger(parts[1], parts[2] == "on")
+                print(f"  {text}")
+                return self._send(200, text.encode(), "text/plain")
+            url = urlsplit(self.path)
+            parts = url.path.strip("/").split("/")
+            if len(parts) == 3 and parts[0] == "sim" and parts[1] in cam.analytics and parts[2] in ("on", "off", "burst"):
+                if parts[2] == "burst":
+                    n = min(int((parse_qs(url.query).get("n") or ["50"])[0]), 1000)
+                    for _ in range(n):
+                        cam.trigger_analytic(parts[1], True)
+                    text = f"sim-{cam.index}: {n} x {parts[1]}"
+                else:
+                    text = cam.trigger_analytic(parts[1], parts[2] == "on")
                 print(f"  {text}")
                 return self._send(200, text.encode(), "text/plain")
             if self.path != "/snapshot.jpg":

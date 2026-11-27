@@ -319,6 +319,10 @@ Item {
             QMetaObject.invokeMethod(events_dialog, "openForGroup", _Q_ARG("QVariant", 7), _Q_ARG("QVariant", "Anantnag"))
             settle()
             assert "Include sub-groups" in texts() and "Digital inputs" in texts(), texts()
+            assert any(t.startswith("Analytics (off)") for t in texts()), texts()
+            events_dialog.setProperty("analyticsOpen", True)
+            settle()
+            assert "Line crossing" in texts() and "Audio alarm" in texts(), texts()
             assert window.grabWindow().save(str(output / "groups-camera-events.png"))
             QTest.keyClick(window, Qt.Key.Key_Escape)
             settle()
@@ -353,12 +357,14 @@ Item {
             page.setProperty("tab", "events")
             detail._apply_camera(1, {**camera, "onvif_host": "192.168.1.241", "onvif_events_enabled": True,
                                      "onvif_event_kinds": ["motion", "tamper"], "onvif_events_store_other": False,
-                                     "onvif_events_status": {"state": "ok", "offered": ["motion", "digital_input"],
+                                     "onvif_events_status": {"state": "ok", "offered": ["motion", "digital_input", "line_crossing"],
                                                              "topics": {"motion": "tns1:VideoSource/MotionAlarm"},
                                                              "since": "2026-11-24T10:00:00Z"}})
             detail._events_all_topics = ["tns1:Device/Trigger/DigitalInput", "tns1:VideoSource/MotionAlarm"]
+            detail._events_analytics = [{"kind": "line_crossing", "rules": [{"name": "Gate line"}]}]
             detail.eventsChanged.emit()
             settle()
+            assert "ANALYTICS" in texts() and "Rules: Gate line" in texts() and "Line crossing" in texts(), texts()
             assert "Receiving events; none yet. Tamper not offered by the camera." in texts(), texts()
             assert "Not offered by this camera" in texts() and "tns1:VideoSource/MotionAlarm" in texts(), texts()
             save_events = window.findChild(QObject, "saveCameraEvents")

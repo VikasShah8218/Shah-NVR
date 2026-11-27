@@ -64,3 +64,25 @@ def test_apply_body():
         "enabled": True, "kinds": None, "group_id": 7, "include_subgroups": False}
     assert ce.apply_body(False, ["tamper"], camera_ids=[1, 2]) == {
         "enabled": False, "kinds": ["tamper"], "camera_ids": [1, 2], "include_subgroups": False}
+
+
+# ---------------------------------------------------------------- analytics (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md §8)
+
+
+def test_analytics_kinds_are_opt_in():
+    assert ce.saved_kinds({"onvif_event_kinds": None}) == ["motion", "tamper", "digital_input"]
+    assert ce.saved_kinds({"onvif_event_kinds": ["line_crossing", "motion", "bogus"]}) == ["motion", "line_crossing"]
+    assert ce.kinds_body(["motion", "tamper", "digital_input"]) is None
+    assert ce.kinds_body(["motion", "tamper", "digital_input", "face"]) == ["motion", "tamper", "digital_input", "face"]
+    assert ce.with_kind(["audio_alarm", "motion"], "intrusion", True) == ["motion", "intrusion", "audio_alarm"]
+    form = {"enabled": True, "kinds": ["line_crossing"], "storeOther": False}
+    assert ce.body_from_form(form)["onvif_event_kinds"] == ["line_crossing"]
+    assert ce.apply_body(True, ["motion", "counting"], [3])["kinds"] == ["motion", "counting"]
+    assert ce.kind_title("audio_alarm") == "Audio alarm"
+
+
+def test_status_line_busy():
+    line = ce.status_line(True, ["line_crossing"], {"state": "ok", "offered": ["line_crossing"],
+                                                     "detail": "busy: 4 analytics event(s) not stored (over 30 a minute)"},
+                          lambda _s: "now")
+    assert line["tone"] == "warning" and "busy: 4" in line["text"]

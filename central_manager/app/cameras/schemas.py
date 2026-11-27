@@ -6,8 +6,10 @@ from pydantic import BaseModel, Field, field_validator
 from app.cameras.models import StreamStatus
 
 
-# Camera events from ONVIF (docs/ONVIF_EVENTS_PLAN.md)
-OnvifEventKind = Literal["motion", "tamper", "digital_input"]
+# Camera events from ONVIF (docs/ONVIF_EVENTS_PLAN.md). The analytics kinds are opt-in: null = the three basic kinds
+# (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A5).
+OnvifEventKind = Literal["motion", "tamper", "digital_input", "line_crossing", "intrusion", "loitering", "object_left",
+                         "person", "face", "counting", "audio_alarm"]
 
 
 class StreamIn(BaseModel):
@@ -105,7 +107,7 @@ class CameraUpdate(BaseModel):
     event_post_seconds: int | None = Field(default=None, ge=0, le=600)
     event_marking: bool | None = None
     onvif_events_enabled: bool | None = None  # leave out = unchanged
-    onvif_event_kinds: list[OnvifEventKind] | None = None  # send null = all kinds
+    onvif_event_kinds: list[OnvifEventKind] | None = None  # send null = the basic kinds (motion, tamper, inputs)
     onvif_events_store_other: bool | None = None
 
 

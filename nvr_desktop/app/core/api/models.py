@@ -214,6 +214,7 @@ class CameraEventsProbe(ApiModel):
     offered: list[str] = []
     topics: dict[str, str] = {}
     all_topics: list[str] = []
+    analytics: list[dict] = []  # [{kind, topics, rules: [{name, type}]}] (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A7)
 
 
 class OnvifClock(ApiModel):

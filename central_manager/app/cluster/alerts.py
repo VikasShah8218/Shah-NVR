@@ -112,6 +112,11 @@ async def camera_alerts() -> list[AlertOut]:
     for c in await Camera.filter(enabled=True, onvif_events_enabled=True, id__in=assigned,
                                  onvif_events_status__not_isnull=True):
         state = (c.onvif_events_status or {}).get("state")
+        detail = (c.onvif_events_status or {}).get("detail") or ""
+        if state == "ok" and detail.startswith("busy"):  # analytics over the per-minute cap (analytics plan A4)
+            alerts.append(AlertOut(level="warning", kind="camera_events", title=f"{c.name}: camera analytics busy",
+                                   detail=detail[:300] + " - narrow the camera's rules or switch noisy kinds off",
+                                   camera_id=c.id, camera_name=c.name))
         if state in _EVENT_PROBLEMS:
             alerts.append(AlertOut(level="warning", kind="camera_events", title=f"{c.name}: {_EVENT_PROBLEMS[state]}",
                                    detail=_EVENT_HINTS[state], since=(c.onvif_events_status or {}).get("since"),

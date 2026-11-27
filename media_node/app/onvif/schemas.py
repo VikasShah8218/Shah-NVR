@@ -132,6 +132,24 @@ class ProfileGProbeOut(BaseModel):
 class EventProbeOut(BaseModel):
     """What camera events a device offers (docs/ONVIF_EVENTS_PLAN.md §5.5)."""
 
-    offered: list[str]  # kinds: motion | tamper | digital_input
-    topics: dict[str, str]  # kind -> the topic camera events would use
+    offered: list[str]  # kinds: motion | tamper | digital_input, then the analytics kinds
+    topics: dict[str, str]  # kind -> the topic(s) camera events would use
     all_topics: list[str]  # every topic the camera lists
+    analytics: list["AnalyticsKindOut"] = []  # analytics kinds offered, with the camera's rules for each
+
+
+class AnalyticsRuleOut(BaseModel):
+    name: str
+    type: str | None = None
+
+
+class AnalyticsKindOut(BaseModel):
+    """One analytics kind the camera offers (docs/ONVIF_ANALYTICS_EVENTS_PLAN.md A7); rules = the configured ones that
+    report it (read-only: set up in the camera's web page)."""
+
+    kind: str
+    topics: list[str]
+    rules: list[AnalyticsRuleOut] = []
+
+
+EventProbeOut.model_rebuild()
